@@ -1,31 +1,33 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
-import { useFonts } from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from "react";
+import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
-    // Add custom fonts here if needed
-    // 'CustomFont': require('../assets/fonts/CustomFont.ttf'),
+    'SFProBold': require("@assets/fonts/SF-Pro-Rounded-Bold.otf"),
+    'SFProSB': require("@assets/fonts/SF-Pro-Rounded-Semibold.otf"),
+    'SFProMedium': require("@assets/fonts/SF-Pro-Rounded-Medium.otf"),
+    'SFProReg': require("@assets/fonts/SF-Pro-Rounded-Regular.otf"),
+    'SFProLight': require("@assets/fonts/SF-Pro-Rounded-Light.otf"),
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  // Handle font loading errors
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
+  // Hide splash when fonts are ready
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
 
-  if (!loaded) {
-    return null;
-  }
+  if (!loaded) return null;
 
   return (
     <Stack
@@ -33,30 +35,30 @@ export default function RootLayout() {
         headerShown: false,
       }}
     >
-      <Stack.Screen 
-        name="index" 
+      <Stack.Screen
+        name="index"
         options={{
           headerShown: false,
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="welcome" 
+      <Stack.Screen
+        name="welcome"
         options={{
           headerShown: false,
           gestureEnabled: false,
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="(auth)" 
+      <Stack.Screen
+        name="(auth)"
         options={{
           headerShown: false,
-        }} 
+        }}
       />
-      <Stack.Screen 
-        name="(tabs)" 
+      <Stack.Screen
+        name="(tabs)"
         options={{
           headerShown: false,
-        }} 
+        }}
       />
     </Stack>
   );

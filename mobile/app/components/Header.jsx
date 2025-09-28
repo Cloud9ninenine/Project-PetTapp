@@ -48,14 +48,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     height: 100, // 🔑 uniform across app
-    paddingHorizontal: 15,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingBottom: 20,
+    paddingTop: 50,
+    gap: 13,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
+
+
+
   backButton: { padding: 5 },
   headerTitle: {
     fontSize: 22,

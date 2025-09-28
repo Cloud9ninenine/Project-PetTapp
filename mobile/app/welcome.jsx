@@ -13,23 +13,20 @@ import { useFonts } from 'expo-font';
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
-  // Load SF Pro Rounded Medium font
-  const [fontsLoaded] = useFonts({
-    'SF-Pro-Rounded-Medium': require('./assets/fonts/SF-Pro-Rounded-Medium.otf'),
+  const [loaded] = useFonts({
+    'SFProBold': require('./assets/fonts/SF-Pro-Rounded-Bold.otf'),
   });
 
   useEffect(() => {
-    // Auto-navigate to auth after 3 seconds
-    const timer = setTimeout(() => {
-      router.replace('/(auth)/login');
-    }, 3000);
+    if (loaded) {
+      const timer = setTimeout(() => {
+        router.replace('/(auth)/login');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [loaded]);
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!fontsLoaded) {
-    return null; // Show nothing while fonts are loading
-  }
+  if (!loaded) return null; // prevent fallback font flash
 
   return (
     <SafeAreaView style={styles.container}>
@@ -57,23 +54,22 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: 100,
-    paddingHorizontal: 0,
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 400,
-    height: 400,
-    marginBottom: -100,
+    width: 500,
+    height: 500,
+    marginBottom: -170,
   },
   appName: {
     fontSize: 72,
-    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 2,
     textAlign: 'center',
-    fontFamily: 'SF-Pro-Rounded-Medium',
+    fontFamily: 'SFProBold', // 👈 must match the key in useFonts
   },
+
 });
