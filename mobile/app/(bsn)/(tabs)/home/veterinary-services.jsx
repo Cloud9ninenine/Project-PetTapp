@@ -10,7 +10,8 @@ import {
   TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import SearchHeader from '../../components/SearchHeader';
+import { Ionicons } from '@expo/vector-icons';
+import SearchHeader from '@components/SearchHeader';
 
 export default function VeterinaryServicesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,23 +51,14 @@ export default function VeterinaryServicesScreen() {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
-    
+
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        // Full star
-        stars.push(
-          <Text key={i} style={styles.fullStar}>★</Text>
-        );
+        stars.push(<Ionicons key={i} name="star" size={12} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        // Half star (you can customize this further if needed)
-        stars.push(
-          <Text key={i} style={styles.halfStar}>★</Text>
-        );
+        stars.push(<Ionicons key={i} name="star-half" size={12} color="#FFD700" />);
       } else {
-        // Empty star
-        stars.push(
-          <Text key={i} style={styles.emptyStar}>☆</Text>
-        );
+        stars.push(<Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -244,19 +236,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 1,
-  },
-  fullStar: {
-    color: '#FFD700',
-    fontSize: 12,
-  },
-  halfStar: {
-    color: '#FFD700',
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  emptyStar: {
-    color: '#E0E0E0',
-    fontSize: 12,
   },
   ratingText: {
     fontSize: 10,

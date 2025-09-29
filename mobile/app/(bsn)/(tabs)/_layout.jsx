@@ -2,7 +2,7 @@
 import { Stack } from "expo-router";
 import { usePathname } from "expo-router";
 import { View, StyleSheet } from "react-native";
-import TabNavigator from "../components/TabNavigator";
+import TabNavigator from "@components/TabNavigator";
 
 export default function RootLayout() {
   const pathname = usePathname();

@@ -55,7 +55,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
-        name="(tabs)"
+        name="(user)"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="(bsn)"
         options={{
           headerShown: false,
         }}

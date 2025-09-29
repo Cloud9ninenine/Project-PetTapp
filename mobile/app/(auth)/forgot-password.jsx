@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,35 +9,33 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Image,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+  ImageBackground,
+} from "react-native";
+import { router } from "expo-router";
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSendCode = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+      Alert.alert("Error", "Please enter your email address");
       return;
     }
 
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    if (!email.includes("@")) {
+      Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
     setIsLoading(true);
 
-    // TODO: Implement actual forgot password logic here
     setTimeout(() => {
       setIsLoading(false);
       Alert.alert(
-        'Code Sent', 
-        'A reset code has been sent to your email address.',
-        [{ text: 'OK', onPress: () => router.back() }]
+        "Code Sent",
+        "A reset code has been sent to your email address.",
+        [{ text: "OK", onPress: () => router.back() }]
       );
     }, 1000);
   };
@@ -47,62 +45,57 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <SafeAreaView style={{ flex: 1 }}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
         <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Image 
-                source={require('@assets/images/PetTappLogoInverted.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.title}>Forgot Password</Text>
-            <Text style={styles.subtitle}>
-              Fill in your email and we'll send a link to reset your password
+          {/* Title */}
+          <Text style={styles.title}>Forgot Password</Text>
+          <Text style={styles.subtitle}>
+            Fill in your email and we'll send a link to reset your password
+          </Text>
+
+          {/* Email input */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Email Address"
+              placeholderTextColor="#999"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+          </View>
+
+          {/* Buttons */}
+          <TouchableOpacity
+            style={styles.sendCodeButton}
+            onPress={handleSendCode}
+            disabled={isLoading}
+          >
+            <Text style={styles.sendCodeButtonText}>
+              {isLoading ? "Sending..." : "Send Code"}
             </Text>
-          </View>
+          </TouchableOpacity>
 
-          {/* Form */}
-          <View style={styles.form}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            <TouchableOpacity 
-              style={styles.sendCodeButton}
-              onPress={handleSendCode}
-              disabled={isLoading}
-            >
-              <Text style={styles.sendCodeButtonText}>
-                {isLoading ? 'Sending...' : 'Send Code'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.backToLoginButton}
-              onPress={handleBackToLogin}
-            >
-              <Text style={styles.backToLoginButtonText}>Back to Login</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.backToLoginButton}
+            onPress={handleBackToLogin}
+          >
+            <Text style={styles.backToLoginButtonText}>Back to Login</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -110,89 +103,77 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
   },
-  keyboardView: {
-    flex: 1,
+  backgroundImageStyle: {
+    opacity: 0.1, // 🔹 faint paw prints
   },
+
+  keyboardView: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    justifyContent: 'center',
+    justifyContent: "center",
+    paddingHorizontal: 50,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    marginBottom: 20,
-  },
-  logo: {
-    width: 80,
-    height: 80,
-  },
+
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginBottom: 12,
+    fontSize: 40,
+    color: "#1C86FF",
+    textAlign: "center",
+    marginBottom: 8,
+    fontFamily: "SFProBold",
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 20,
+    fontSize: 19,
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 50,
     lineHeight: 20,
   },
-  form: {
-    marginBottom: 32,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
+
+  inputGroup: { marginBottom: 20 },
   label: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
-    fontWeight: '500',
+    fontSize: 18,
+    color: "#333",
+    marginBottom: 6,
+    fontFamily: "SFProSB",
   },
   input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: "#fff",
+    borderWidth: 1.5,
+    borderColor: "black",
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 14,
+    fontSize: 20,
   },
-  actions: {
-    gap: 12,
-  },
+
   sendCodeButton: {
-    backgroundColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: "#1C86FF",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 12,
   },
   sendCodeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "SFProReg",
   },
+
   backToLoginButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: "#fff",
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#000",
   },
   backToLoginButtonText: {
-    color: '#333',
+    color: "#000",
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: "SFProSB",
   },
 });

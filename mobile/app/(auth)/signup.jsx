@@ -108,7 +108,7 @@ export default function SignUpScreen() {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      router.replace("initial-setup");
+      router.replace("account-created");
     }, 1200);
   };
 
@@ -233,7 +233,6 @@ export default function SignUpScreen() {
           <TouchableOpacity
             style={[styles.confirmButton, !canSubmit && styles.disabledButton]}
             onPress={handleConfirm}
-            activeOpacity={0.7} // para may tap feedback kahit naka "disabled" look
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
@@ -289,9 +288,9 @@ const styles = StyleSheet.create({
   ...StyleSheet.absoluteFillObject,
   transform: [{ scale: 1.5 }], 
  },
+ 
   backgroundImageStyle: { opacity: 0.1 },
   
-
   keyboardView: { flex: 1 },
   content: {
     flex: 1,

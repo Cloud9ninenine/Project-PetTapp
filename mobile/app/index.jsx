@@ -23,7 +23,7 @@ export default function IndexScreen() {
       }, 1500);
       
       // If authenticated, redirect to main app:
-      // router.replace('/(tabs)');
+      // router.replace('/(user)/(tabs)');
     } catch (error) {
       // If error checking auth, redirect to welcome
       router.replace('/welcome');

@@ -10,7 +10,8 @@ import {
   Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import SearchHeader from "../../components/SearchHeader"; // ✅ import the new header
+import { Ionicons } from "@expo/vector-icons";
+import SearchHeader from "@components/SearchHeader";
 
 const { width } = Dimensions.get("window");
 
@@ -83,11 +84,11 @@ export default function HomeScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Text key={i} style={styles.fullStar}>★</Text>);
+        stars.push(<Ionicons key={i} name="star" size={12} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Text key={i} style={styles.halfStar}>★</Text>);
+        stars.push(<Ionicons key={i} name="star-half" size={12} color="#FFD700" />);
       } else {
-        stars.push(<Text key={i} style={styles.emptyStar}>☆</Text>);
+        stars.push(<Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -294,19 +295,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 1,
-  },
-  fullStar: {
-    color: "#FFD700",
-    fontSize: 12,
-  },
-  halfStar: {
-    color: "#FFD700",
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  emptyStar: {
-    color: "#E0E0E0",
-    fontSize: 12,
   },
   ratingText: {
     fontSize: 10,

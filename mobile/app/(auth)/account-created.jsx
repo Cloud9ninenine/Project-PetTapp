@@ -1,100 +1,98 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Image,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+  ImageBackground,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 
 export default function AccountCreatedScreen() {
   const handleContinueToLogin = () => {
-    router.replace('/(auth)/login');
+    router.replace("/(auth)/login");
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Image 
-              source={require('@assets/images/PetTappLogoInverted.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.title}>Account Created!</Text>
-          <Text style={styles.subtitle}>
-            Verify your account through the link sent to your email.
-          </Text>
-        </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      {/* Background with paw pattern */}
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
 
-        {/* Action Button */}
-        <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.continueButton}
-            onPress={handleContinueToLogin}
-          >
-            <Text style={styles.continueButtonText}>Continue to Login</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.content}>
+        {/* Checkmark */}
+        <Ionicons name="checkmark-circle" size={120} color="#1C86FF" style={styles.icon} />
+
+
+        {/* Title + Subtitle */}
+        <Text style={styles.title}>Account Created!</Text>
+        <Text style={styles.subtitle}>
+          Verify your account through the link sent to your email.
+        </Text>
+
+        {/* Button */}
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={handleContinueToLogin}
+        >
+          <Text style={styles.continueButtonText}>Continue to Login</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
   },
+  backgroundImageStyle: {
+    opacity: 0.1,
+  },
+
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 50,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 60,
-  },
-  logoContainer: {
-    marginBottom: 30,
-  },
-  logo: {
-    width: 100,
-    height: 100,
+
+  icon: {
+    marginBottom: 0,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginBottom: 16,
+    fontSize: 40,
+    fontFamily: "SFProBold",
+    color: "#1C86FF",
+    textAlign: "center",
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    paddingHorizontal: 20,
+    fontSize: 20,
+    fontFamily: "SFProReg",
+    color: "black",
+    textAlign: "center",
+    marginBottom: 40,
     lineHeight: 24,
   },
-  actions: {
-    width: '100%',
-  },
+
   continueButton: {
-    backgroundColor: '#1C86FF',
+    backgroundColor: "#1C86FF",
     paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
+    borderRadius: 10,
+    alignItems: "center",
+    width: "100%",
   },
   continueButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: "#fff",
+    fontSize: 18,
+    fontFamily:"SFProReg"
   },
 });

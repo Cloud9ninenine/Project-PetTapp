@@ -10,6 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
 
 const { width } = Dimensions.get('window');
@@ -64,20 +65,14 @@ export default function ServiceDetailsScreen() {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
-    
+
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(
-          <Text key={i} style={styles.fullStar}>★</Text>
-        );
+        stars.push(<Ionicons key={i} name="star" size={16} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <Text key={i} style={styles.halfStar}>★</Text>
-        );
+        stars.push(<Ionicons key={i} name="star-half" size={16} color="#FFD700" />);
       } else {
-        stars.push(
-          <Text key={i} style={styles.emptyStar}>☆</Text>
-        );
+        stars.push(<Ionicons key={i} name="star-outline" size={16} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -320,19 +315,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 1,
-  },
-  fullStar: {
-    color: '#FFD700',
-    fontSize: 16,
-  },
-  halfStar: {
-    color: '#FFD700',
-    fontSize: 16,
-    opacity: 0.6,
-  },
-  emptyStar: {
-    color: '#E0E0E0',
-    fontSize: 16,
   },
   ratingText: {
     fontSize: 14,

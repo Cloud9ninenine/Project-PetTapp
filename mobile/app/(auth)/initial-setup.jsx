@@ -1,314 +1,102 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+  ImageBackground,
+} from "react-native";
+import { router } from "expo-router";
 
 export default function InitialSetupScreen() {
-  const [selectedProfile, setSelectedProfile] = useState('petowner');
-  const [userInfo, setUserInfo] = useState({
-    firstName: '',
-    lastName: '',
-    homeAddress: '',
-    contactInformation: '',
-  });
+  const [selectedProfile, setSelectedProfile] = useState(null);
 
-  const updateUserInfo = (field, value) => {
-    setUserInfo(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleNext = () => {
-    // Validate user information
-    const { firstName, lastName, homeAddress, contactInformation } = userInfo;
-    if (!firstName || !lastName || !homeAddress || !contactInformation) {
-      Alert.alert('Error', 'Please fill in all user information fields');
-      return;
+  const handleSelect = (profile) => {
+    setSelectedProfile(profile);
+    if (profile === "petowner") {
+      router.push("/(auth)/user-information");
+    } else if (profile === "business") {
+      router.push("/(auth)/business-information");
     }
-
-    // TODO: Save user information to storage/backend
-    // Navigate to pet information page
-    router.push('/(auth)/pet-information');
-  };
-
-  const handleSkip = () => {
-    Alert.alert(
-      'Skip Setup',
-      'You can complete your profile later in settings. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip', onPress: () => router.replace('/(tabs)') }
-      ]
-    );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Initial Account Setup | Pet Owner</Text>
-            <Text style={styles.subtitle}>User Selection Page</Text>
-            <View style={styles.stepIndicator}>
-              <Text style={styles.stepTextActive}>User Information Configuration</Text>
-              <Text style={styles.stepText}>Pet Information Configuration</Text>
-            </View>
-          </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      {/* Background with paw pattern */}
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")} // paw pattern file
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
 
-          {/* Profile Selection */}
-          <View style={styles.profileSelection}>
-            <Text style={styles.sectionTitle}>Continue as</Text>
-            <Text style={styles.sectionSubtitle}>Select a user profile to continue</Text>
-            
-            <TouchableOpacity 
-              style={[
-                styles.profileButton,
-                selectedProfile === 'petowner' && styles.profileButtonActive
-              ]}
-              onPress={() => setSelectedProfile('petowner')}
-            >
-              <Text style={[
-                styles.profileButtonText,
-                selectedProfile === 'petowner' && styles.profileButtonTextActive
-              ]}>
-                Pet Owner
-              </Text>
-            </TouchableOpacity>
+      <View style={styles.content}>
+        <Text style={styles.title}>Continue as</Text>
+        <Text style={styles.subtitle}>Select a user profile to continue</Text>
 
-            <TouchableOpacity 
-              style={[
-                styles.profileButton,
-                selectedProfile === 'business' && styles.profileButtonActive
-              ]}
-              onPress={() => setSelectedProfile('business')}
-            >
-              <Text style={[
-                styles.profileButtonText,
-                selectedProfile === 'business' && styles.profileButtonTextActive
-              ]}>
-                Business
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => handleSelect("petowner")}
+        >
+          <Text style={styles.buttonText}>Pet Owner</Text>
+        </TouchableOpacity>
 
-          {/* User Information Section */}
-          <View style={styles.formSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>User Information</Text>
-              <View style={styles.addButton}>
-                <Ionicons name="add" size={24} color="#666" />
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>First Name</Text>
-              <TextInput
-                style={styles.input}
-                value={userInfo.firstName}
-                onChangeText={(value) => updateUserInfo('firstName', value)}
-                placeholder="Enter first name"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Last Name</Text>
-              <TextInput
-                style={styles.input}
-                value={userInfo.lastName}
-                onChangeText={(value) => updateUserInfo('lastName', value)}
-                placeholder="Enter last name"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Home Address</Text>
-              <TextInput
-                style={styles.input}
-                value={userInfo.homeAddress}
-                onChangeText={(value) => updateUserInfo('homeAddress', value)}
-                placeholder="Enter home address"
-                multiline={true}
-                numberOfLines={2}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contact Information</Text>
-              <TextInput
-                style={styles.input}
-                value={userInfo.contactInformation}
-                onChangeText={(value) => updateUserInfo('contactInformation', value)}
-                placeholder="Enter phone number or email"
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-              <Text style={styles.nextButtonText}>Next</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Skip Button */}
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipButtonText}>Skip</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => handleSelect("business")}
+        >
+          <Text style={styles.buttonText}>Business</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
   },
-  scrollView: {
-    flex: 1,
+  backgroundImageStyle: {
+    opacity: 0.1, // subtle paw prints like your reference
   },
+
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 40,
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 50,
   },
-  header: {
-    marginBottom: 32,
-  },
+
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 40,
+    color: "#1C86FF",
+    textAlign: "center",
+    fontFamily:"SFProBold",
+    marginBottom: -15,
   },
+  
   subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    fontSize: 16,
+    fontFamily: "SFProReg",
+    color: "black",
+    textAlign: "center",
+    marginBottom: 30,
   },
-  stepIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  stepText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  stepTextActive: {
-    fontSize: 12,
-    color: '#000',
-    fontWeight: '600',
-  },
-  profileSelection: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  profileButton: {
-    backgroundColor: '#fff',
+
+  button: {
+    backgroundColor: "#1C86FF",
     paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 12,
-    alignItems: 'center',
+    borderRadius: 10,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 28,
   },
-  profileButtonActive: {
-    backgroundColor: '#000',
-    borderColor: '#000',
-  },
-  profileButtonText: {
+
+  buttonText: {
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  profileButtonTextActive: {
-    color: '#fff',
-  },
-  formSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  addButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
-  },
-  nextButton: {
-    backgroundColor: '#000',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  nextButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  skipButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  skipButtonText: {
-    color: '#666',
-    fontSize: 14,
-    textDecorationLine: 'underline',
+    fontFamily:"SFProReg",
   },
 });

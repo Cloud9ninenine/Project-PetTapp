@@ -28,9 +28,16 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
+
     setTimeout(() => {
       setIsLoading(false);
-      router.replace("/(tabs)/home");
+
+      // 🟢 Fake condition: if email contains "new", go to setup
+      if (email.includes("new")) {
+        router.replace("/(auth)/initial-setup");
+      } else {
+        router.replace("/(user)/(tabs)/home");
+      }
     }, 1000);
   };
 
