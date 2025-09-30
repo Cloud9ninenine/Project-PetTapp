@@ -8,42 +8,26 @@ import {
   Image,
   Animated,
   Dimensions,
-  ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-export default function BookingConfirmationModal({ 
-  visible, 
-  onClose, 
-  onConfirm, 
+export default function BookingConfirmationModal({
+  visible,
+  onClose,
+  onConfirm,
   serviceName,
   serviceCategory,
-  servicePrice 
+  servicePrice
 }) {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  
-  // Calendar state
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  
-  // Time picker state
-  const [selectedHour, setSelectedHour] = useState(null);
-  const [selectedMinute, setSelectedMinute] = useState(null);
-  const [selectedPeriod, setSelectedPeriod] = useState('AM');
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-
-  const hours = Array.from({length: 12}, (_, i) => i + 1);
-  const minutes = ['00', '15', '30', '45'];
 
   React.useEffect(() => {
     if (visible) {
@@ -79,9 +63,9 @@ export default function BookingConfirmationModal({
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={14} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={14} color="#ff9b79" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={14} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star-half" size={14} color="#ff9b79" />);
       } else {
         stars.push(<Ionicons key={i} name="star-outline" size={14} color="#E0E0E0" />);
       }
@@ -90,112 +74,46 @@ export default function BookingConfirmationModal({
   };
 
   const formatDate = (date) => {
-    if (!date) return 'Select date';
-    const options = { 
-      weekday: 'short', 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    const options = {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     };
     return date.toLocaleDateString('en-US', options);
   };
 
-  const formatTime = () => {
-    if (!selectedHour || selectedMinute === null) return 'Select time';
-    return `${selectedHour}:${selectedMinute} ${selectedPeriod}`;
+  const formatTime = (time) => {
+    return time.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
-  const getDaysInMonth = (month, year) => {
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (month, year) => {
-    return new Date(year, month, 1).getDay();
-  };
-
-  const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(currentMonth, currentYear);
-    const firstDay = getFirstDayOfMonth(currentMonth, currentYear);
-    const days = [];
-    
-    // Empty cells for days before first day of month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<View key={`empty-${i}`} style={styles.emptyDay} />);
+  const handleDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
     }
-    
-    // Days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(currentYear, currentMonth, day);
-      const isToday = new Date().toDateString() === date.toDateString();
-      const isSelected = selectedDate && selectedDate.toDateString() === date.toDateString();
-      const isPastDate = date < new Date().setHours(0, 0, 0, 0);
-      
-      days.push(
-        <TouchableOpacity
-          key={day}
-          style={[
-            styles.dayButton,
-            isToday && styles.todayButton,
-            isSelected && styles.selectedDayButton,
-            isPastDate && styles.pastDayButton
-          ]}
-          onPress={() => !isPastDate && selectDate(date)}
-          disabled={isPastDate}
-        >
-          <Text style={[
-            styles.dayText,
-            isToday && styles.todayText,
-            isSelected && styles.selectedDayText,
-            isPastDate && styles.pastDayText
-          ]}>
-            {day}
-          </Text>
-        </TouchableOpacity>
-      );
+    if (date) {
+      setSelectedDate(date);
     }
-    
-    return days;
   };
 
-  const selectDate = (date) => {
-    setSelectedDate(date);
-    setShowDatePicker(false);
-  };
-
-  const selectTime = () => {
-    if (selectedHour && selectedMinute !== null) {
-      setSelectedTime(formatTime());
+  const handleTimeChange = (event, time) => {
+    if (Platform.OS === 'android') {
       setShowTimePicker(false);
+    }
+    if (time) {
+      setSelectedTime(time);
     }
   };
 
   const handleConfirm = () => {
-    if (selectedDate && selectedTime) {
-      onConfirm({ 
-        date: formatDate(selectedDate), 
-        time: selectedTime 
-      });
-    } else {
-      alert('Please select both date and time');
-    }
-  };
-
-  const changeMonth = (direction) => {
-    if (direction === 'prev') {
-      if (currentMonth === 0) {
-        setCurrentMonth(11);
-        setCurrentYear(currentYear - 1);
-      } else {
-        setCurrentMonth(currentMonth - 1);
-      }
-    } else {
-      if (currentMonth === 11) {
-        setCurrentMonth(0);
-        setCurrentYear(currentYear + 1);
-      } else {
-        setCurrentMonth(currentMonth + 1);
-      }
-    }
+    onConfirm({
+      date: formatDate(selectedDate),
+      time: formatTime(selectedTime)
+    });
   };
 
   if (!visible) return null;
@@ -214,7 +132,7 @@ export default function BookingConfirmationModal({
           onPress={onClose}
         />
         
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalContainer,
             {
@@ -223,7 +141,12 @@ export default function BookingConfirmationModal({
           ]}
         >
           <View style={styles.handleBar} />
-          
+
+          <Text style={styles.modalTitle}>Book Confirmation</Text>
+          <Text style={styles.modalSubtitle}>
+            This service will be booked to {'\n'}the selected schedule.
+          </Text>
+
           <View style={styles.serviceCard}>
             <Image source={getServiceImage()} style={styles.serviceImage} />
             <View style={styles.serviceInfo}>
@@ -252,7 +175,7 @@ export default function BookingConfirmationModal({
             <Text style={styles.inputLabel}>Time</Text>
             <TouchableOpacity style={styles.inputField} onPress={() => setShowTimePicker(true)}>
               <Text style={styles.inputText}>
-                {formatTime()}
+                {formatTime(selectedTime)}
               </Text>
               <View style={styles.dropdownIcon}>
                 <Text style={styles.dropdownIconText}>⌄</Text>
@@ -277,165 +200,26 @@ export default function BookingConfirmationModal({
         </Animated.View>
       </View>
 
-      {/* Calendar Date Picker */}
-      <Modal
-        visible={showDatePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowDatePicker(false)}
-      >
-        <View style={styles.pickerOverlay}>
-          <View style={styles.calendarContainer}>
-            <Text style={styles.pickerTitle}>Select Date</Text>
-            
-            {/* Month/Year Header */}
-            <View style={styles.calendarHeader}>
-              <TouchableOpacity onPress={() => changeMonth('prev')}>
-                <Text style={styles.navButton}>‹</Text>
-              </TouchableOpacity>
-              <Text style={styles.monthYearText}>
-                {months[currentMonth]} {currentYear}
-              </Text>
-              <TouchableOpacity onPress={() => changeMonth('next')}>
-                <Text style={styles.navButton}>›</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {/* Days of Week Header */}
-            <View style={styles.daysOfWeekContainer}>
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <Text key={day} style={styles.dayOfWeekText}>{day}</Text>
-              ))}
-            </View>
-            
-            {/* Calendar Grid */}
-            <View style={styles.calendarGrid}>
-              {renderCalendar()}
-            </View>
-            
-            <TouchableOpacity
-              style={styles.pickerCloseButton}
-              onPress={() => setShowDatePicker(false)}
-            >
-              <Text style={styles.pickerCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Native Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
 
-      {/* Time Picker */}
-      <Modal
-        visible={showTimePicker}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowTimePicker(false)}
-      >
-        <View style={styles.pickerOverlay}>
-          <View style={styles.timePickerContainer}>
-            <Text style={styles.pickerTitle}>Select Time</Text>
-            
-            <View style={styles.timePickerContent}>
-              {/* Hours */}
-              <View style={styles.timeColumn}>
-                <Text style={styles.timeColumnLabel}>Hour</Text>
-                <ScrollView style={styles.timeScrollView}>
-                  {hours.map(hour => (
-                    <TouchableOpacity
-                      key={hour}
-                      style={[
-                        styles.timeOption,
-                        selectedHour === hour && styles.selectedTimeOption
-                      ]}
-                      onPress={() => setSelectedHour(hour)}
-                    >
-                      <Text style={[
-                        styles.timeOptionText,
-                        selectedHour === hour && styles.selectedTimeText
-                      ]}>
-                        {hour}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              
-              {/* Minutes */}
-              <View style={styles.timeColumn}>
-                <Text style={styles.timeColumnLabel}>Min</Text>
-                <ScrollView style={styles.timeScrollView}>
-                  {minutes.map(minute => (
-                    <TouchableOpacity
-                      key={minute}
-                      style={[
-                        styles.timeOption,
-                        selectedMinute === minute && styles.selectedTimeOption
-                      ]}
-                      onPress={() => setSelectedMinute(minute)}
-                    >
-                      <Text style={[
-                        styles.timeOptionText,
-                        selectedMinute === minute && styles.selectedTimeText
-                      ]}>
-                        {minute}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-              
-              {/* AM/PM */}
-              <View style={styles.timeColumn}>
-                <Text style={styles.timeColumnLabel}>Period</Text>
-                <View style={styles.periodContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.periodOption,
-                      selectedPeriod === 'AM' && styles.selectedTimeOption
-                    ]}
-                    onPress={() => setSelectedPeriod('AM')}
-                  >
-                    <Text style={[
-                      styles.timeOptionText,
-                      selectedPeriod === 'AM' && styles.selectedTimeText
-                    ]}>
-                      AM
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.periodOption,
-                      selectedPeriod === 'PM' && styles.selectedTimeOption
-                    ]}
-                    onPress={() => setSelectedPeriod('PM')}
-                  >
-                    <Text style={[
-                      styles.timeOptionText,
-                      selectedPeriod === 'PM' && styles.selectedTimeText
-                    ]}>
-                      PM
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.timePickerButtons}>
-              <TouchableOpacity
-                style={styles.timeConfirmButton}
-                onPress={selectTime}
-              >
-                <Text style={styles.timeConfirmText}>Confirm</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.pickerCloseButton}
-                onPress={() => setShowTimePicker(false)}
-              >
-                <Text style={styles.pickerCloseText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Native Time Picker */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={selectedTime}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleTimeChange}
+        />
+      )}
     </Modal>
   );
 }
@@ -464,7 +248,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
     borderRadius: 2,
     alignSelf: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
     marginBottom: 20,
+    lineHeight: 20,
   },
   serviceCard: {
     flexDirection: 'row',

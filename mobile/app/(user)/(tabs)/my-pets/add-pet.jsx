@@ -1,0 +1,825 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  Alert,
+  Modal,
+  ImageBackground,
+  Image,
+  Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import Header from '@components/Header';
+
+const SPECIES_OPTIONS = [
+  { label: 'Select species', value: '' },
+  { label: 'Dog', value: 'dog' },
+  { label: 'Cat', value: 'cat' },
+  { label: 'Bird', value: 'bird' },
+  { label: 'Fish', value: 'fish' },
+  { label: 'Rabbit', value: 'rabbit' },
+  { label: 'Hamster', value: 'hamster' },
+  { label: 'Other', value: 'other' },
+];
+
+const BREED_OPTIONS_BY_SPECIES = {
+  dog: [
+    { label: 'Select breed', value: '' },
+    { label: 'Golden Retriever', value: 'golden-retriever' },
+    { label: 'Labrador', value: 'labrador' },
+    { label: 'German Shepherd', value: 'german-shepherd' },
+    { label: 'Bulldog', value: 'bulldog' },
+    { label: 'Beagle', value: 'beagle' },
+    { label: 'Poodle', value: 'poodle' },
+    { label: 'Rottweiler', value: 'rottweiler' },
+    { label: 'Yorkshire Terrier', value: 'yorkshire-terrier' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
+  cat: [
+    { label: 'Select breed', value: '' },
+    { label: 'Siamese', value: 'siamese' },
+    { label: 'Persian', value: 'persian' },
+    { label: 'Maine Coon', value: 'maine-coon' },
+    { label: 'Ragdoll', value: 'ragdoll' },
+    { label: 'Bengal', value: 'bengal' },
+    { label: 'British Shorthair', value: 'british-shorthair' },
+    { label: 'Sphynx', value: 'sphynx' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
+  bird: [
+    { label: 'Select breed', value: '' },
+    { label: 'Parrot', value: 'parrot' },
+    { label: 'Canary', value: 'canary' },
+    { label: 'Cockatiel', value: 'cockatiel' },
+    { label: 'Budgerigar', value: 'budgerigar' },
+    { label: 'Lovebird', value: 'lovebird' },
+    { label: 'Finch', value: 'finch' },
+    { label: 'Other', value: 'other' },
+  ],
+  fish: [
+    { label: 'Select breed', value: '' },
+    { label: 'Goldfish', value: 'goldfish' },
+    { label: 'Betta', value: 'betta' },
+    { label: 'Guppy', value: 'guppy' },
+    { label: 'Tetra', value: 'tetra' },
+    { label: 'Angelfish', value: 'angelfish' },
+    { label: 'Koi', value: 'koi' },
+    { label: 'Other', value: 'other' },
+  ],
+  rabbit: [
+    { label: 'Select breed', value: '' },
+    { label: 'Holland Lop', value: 'holland-lop' },
+    { label: 'Netherland Dwarf', value: 'netherland-dwarf' },
+    { label: 'Flemish Giant', value: 'flemish-giant' },
+    { label: 'Rex', value: 'rex' },
+    { label: 'Lionhead', value: 'lionhead' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
+  hamster: [
+    { label: 'Select breed', value: '' },
+    { label: 'Syrian', value: 'syrian' },
+    { label: 'Dwarf', value: 'dwarf' },
+    { label: 'Roborovski', value: 'roborovski' },
+    { label: 'Chinese', value: 'chinese' },
+    { label: 'Other', value: 'other' },
+  ],
+  other: [
+    { label: 'Select breed', value: '' },
+    { label: 'Mixed', value: 'mixed' },
+    { label: 'Unknown', value: 'unknown' },
+    { label: 'Other', value: 'other' },
+  ],
+};
+
+export default function AddPetScreen() {
+  const router = useRouter();
+  const [petInfo, setPetInfo] = useState({
+    petName: '',
+    birthday: '',
+    species: '',
+    breed: '',
+    gender: '',
+    weight: '',
+    additionalInfo: '',
+  });
+  const [petImage, setPetImage] = useState(null);
+  const [showSpeciesModal, setShowSpeciesModal] = useState(false);
+  const [showBreedModal, setShowBreedModal] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  const GENDER_OPTIONS = [
+    { label: 'Select gender', value: '' },
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' },
+  ];
+
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText} numberOfLines={1}>
+        Add New Pet
+      </Text>
+    </View>
+  );
+
+  const updatePetInfo = (field, value) => {
+    setPetInfo(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSpeciesSelect = (value, label) => {
+    updatePetInfo('species', value);
+    updatePetInfo('breed', '');
+    setShowSpeciesModal(false);
+  };
+
+  const handleBreedSelect = (value, label) => {
+    updatePetInfo('breed', value);
+    setShowBreedModal(false);
+  };
+
+  const handleGenderSelect = (value, label) => {
+    updatePetInfo('gender', value);
+    setShowGenderModal(false);
+  };
+
+  const getSpeciesLabel = () => {
+    const selected = SPECIES_OPTIONS.find(option => option.value === petInfo.species);
+    return selected ? selected.label : 'Select species';
+  };
+
+  const getBreedLabel = () => {
+    if (!petInfo.species) return 'Select species first';
+    const breedOptions = BREED_OPTIONS_BY_SPECIES[petInfo.species] || [];
+    const selected = breedOptions.find(option => option.value === petInfo.breed);
+    return selected ? selected.label : 'Select breed';
+  };
+
+  const getGenderLabel = () => {
+    const selected = GENDER_OPTIONS.find(option => option.value === petInfo.gender);
+    return selected ? selected.label : 'Select gender';
+  };
+
+  const getBreedOptions = () => {
+    return BREED_OPTIONS_BY_SPECIES[petInfo.species] || [];
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setPetImage(result.assets[0].uri);
+    }
+  };
+
+  const handleDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+
+    if (date) {
+      setSelectedDate(date);
+      const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
+      updatePetInfo('birthday', formattedDate);
+    }
+  };
+
+  const showDatePickerModal = () => {
+    setShowDatePicker(true);
+  };
+
+  const handleSave = () => {
+    const { petName, birthday, species, breed, gender, weight } = petInfo;
+    if (!petName || !birthday || !species || !breed || !gender || !weight) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+    setShowConfirmModal(true);
+  };
+
+  const confirmSave = () => {
+    setShowConfirmModal(false);
+    Alert.alert('Success', 'Pet added successfully!', [
+      { text: 'OK', onPress: () => router.back() }
+    ]);
+  };
+
+  const handleReset = () => {
+    setShowResetModal(true);
+  };
+
+  const confirmReset = () => {
+    setPetInfo({
+      petName: '',
+      birthday: '',
+      species: '',
+      breed: '',
+      gender: '',
+      weight: '',
+      additionalInfo: '',
+    });
+    setPetImage(null);
+    setShowResetModal(false);
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
+
+      <Header
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderTitle()}
+        showBack={true}
+      />
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Pet Photo Upload */}
+          <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
+            {petImage ? (
+              <Image source={{ uri: petImage }} style={styles.petImage} />
+            ) : (
+              <Ionicons name="add" size={36} color="#1C86FF" />
+            )}
+          </TouchableOpacity>
+
+          {/* Form Section */}
+          <View style={styles.formSection}>
+            {/* Pet Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Pet Name</Text>
+              <TextInput
+                style={styles.input}
+                value={petInfo.petName}
+                onChangeText={(value) => updatePetInfo('petName', value)}
+                placeholder="Enter pet name"
+              />
+            </View>
+
+            {/* Birthday */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Birthday</Text>
+              <TouchableOpacity onPress={showDatePickerModal}>
+                <View style={styles.dateInputContainer}>
+                  <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
+                    {petInfo.birthday || 'MM/DD/YYYY'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color="#666" style={styles.dateIcon} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Species */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Species</Text>
+              <TouchableOpacity
+                style={styles.dropdownButton}
+                onPress={() => setShowSpeciesModal(true)}
+              >
+                <Text style={[styles.dropdownText, !petInfo.species && styles.placeholderText]}>
+                  {getSpeciesLabel()}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Breed */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Breed</Text>
+              <TouchableOpacity
+                style={[styles.dropdownButton, !petInfo.species && styles.disabledDropdown]}
+                onPress={() => petInfo.species && setShowBreedModal(true)}
+                disabled={!petInfo.species}
+              >
+                <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
+                  {getBreedLabel()}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Sex and Weight - Side by Side */}
+            <View style={styles.rowInputGroup}>
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Sex</Text>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowGenderModal(true)}
+                >
+                  <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
+                    {getGenderLabel()}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Weight (kg)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={petInfo.weight}
+                  onChangeText={(value) => updatePetInfo('weight', value)}
+                  placeholder="Weight"
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            {/* Additional Info */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Additional Info</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={petInfo.additionalInfo}
+                onChangeText={(value) => updatePetInfo('additionalInfo', value)}
+                placeholder="Enter additional information (color, markings, etc.)"
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
+                <Text style={styles.confirmButtonText}>Add</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
+                <Text style={styles.resetButtonText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Species Modal */}
+      <Modal
+        visible={showSpeciesModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSpeciesModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSpeciesModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Species</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {SPECIES_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.modalOption}
+                  onPress={() => handleSpeciesSelect(option.value, option.label)}
+                >
+                  <Text style={styles.modalOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowSpeciesModal(false)}
+            >
+              <Text style={styles.confirmButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Breed Modal */}
+      <Modal
+        visible={showBreedModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowBreedModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowBreedModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Breed</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {getBreedOptions().map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.modalOption}
+                  onPress={() => handleBreedSelect(option.value, option.label)}
+                >
+                  <Text style={styles.modalOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowBreedModal(false)}
+            >
+              <Text style={styles.confirmButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Gender Modal */}
+      <Modal
+        visible={showGenderModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowGenderModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowGenderModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Gender</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {GENDER_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.modalOption}
+                  onPress={() => handleGenderSelect(option.value, option.label)}
+                >
+                  <Text style={styles.modalOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowGenderModal(false)}
+            >
+              <Text style={styles.confirmButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContent}>
+            <Ionicons name="checkmark-circle" size={60} color="#1C86FF" style={styles.confirmIcon} />
+            <Text style={styles.confirmModalTitle}>Confirm Add Pet</Text>
+            <Text style={styles.confirmModalText}>
+              Are you sure you want to add {petInfo.petName} to your pets list?
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButtonModal}
+                onPress={confirmSave}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reset Confirmation Modal */}
+      <Modal
+        visible={showResetModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowResetModal(false)}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <View style={styles.confirmModalContent}>
+            <Ionicons name="refresh-circle" size={60} color="#FF9B79" style={styles.confirmIcon} />
+            <Text style={styles.confirmModalTitle}>Reset Form</Text>
+            <Text style={styles.confirmModalText}>
+              Are you sure you want to reset all fields? All entered information will be cleared.
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowResetModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButtonModal, styles.resetButtonModal]}
+                onPress={confirmReset}
+              >
+                <Text style={styles.confirmButtonText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          maximumDate={new Date()}
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+  backgroundImageStyle: {
+    opacity: 0.1,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  titleText: {
+    color: '#fff',
+    fontSize: 24,
+    fontFamily: 'SFProBold',
+    textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 30,
+    paddingTop: 30,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  addCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  petImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 50,
+  },
+  formSection: {
+    width: '100%',
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  rowInputGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  halfInput: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 16,
+    color: 'black',
+    marginBottom: 6,
+    fontFamily: 'SFProSB',
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+  },
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    borderRadius: 10,
+  },
+  dateInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    color: '#333',
+  },
+  placeholderTextInput: {
+    color: '#999',
+  },
+  dateIcon: {
+    paddingHorizontal: 12,
+  },
+  dropdownButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dropdownText: {
+    fontSize: 16,
+    color: '#333',
+    fontFamily: 'SFProReg',
+  },
+  placeholderText: {
+    color: '#999',
+  },
+  disabledDropdown: {
+    opacity: 0.5,
+  },
+  textArea: {
+    minHeight: 80,
+    paddingTop: 12,
+  },
+  buttonContainer: {
+    flexDirection: 'column',
+    gap: 12,
+    marginTop: 10,
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#1C86FF',
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    fontWeight: '600',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: '#1C86FF',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'SFProBold',
+    color: '#1C86FF',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    color: '#333',
+  },
+  modalCloseButton: {
+    backgroundColor: '#1C86FF',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 30,
+    width: '90%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  confirmIcon: {
+    marginBottom: 20,
+  },
+  confirmModalTitle: {
+    fontSize: 22,
+    fontFamily: 'SFProBold',
+    color: '#1C86FF',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  confirmModalText: {
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#1C86FF',
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    fontWeight: '600',
+  },
+  confirmButtonModal: {
+    flex: 1,
+    backgroundColor: '#1C86FF',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  resetButtonModal: {
+    backgroundColor: '#FF9B79',
+  },
+});

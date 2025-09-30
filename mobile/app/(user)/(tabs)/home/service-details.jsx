@@ -7,19 +7,23 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ImageBackground,
   Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
+import Header from '@components/Header';
 
 const { width } = Dimensions.get('window');
+
 
 export default function ServiceDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [activeTab, setActiveTab] = useState('details');
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Get image based on service name or ID
   const getServiceImage = () => {
@@ -61,6 +65,14 @@ export default function ServiceDetailsScreen() {
     ]
   };
 
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText} numberOfLines={1}>
+        {serviceData.name}
+      </Text>
+    </View>
+  );
+
   const renderStars = (rating) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -68,11 +80,11 @@ export default function ServiceDetailsScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={16} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={16} color="#ff9b79" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={16} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star-half" size={16} color="#ff9b79" />);
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={16} color="#E0E0E0" />);
+        stars.push(<Ionicons key={i} name="star-outline" size={16} color="#ff9b79" />);
       }
     }
     return stars;
@@ -97,6 +109,16 @@ export default function ServiceDetailsScreen() {
     if (activeTab === 'details') {
       return (
         <View style={styles.tabContent}>
+          {/* Petshop Info */}
+          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
+          <View style={styles.ratingContainer}>
+            <View style={styles.starsContainer}>
+              {renderStars(serviceData.rating)}
+            </View>
+            <Text style={styles.ratingText}>({serviceData.rating})</Text>
+          </View>
+
+          {/* Service Details */}
           <Text style={styles.sectionTitle}>Service Details</Text>
           <Text style={styles.description}>{serviceData.fullDescription}</Text>
         </View>
@@ -104,6 +126,16 @@ export default function ServiceDetailsScreen() {
     } else {
       return (
         <View style={styles.tabContent}>
+          {/* Petshop Info */}
+          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
+          <View style={styles.ratingContainer}>
+            <View style={styles.starsContainer}>
+              {renderStars(serviceData.rating)}
+            </View>
+            <Text style={styles.ratingText}>({serviceData.rating})</Text>
+          </View>
+
+          {/* Reviews */}
           <Text style={styles.sectionTitle}>Reviews</Text>
           {serviceData.reviews.map((review) => (
             <View key={review.id} style={styles.reviewCard}>
@@ -124,32 +156,41 @@ export default function ServiceDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{serviceData.name}</Text>
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Text style={styles.favoriteIcon}>♡</Text>
-        </TouchableOpacity>
-      </View>
-
+      <Header
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderTitle()}
+        rightComponent={
+          <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={28}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView style={styles.scrollView}>
         {/* Service Image */}
         <Image source={serviceData.image} style={styles.serviceImage} />
-
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'details' && styles.activeTab]}
             onPress={() => setActiveTab('details')}
           >
             <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
-              Details
+              Info
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
             onPress={() => setActiveTab('reviews')}
           >
@@ -157,18 +198,6 @@ export default function ServiceDetailsScreen() {
               Reviews
             </Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Service Info */}
-        <View style={styles.serviceInfo}>
-          <Text style={styles.serviceName}>{serviceData.name}</Text>
-          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {renderStars(serviceData.rating)}
-            </View>
-            <Text style={styles.ratingText}>({serviceData.rating})</Text>
-          </View>
         </View>
 
         {/* Tab Content */}
@@ -183,7 +212,16 @@ export default function ServiceDetailsScreen() {
         <TouchableOpacity style={styles.bookButton} onPress={handleBooking}>
           <Text style={styles.bookButtonText}>Book</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.chatButton}>
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => router.push({
+            pathname: `/(user)/(tabs)/messages/${serviceData.id}`,
+            params: {
+              serviceName: serviceData.name,
+              fromService: 'true',
+            }
+          })}
+        >
           <Text style={styles.chatButtonText}>Chat</Text>
         </TouchableOpacity>
       </View>
@@ -206,60 +244,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f0f0f0',
   },
-  header: {
-    backgroundColor: '#1C86FF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    paddingTop: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+
+  backgroundimg: { 
+  ...StyleSheet.absoluteFillObject,
+  transform: [{ scale: 1.5 }], 
+ },
+ 
+  backgroundImageStyle: { opacity: 0.1 },
+
+  titleContainer: {
     flex: 1,
-    textAlign: 'center',
   },
-  favoriteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  favoriteIcon: {
+  titleText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 24,
+    fontFamily: "SFProBold",
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   scrollView: {
     flex: 1,
   },
   serviceImage: {
-    width: '100%',
-    height: 250,
+    width: "90%",
+    height: 300,
     resizeMode: 'cover',
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 15,
+    borderRadius: 12,
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     marginHorizontal: 20,
-    marginTop: -20,
+    marginBottom: 10,
     borderRadius: 8,
     overflow: 'hidden',
     elevation: 2,
@@ -285,27 +304,10 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#fff',
   },
-  serviceInfo: {
-    backgroundColor: '#fff',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  serviceName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginBottom: 5,
-  },
   serviceCategory: {
-    fontSize: 14,
+    fontSize: 30,
     color: '#FF9B79',
-    marginBottom: 10,
+    fontFamily:"SFProBold",
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 14,
-    color: '#666',
+    color: '#1C86FF',
     marginLeft: 8,
     fontWeight: '500',
   },
@@ -338,11 +340,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+    marginTop: 15,
+    marginBottom: 10,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: 'black',
     lineHeight: 20,
   },
   reviewCard: {
@@ -383,9 +386,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.5,
     shadowRadius: 4,
+    borderTopLeftRadius:12,
+    borderTopRightRadius:12,
   },
   priceContainer: {
     flex: 1,
@@ -399,7 +404,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
     paddingHorizontal: 30,
     paddingVertical: 12,
-    borderRadius: 25,
+    borderRadius: 8,
     marginRight: 10,
   },
   bookButtonText: {
@@ -409,11 +414,11 @@ const styles = StyleSheet.create({
   },
   chatButton: {
     backgroundColor: '#fff',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#1C86FF',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 25,
+    borderRadius: 8,
   },
   chatButtonText: {
     color: '#1C86FF',

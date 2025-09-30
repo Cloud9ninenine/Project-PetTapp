@@ -51,7 +51,7 @@ export default function FooterTabs() {
               styles.tab,
               isFocused && styles.tabActive
             ]}
-            onPress={() => router.push(tab.route)}
+            onPress={() => router.replace(tab.route)}
             activeOpacity={0.7}
           >
             <Image

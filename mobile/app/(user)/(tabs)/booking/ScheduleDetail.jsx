@@ -17,6 +17,14 @@ const ScheduleDetail = () => {
   const params = useLocalSearchParams();
   const { id, title, date, time, type, status } = params;
 
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText} numberOfLines={1}>
+        Schedule Summary
+      </Text>
+    </View>
+  );
+
   const scheduleDetail = {
     id: id || "100001",
     title: title || "Pet Boarding",
@@ -25,8 +33,8 @@ const ScheduleDetail = () => {
     status: status || "scheduled",
     bookingId: id || "100001",
     bookingTime: date ? `${date} ${time}` : "mm-dd-yyyy hh-mm",
-    paymentTime: "mm-dd-yyyy hh-mm",
-    completedTime: "mm-dd-yyyy hh-mm",
+    paymentTime: "09-25-2025 03-43",
+    completedTime: "09-26-2025 04-36",
   };
 
   const getStatusConfig = (status) => {
@@ -106,8 +114,10 @@ const ScheduleDetail = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <Header
-        title="Schedule Summary"
-        onPress={() => router.back()}
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderTitle()}
+        showBack={true}
       />
       <ScrollView contentContainerStyle={styles.content}>
         {/* Status Bar */}
@@ -161,22 +171,14 @@ const ScheduleDetail = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
-    height: 100,
-    backgroundColor: "#2196F3",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  titleContainer: {
+    flex: 1,
   },
-  backButton: { padding: 5 },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#FFFFFF",
+  titleText: {
+    color: '#fff',
+    fontSize: 24,
+    fontFamily: 'SFProBold',
+    textAlign: 'center',
   },
   content: { padding: 20 },
   statusBar: {

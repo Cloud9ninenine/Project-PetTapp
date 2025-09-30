@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   SafeAreaView,
+  ImageBackground,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
@@ -18,27 +19,53 @@ const Bookings = () => {
 
   const [schedules] = useState([
     {
-      id: '1',
+      id: '109-177-748',
       title: 'Veterinary Appointment',
-      date: 'Date',
-      time: 'Time',
+      businessName: 'PetCo Animal Clinic',
+      businessType: 'Veterinary Service',
+      date: '10-08-2025',
+      time: '1:00 PM',
       icon: 'medical-outline',
       status: 'Scheduled'
     },
     {
-      id: '2',
+      id: '356-455-349',
       title: 'Pet Grooming',
-      date: 'Date',
-      time: 'Time',
+      businessName: 'Paws & Claws Grooming',
+      businessType: 'Pet Grooming',
+      date: '10-02-2025',
+      time: '8:00 AM',
       icon: 'cut-outline',
       status: 'Cancelled'
     },
     {
-      id: '3',
+      id: '497-370-547',
       title: 'Pet Boarding',
-      date: 'Date',
-      time: 'Time',
+      businessName: 'Happy Tails Pet Hotel',
+      businessType: 'Pet Boarding',
+      date: '09-30-2025',
+      time: '6:00 PM',
       icon: 'home-outline',
+      status: 'Completed'
+    },
+    {
+      id: '266-139-886',
+      title: 'Vaccination',
+      businessName: 'Animed Veterinary Clinic',
+      businessType: 'Veterinary Service',
+      date: '10-03-2025',
+      time: '8:00 AM',
+      icon: 'medical-outline',
+      status: 'Scheduled'
+    },
+    {
+      id: '976-630-165',
+      title: 'Pet Training',
+      businessName: 'Bark & Train Academy',
+      businessType: 'Pet Training',
+      date: '10-06-2025',
+      time: '10:00 AM',
+      icon: 'school-outline',
       status: 'Completed'
     }
   ]);
@@ -67,12 +94,13 @@ const Bookings = () => {
     >
       {/* Icon inside circle */}
       <View style={styles.circlePlaceholder}>
-        <Ionicons name={item.icon} size={24} color="#4A90E2" />
+        <Ionicons name={item.icon} size={30} color="#1C86FF" />
       </View>
 
       {/* Details */}
       <View style={styles.scheduleDetails}>
         <Text style={styles.scheduleTitle}>{item.title}</Text>
+        <Text style={styles.businessName}>{item.businessName}</Text>
         <Text style={styles.scheduleDateTime}>{item.date} | {item.time}</Text>
       </View>
 
@@ -83,10 +111,29 @@ const Bookings = () => {
     </TouchableOpacity>
   );
 
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText} numberOfLines={1}>
+        My Schedules
+      </Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
       {/* Header */}
-      <Header title="My Schedules" />
+      <Header
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderTitle()}
+        showBack={false}
+      />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -117,21 +164,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 20,
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingTop: 50,
-    gap: 13,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  
+  backgroundimg: { 
+  ...StyleSheet.absoluteFillObject,
+  transform: [{ scale: 1.5 }], 
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+ 
+  backgroundImageStyle: { opacity: 0.1 },
+  titleContainer: {
+    flex: 1,
+  },
+  titleText: {
+    color: '#fff',
+    fontSize: 24,
+    fontFamily: 'SFProBold',
+    textAlign: 'center',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -141,7 +188,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#1C86FF',
+    height: 50,
   },
   searchIcon: {
     marginRight: 8,
@@ -164,12 +212,13 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#1C86FF',
+    height:100,
   },
   circlePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 75,
+    height: 75,
+    borderRadius: 50,
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
@@ -182,10 +231,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333333',
+    marginBottom: 2,
+  },
+  businessName: {
+    fontSize: 13,
+    color: '#1C86FF',
     marginBottom: 4,
   },
   scheduleDateTime: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#777777',
   },
   statusText: {

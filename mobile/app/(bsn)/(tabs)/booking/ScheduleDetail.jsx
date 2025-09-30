@@ -25,8 +25,8 @@ const ScheduleDetail = () => {
     status: status || "scheduled",
     bookingId: id || "100001",
     bookingTime: date ? `${date} ${time}` : "mm-dd-yyyy hh-mm",
-    paymentTime: "mm-dd-yyyy hh-mm",
-    completedTime: "mm-dd-yyyy hh-mm",
+    paymentTime: "09-25-2025 03-43",
+    completedTime: "09-26-2025 04-36",
   };
 
   const getStatusConfig = (status) => {

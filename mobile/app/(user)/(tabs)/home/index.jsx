@@ -10,66 +10,181 @@ import {
   ImageBackground,
   Dimensions,
   Animated,
+  Easing,
+  PanResponder,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SearchHeader from "@components/SearchHeader";
 
 const { width } = Dimensions.get("window");
+// Use a rounded integer slide width to avoid sub-pixel gaps
+const SLIDE_WIDTH = Math.round(width - 32);
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
+  // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
-  const carouselRef = useRef(null);
+
   const router = useRouter();
+  const translateX = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveSlide((prevSlide) => {
-        const nextSlide = (prevSlide + 1) % carouselImages.length;
-        const offset = nextSlide * (width - 32);
-        carouselRef.current?.scrollToOffset({
-          offset,
-          animated: true,
-        });
-        return nextSlide;
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
+  // real carousel images
   const carouselImages = [
     {
       id: 1,
       image: require("@assets/images/serviceimages/Vet Care.png"),
       title: "Wellness Check-up",
       subtitle: "PetCo Clinic",
-      rating: 4.9,
     },
     {
       id: 2,
       image: require("@assets/images/serviceimages/21.png"),
       title: "Professional Grooming",
       subtitle: "Pet Spa",
-      rating: 4.8,
     },
     {
       id: 3,
       image: require("@assets/images/serviceimages/22.png"),
       title: "Pet Boarding",
       subtitle: "Pet Hotel",
-      rating: 4.7,
     },
     {
       id: 4,
       image: require("@assets/images/serviceimages/23.png"),
       title: "Pet Training",
       subtitle: "Training Center",
-      rating: 4.9,
     },
   ];
 
+  // build extended array: [last, ...images, first] for looping
+  const extendedImages = [
+    carouselImages[carouselImages.length - 1],
+    ...carouselImages,
+    carouselImages[0],
+  ];
+
+  // internal index points into extendedImages (start at 1 => first real slide)
+  const internalIndexRef = useRef(1);
+  const [internalIndex, setInternalIndex] = useState(1);
+
+  // autoplay interval ref so we can stop / restart during drag
+  const intervalRef = useRef(null);
+
+  // helper to update user-facing activeSlide from internal index
+  const syncActiveSlide = (internalIdx) => {
+    const n = carouselImages.length;
+    // map internalIndex (1..n) -> 0..n-1
+    const logical = ((internalIdx - 1) % n + n) % n;
+    setActiveSlide(logical);
+  };
+
+  // move to extended index (with animation). handles wrap jump after animation.
+  const animateToInternalIndex = (toIndex, { animated = true } = {}) => {
+    const maxIndex = extendedImages.length - 1;
+    if (!animated) {
+      translateX.setValue(-toIndex * SLIDE_WIDTH);
+      internalIndexRef.current = toIndex;
+      setInternalIndex(toIndex);
+      syncActiveSlide(toIndex);
+      return;
+    }
+
+    Animated.timing(translateX, {
+      toValue: -toIndex * SLIDE_WIDTH,
+      duration: 700,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      // If we moved to the first cloned slide (index 0) -> jump to real last
+      if (toIndex === 0) {
+        const jumpTo = carouselImages.length;
+        translateX.setValue(-jumpTo * SLIDE_WIDTH);
+        internalIndexRef.current = jumpTo;
+        setInternalIndex(jumpTo);
+        syncActiveSlide(jumpTo);
+        return;
+      }
+      // If we moved to the last cloned slide -> jump to real first
+      if (toIndex === maxIndex) {
+        const jumpTo = 1;
+        translateX.setValue(-jumpTo * SLIDE_WIDTH);
+        internalIndexRef.current = jumpTo;
+        setInternalIndex(jumpTo);
+        syncActiveSlide(jumpTo);
+        return;
+      }
+
+      // normal case: landed on a real slide
+      internalIndexRef.current = toIndex;
+      setInternalIndex(toIndex);
+      syncActiveSlide(toIndex);
+    });
+  };
+
+  // autoplay controls
+  const startAutoPlay = (ms = 5000) => {
+    stopAutoPlay();
+    intervalRef.current = setInterval(() => {
+      const next = internalIndexRef.current + 1;
+      animateToInternalIndex(next);
+    }, ms);
+  };
+  const stopAutoPlay = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  // set initial position and start autoplay
+  useEffect(() => {
+    // ensure starting at internal index = 1 (first real slide)
+    translateX.setValue(-1 * SLIDE_WIDTH);
+    internalIndexRef.current = 1;
+    setInternalIndex(1);
+    syncActiveSlide(1);
+    startAutoPlay(5000);
+    return () => stopAutoPlay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // PanResponder for manual swipes (uses same animateToInternalIndex)
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 8,
+      onPanResponderGrant: () => {
+        // pause autoplay while interacting
+        stopAutoPlay();
+      },
+      onPanResponderMove: (_, gesture) => {
+        // drag visually: base position is -internalIndexRef.current * SLIDE_WIDTH
+        const base = -internalIndexRef.current * SLIDE_WIDTH;
+        translateX.setValue(base + gesture.dx);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const threshold = SLIDE_WIDTH * 0.2; // swipe threshold (20% width)
+        const dx = gesture.dx;
+        let target = internalIndexRef.current;
+
+        if (dx < -threshold && internalIndexRef.current < extendedImages.length - 1) {
+          target = internalIndexRef.current + 1;
+        } else if (dx > threshold && internalIndexRef.current > 0) {
+          target = internalIndexRef.current - 1;
+        } else {
+          target = internalIndexRef.current;
+        }
+
+        animateToInternalIndex(target);
+        // resume autoplay after a short delay
+        setTimeout(() => startAutoPlay(5000), 800);
+      },
+    })
+  ).current;
+
+  // Services + nearby arrays (unchanged)
   const services = [
     {
       id: 1,
@@ -123,9 +238,7 @@ export default function HomeScreen() {
   ];
 
   const handleServicePress = (service) => {
-    if (service.route) {
-      router.push(service.route);
-    }
+    if (service.route) router.push(service.route);
   };
 
   const renderStars = (rating) => {
@@ -137,33 +250,17 @@ export default function HomeScreen() {
       if (i < fullStars) {
         stars.push(<Ionicons key={i} name="star" size={12} color="#ff9b79" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={12} color="#ff9b79" />);
+        stars.push(
+          <Ionicons key={i} name="star-half" size={12} color="#ff9b79" />
+        );
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />);
+        stars.push(
+          <Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />
+        );
       }
     }
     return stars;
   };
-
-  const onScroll = (event) => {
-    const slideSize = width - 32;
-    const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
-    setActiveSlide(index);
-  };
-
-  const onScrollBeginDrag = () => {
-    // User is manually scrolling, so we don't interfere
-  };
-
-  const renderCarouselItem = ({ item }) => (
-    <View style={styles.carouselSlide}>
-      <Image source={item.image} style={styles.featuredImage} />
-      <View style={styles.carouselTextContainer}>
-        <Text style={styles.featuredTitle}>{item.title}</Text>
-        <Text style={styles.featuredSubtitle}>{item.subtitle}</Text>
-      </View>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -180,92 +277,90 @@ export default function HomeScreen() {
       >
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.mainContent}>
-          {/* Featured Carousel */}
-          <View style={styles.featuredCard}>
-            <Animated.FlatList
-              ref={carouselRef}
-              data={carouselImages}
-              renderItem={renderCarouselItem}
-              keyExtractor={(item) => item.id.toString()}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { x: new Animated.Value(0) } } }],
-                {
-                  useNativeDriver: true,
-                  listener: onScroll,
-                }
-              )}
-              onScrollBeginDrag={onScrollBeginDrag}
-              scrollEventThrottle={16}
-              snapToInterval={width - 32}
-              snapToAlignment="center"
-              decelerationRate={0.1}
-              contentContainerStyle={styles.carouselContent}
-            />
-            <View style={styles.pagination}>
-              {carouselImages.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.paginationDot,
-                    index === activeSlide && styles.paginationDotActive,
-                  ]}
-                />
+            {/* Featured Carousel */}
+            <View style={styles.featuredCard} {...panResponder.panHandlers}>
+              <Animated.View
+                style={{
+                  flexDirection: "row",
+                  width: SLIDE_WIDTH * extendedImages.length,
+                  transform: [{ translateX }],
+                }}
+              >
+                {extendedImages.map((item, idx) => (
+                  <View key={`slide-${idx}-${item.id}`} style={styles.carouselSlide}>
+                    <Image source={item.image} style={styles.featuredImage} resizeMode="cover" />
+                    <View style={styles.carouselTextContainer}>
+                      <Text style={styles.featuredTitle}>{item.title}</Text>
+                      <Text style={styles.featuredSubtitle}>{item.subtitle}</Text>
+                    </View>
+                  </View>
+                ))}
+              </Animated.View>
+
+              {/* Pagination */}
+              <View style={styles.pagination}>
+                {carouselImages.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.paginationDot,
+                      index === activeSlide && styles.paginationDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+
+            {/* Services Grid */}
+            <View style={styles.servicesGrid}>
+              {services.map((service) => (
+                <TouchableOpacity
+                  key={service.id}
+                  style={styles.serviceCard}
+                  onPress={() => handleServicePress(service)}
+                >
+                  <View
+                    style={[
+                      styles.serviceIconContainer,
+                      { backgroundColor: service.color },
+                    ]}
+                  >
+                    <Image source={service.icon} style={styles.serviceIcon} />
+                  </View>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Nearby Services Title */}
+            <Text style={styles.sectionTitle}>Nearby Services</Text>
+
+            {/* Nearby Services Grid */}
+            <View style={styles.nearbyGrid}>
+              {nearbyServices.map((service) => (
+                <View key={service.id} style={styles.nearbyCardWrapper}>
+                  <View style={styles.nearbyCard}>
+                    <View style={styles.nearbyImageContainer}>
+                      <Image source={service.image} style={styles.nearbyImage} />
+                    </View>
+                  </View>
+                  <View style={styles.nearbyCardInfo}>
+                    <Text style={styles.nearbyName}>{service.name}</Text>
+                    <View style={styles.nearbyStarsContainer}>
+                      {renderStars(service.rating)}
+                    </View>
+                  </View>
+                </View>
               ))}
             </View>
           </View>
-
-          {/* Services Grid */}
-          <View style={styles.servicesGrid}>
-            {services.map((service) => (
-              <TouchableOpacity
-                key={service.id}
-                style={styles.serviceCard}
-                onPress={() => handleServicePress(service)}
-              >
-                <View
-                  style={[
-                    styles.serviceIconContainer,
-                    { backgroundColor: service.color },
-                  ]}
-                >
-                  <Image source={service.icon} style={styles.serviceIcon} />
-                </View>
-                <Text style={styles.serviceTitle}>{service.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Nearby Services Title */}
-          <Text style={styles.sectionTitle}>Nearby Services</Text>
-
-          {/* Nearby Services Grid */}
-          <View style={styles.nearbyGrid}>
-            {nearbyServices.map((service) => (
-              <View key={service.id} style={styles.nearbyCardWrapper}>
-                <View style={styles.nearbyCard}>
-                  <View style={styles.nearbyImageContainer}>
-                    <Image source={service.image} style={styles.nearbyImage} />
-                  </View>
-                </View>
-                <View style={styles.nearbyCardInfo}>
-                  <Text style={styles.nearbyName}>{service.name}</Text>
-                  <View style={styles.nearbyStarsContainer}>
-                    {renderStars(service.rating)}
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-    </ImageBackground>
+        </ScrollView>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
 
+// ===================== styles (unchanged except kept for context) =====================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -276,7 +371,7 @@ const styles = StyleSheet.create({
   mainContent: {
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 20,
   },
   featuredCard: {
     position: "relative",
@@ -284,38 +379,18 @@ const styles = StyleSheet.create({
     width: "100%",
     marginTop: 20,
     marginBottom: 30,
-  },
-  carouselContent: {
-    paddingHorizontal: 0,
+    overflow: "hidden",
   },
   carouselSlide: {
-    width: width - 32,
+    width: SLIDE_WIDTH,
     height: 240,
     borderRadius: 16,
     overflow: "hidden",
-    position: "relative",
     marginHorizontal: 0,
   },
   featuredImage: {
     width: "100%",
     height: "100%",
-  },
-  pagination: {
-    position: "absolute",
-    bottom: 12,
-    alignSelf: "center",
-    flexDirection: "row",
-    gap: 6,
-  },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
-  },
-  paginationDotActive: {
-    backgroundColor: "#fff",
-    width: 24,
   },
   carouselTextContainer: {
     position: "absolute",
@@ -338,6 +413,23 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
+  },
+  pagination: {
+    position: "absolute",
+    bottom: 12,
+    alignSelf: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+  },
+  paginationDotActive: {
+    backgroundColor: "#fff",
+    width: 24,
   },
   servicesGrid: {
     flexDirection: "row",
@@ -370,7 +462,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 30,
-    fontFamily:"SFProBold",
+    fontFamily: "SFProBold",
     color: "#1C86FF",
     textAlign: "center",
   },
@@ -389,7 +481,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#1C86FF",
     overflow: "hidden",
-    height: "40%",
+    height: 150,
   },
   nearbyImageContainer: {
     flex: 1,
@@ -416,16 +508,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 2,
-  },
-  starsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 1,
-  },
-  ratingText: {
-    fontSize: 10,
-    color: "#666",
-    marginLeft: 4,
-    fontWeight: "500",
   },
 });

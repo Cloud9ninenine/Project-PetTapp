@@ -7,11 +7,13 @@ import { useRouter } from "expo-router";
 const Header = ({
   title = "",
   showBack = true,
-  backgroundColor = "#2196F3",
+  backgroundColor = "#1C86FF ",
   titleColor = "#FFFFFF",
   leftComponent = null,
   rightComponent = null,
   onBackPress = null,
+  titleStyle = {},
+  customTitle = null,
 }) => {
   const router = useRouter();
 
@@ -24,17 +26,19 @@ const Header = ({
             style={styles.backButton}
             onPress={onBackPress || (() => router.back())}
           >
-            <Ionicons name="arrow-back" size={24} color={titleColor} />
+            <Ionicons name="arrow-back" size={28} color={titleColor} />
           </TouchableOpacity>
         ) : (
           leftComponent
         )}
       </View>
 
-      {/* Title */}
-      <Text style={[styles.headerTitle, { color: titleColor }]} numberOfLines={1}>
-        {title}
-      </Text>
+      {/* Title - can be custom component or text */}
+      {customTitle || (
+        <Text style={[styles.headerTitle, { color: titleColor }, titleStyle]} numberOfLines={1}>
+          {title}
+        </Text>
+      )}
 
       {/* Right side: Optional icons or actions */}
       <View style={styles.side}>{rightComponent}</View>
@@ -47,7 +51,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    height: 100, // 🔑 uniform across app
+    height: 110,
     paddingHorizontal: 20,
     paddingVertical: 20,
     paddingBottom: 20,
@@ -56,18 +60,15 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-
-
-
   backButton: { padding: 5 },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     flex: 1,
     textAlign: "center",
   },
   side: {
-    width: 40, // keeps spacing uniform left & right
+    width: 45,
     alignItems: "center",
     justifyContent: "center",
   },
