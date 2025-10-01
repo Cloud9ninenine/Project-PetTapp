@@ -8,7 +8,15 @@ export default function RootLayout() {
   const pathname = usePathname();
 
   // Screens where you don't want the footer
-  const hideFooterOn = ["/home/service-details"];
+  const hideFooterOn = [
+    "/home/service-details",
+    "/home/nearby-service-map",
+    "/home/service-scheduled",
+    "/home/schedule-booking",
+    "/booking/review-service",
+    "/notification",
+    "/messages/"
+  ];
 
   const shouldHideFooter = hideFooterOn.some((path) =>
     pathname.startsWith(path)

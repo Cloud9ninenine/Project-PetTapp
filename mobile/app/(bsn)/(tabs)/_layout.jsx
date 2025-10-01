@@ -2,7 +2,7 @@
 import { Stack } from "expo-router";
 import { usePathname } from "expo-router";
 import { View, StyleSheet } from "react-native";
-import TabNavigator from "@components/TabNavigator";
+import BusinessTabNavigator from "@components/BusinessTabNavigator";
 
 export default function RootLayout() {
   const pathname = usePathname();
@@ -21,7 +21,7 @@ export default function RootLayout() {
           headerShown: false, // 🔑 hides that ugly back header
         }}
       />
-      {!shouldHideFooter && <TabNavigator />}
+      {!shouldHideFooter && <BusinessTabNavigator />}
     </View>
   );
 }

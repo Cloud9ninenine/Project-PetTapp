@@ -4,19 +4,19 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "@components/Header";
-import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const ScheduleDetail = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { id, title, date, time, type, status } = params;
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -26,20 +26,38 @@ const ScheduleDetail = () => {
     </View>
   );
 
+  const formatDateTime = (dateStr, timeStr) => {
+    if (!dateStr || !timeStr) return "Not specified";
+    // Parse the date string (format: 10-08-2025)
+    const [month, day, year] = dateStr.split('-');
+    const dateObj = new Date(year, month - 1, day);
+
+    const formattedDate = dateObj.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+
+    return `${formattedDate} • ${timeStr}`;
+  };
+
+  // Use dynamic data from params
   const scheduleDetail = {
-    id: id || "100001",
-    title: title || "Pet Boarding",
-    clinic: "PetCo Clinic",
-    service: type || "Pet Boarding",
-    status: status || "scheduled",
-    bookingId: id || "100001",
-    bookingTime: date ? `${date} ${time}` : "mm-dd-yyyy hh-mm",
-    paymentTime: "09-25-2025 03-43",
-    completedTime: "09-26-2025 04-36",
+    id: params.id || "100001",
+    title: params.title || "Service Booking",
+    clinic: params.businessName || "Pet Service",
+    service: params.businessType || params.title || "Service",
+    status: params.status || "scheduled",
+    bookingId: params.id || "100001",
+    icon: params.icon || "calendar-outline",
+    bookingTime: formatDateTime(params.date, params.time),
+    paymentTime: "Sep 25, 2025 • 3:43 PM",
+    completedTime: "Sep 26, 2025 • 4:36 PM",
   };
 
   const getStatusConfig = (status) => {
-    switch (status) {
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
       case "scheduled":
         return { label: "Scheduled", backgroundColor: "#4CAF50" };
       case "cancelled":
@@ -47,18 +65,24 @@ const ScheduleDetail = () => {
       case "completed":
         return { label: "Completed", backgroundColor: "#2196F3" };
       default:
-        return { label: "Unknown", backgroundColor: "#9E9E9E" };
+        return { label: status, backgroundColor: "#9E9E9E" };
     }
   };
 
-  const statusConfig = getStatusConfig(scheduleDetail.status.toLowerCase());
+  const statusConfig = getStatusConfig(scheduleDetail.status);
 
   const copyBookingId = () => {
     Alert.alert("Copied", "Booking ID copied to clipboard");
   };
 
   const handleChat = () => {
-    Alert.alert("Chat", "Opening chat with clinic...");
+    router.push({
+      pathname: `/(user)/(tabs)/messages/${scheduleDetail.id}`,
+      params: {
+        serviceName: scheduleDetail.clinic,
+        fromService: 'true',
+      }
+    });
   };
 
   const handleCancel = () => {
@@ -69,7 +93,14 @@ const ScheduleDetail = () => {
   };
 
   const handleRate = () => {
-    Alert.alert("Rate Service", "Opening rating screen...");
+    router.push({
+      pathname: '../booking/review-service',
+      params: {
+        clinic: scheduleDetail.clinic,
+        service: scheduleDetail.service,
+        bookingId: scheduleDetail.bookingId,
+      },
+    });
   };
 
   const renderActionButtons = () => {
@@ -77,12 +108,14 @@ const ScheduleDetail = () => {
 
     if (status === "completed") {
       return (
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.fullButton} onPress={handleChat}>
-            <Text style={styles.fullButtonText}>Chat</Text>
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
+            <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.sideBySideButtonText}>Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.fullButtonOutline} onPress={handleRate}>
-            <Text style={styles.fullButtonOutlineText}>Rate</Text>
+          <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleRate}>
+            <Ionicons name="star-outline" size={moderateScale(20)} color="#ff9b79" />
+            <Text style={[styles.sideBySideButtonOutlineText, { color: "#ff9b79" }]}>Rate</Text>
           </TouchableOpacity>
         </View>
       );
@@ -90,12 +123,14 @@ const ScheduleDetail = () => {
 
     if (status === "scheduled") {
       return (
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.fullButton} onPress={handleChat}>
-            <Text style={styles.fullButtonText}>Chat</Text>
+        <View style={styles.actionButtonsRow}>
+          <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
+            <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.sideBySideButtonText}>Chat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.fullButtonOutline} onPress={handleCancel}>
-            <Text style={styles.fullButtonOutlineText}>Cancel</Text>
+          <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleCancel}>
+            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#FF6B6B" />
+            <Text style={[styles.sideBySideButtonOutlineText, { color: "#FF6B6B" }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
       );
@@ -105,6 +140,7 @@ const ScheduleDetail = () => {
     return (
       <View style={styles.actionButtonsContainer}>
         <TouchableOpacity style={styles.fullButton} onPress={handleChat}>
+          <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
           <Text style={styles.fullButtonText}>Chat</Text>
         </TouchableOpacity>
       </View>
@@ -129,7 +165,7 @@ const ScheduleDetail = () => {
         {/* Clinic Info */}
         <View style={styles.clinicSection}>
           <View style={styles.clinicLogo}>
-            <Ionicons name="business-outline" size={moderateScale(36)} color="#C7C7CC" />
+            <Ionicons name={scheduleDetail.icon} size={hp(4.5)} color="#1C86FF" />
           </View>
           <Text style={styles.clinicName}>{scheduleDetail.clinic}</Text>
           <Text style={styles.serviceName}>{scheduleDetail.service}</Text>
@@ -174,6 +210,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   titleContainer: {
     flex: 1,
+    paddingHorizontal: wp(2),
   },
   titleText: {
     color: '#fff',
@@ -181,10 +218,13 @@ const styles = StyleSheet.create({
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
-  content: { padding: moderateScale(20) },
+  content: {
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(20),
+  },
   statusBar: {
     width: "100%",
-    paddingVertical: moderateScale(10),
+    paddingVertical: hp(1.2),
     borderRadius: moderateScale(8),
     alignItems: "center",
     marginBottom: moderateScale(20),
@@ -192,9 +232,9 @@ const styles = StyleSheet.create({
   statusBarText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
   clinicSection: { alignItems: "center", marginBottom: moderateScale(20) },
   clinicLogo: {
-    width: moderateScale(70),
-    height: moderateScale(70),
-    borderRadius: moderateScale(35),
+    width: hp(9),
+    height: hp(9),
+    borderRadius: hp(4.5),
     backgroundColor: "#F0F0F0",
     justifyContent: "center",
     alignItems: "center",
@@ -207,7 +247,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
     borderRadius: moderateScale(12),
     padding: moderateScale(10),
-    marginBottom: moderateScale(30),
+    marginBottom: hp(3),
   },
   detailRow: {
     flexDirection: "row",
@@ -230,22 +270,44 @@ const styles = StyleSheet.create({
   },
   copyButtonText: { color: "#2196F3", fontSize: scaleFontSize(12), fontWeight: "600" },
   actionButtonsContainer: { gap: moderateScale(12) },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: moderateScale(12),
+  },
   fullButton: {
-    backgroundColor: "#2196F3",
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(8),
+    backgroundColor: "#1C86FF",
+    paddingVertical: hp(1.8),
+    borderRadius: moderateScale(12),
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: moderateScale(8),
   },
   fullButtonText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
-  fullButtonOutline: {
-    backgroundColor: "#2196F3",
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(8),
+  sideBySideButton: {
+    flex: 1,
+    backgroundColor: "#1C86FF",
+    paddingVertical: hp(1.8),
+    borderRadius: moderateScale(12),
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#2196F3",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: moderateScale(6),
   },
-  fullButtonOutlineText: { color: "#fff", fontSize: scaleFontSize(16), fontWeight: "600" },
+  sideBySideButtonText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
+  sideBySideButtonOutline: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingVertical: hp(1.8),
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: moderateScale(6),
+    borderWidth: 2,
+    borderColor: "#1C86FF",
+  },
+  sideBySideButtonOutlineText: { color: "#1C86FF", fontSize: scaleFontSize(16), fontWeight: "600" },
 });
 
 export default ScheduleDetail;

@@ -5,23 +5,21 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   Modal,
   ImageBackground,
   Image,
-  useWindowDimensions,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
-import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -29,10 +27,6 @@ export default function ProfileScreen() {
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
-
-  // Determine layout based on screen width
-  const isVeryNarrow = width < 360;
-  const isNarrow = width < 400;
 
   const [profileInfo, setProfileInfo] = useState({
     firstName: 'John',
@@ -138,6 +132,25 @@ export default function ProfileScreen() {
     setShowViewPaymentModal(true);
   };
 
+  const handleDeletePayment = (paymentId) => {
+    Alert.alert(
+      'Delete Payment Option',
+      'Are you sure you want to delete this payment option?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setPaymentOptions(paymentOptions.filter(option => option.id !== paymentId));
+            setShowViewPaymentModal(false);
+            Alert.alert('Success', 'Payment option deleted successfully!');
+          },
+        },
+      ]
+    );
+  };
+
   const savePayment = () => {
     const { cardNumber, cardHolder, expiryDate, cvv } = newPayment;
     if (!cardNumber || !cardHolder || !expiryDate || !cvv) {
@@ -183,7 +196,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: profileImage }} style={styles.profileImage} />
             ) : (
               <View style={styles.placeholderIcon}>
-                <Ionicons name="person" size={moderateScale(50)} color="#1C86FF" />
+                <Ionicons name="person" size={50} color="#1C86FF" />
               </View>
             )}
           </TouchableOpacity>
@@ -259,52 +272,26 @@ export default function ProfileScreen() {
             <View style={styles.paymentSection}>
               <Text style={styles.sectionTitle}>Payment Options</Text>
 
-              <View style={[
-                styles.paymentCardsRow,
-                isVeryNarrow && styles.paymentCardsRowNarrow
-              ]}>
+              <View style={styles.paymentCardsContainer}>
                 {paymentOptions.map((option) => (
                   <TouchableOpacity
                     key={option.id}
-                    style={[
-                      styles.paymentCard,
-                      isVeryNarrow && styles.paymentCardNarrow
-                    ]}
+                    style={styles.paymentCard}
                     onPress={() => handleViewPayment(option)}
                   >
                     <View style={styles.paymentCardContent}>
-                      <Ionicons
-                        name="card-outline"
-                        size={isVeryNarrow ? moderateScale(32) : moderateScale(40)}
-                        color="#1C86FF"
-                      />
+                      <Ionicons name="card-outline" size={40} color="#1C86FF" />
                     </View>
-                    <Text style={[
-                      styles.paymentCardLabel,
-                      isVeryNarrow && styles.paymentCardLabelSmall
-                    ]}>{option.name}</Text>
+                    <Text style={styles.paymentCardLabel}>{option.name}</Text>
                   </TouchableOpacity>
                 ))}
 
                 {/* Add Payment Card */}
-                <TouchableOpacity
-                  style={[
-                    styles.addPaymentCard,
-                    isVeryNarrow && styles.paymentCardNarrow
-                  ]}
-                  onPress={handleAddPayment}
-                >
+                <TouchableOpacity style={styles.addPaymentCard} onPress={handleAddPayment}>
                   <View style={styles.paymentCardContent}>
-                    <Ionicons
-                      name="add"
-                      size={isVeryNarrow ? moderateScale(32) : moderateScale(40)}
-                      color="#1C86FF"
-                    />
+                    <Ionicons name="add" size={40} color="#1C86FF" />
                   </View>
-                  <Text style={[
-                    styles.paymentCardLabel,
-                    isVeryNarrow && styles.paymentCardLabelSmall
-                  ]}>Add</Text>
+                  <Text style={styles.paymentCardLabel}>Add</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -333,7 +320,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.confirmModalOverlay}>
           <View style={styles.confirmModalContent}>
-            <Ionicons name="checkmark-circle" size={moderateScale(60)} color="#1C86FF" style={styles.confirmIcon} />
+            <Ionicons name="checkmark-circle" size={60} color="#1C86FF" style={styles.confirmIcon} />
             <Text style={styles.confirmModalTitle}>Confirm Update</Text>
             <Text style={styles.confirmModalText}>
               Are you sure you want to save these changes to your profile?
@@ -365,7 +352,7 @@ export default function ProfileScreen() {
       >
         <View style={styles.confirmModalOverlay}>
           <View style={styles.confirmModalContent}>
-            <Ionicons name="log-out" size={moderateScale(60)} color="#ff9b79" style={styles.confirmIcon} />
+            <Ionicons name="log-out" size={60} color="#ff9b79" style={styles.confirmIcon} />
             <Text style={styles.confirmModalTitle}>Logout</Text>
             <Text style={styles.confirmModalText}>
               Are you sure you want to logout?
@@ -398,7 +385,7 @@ export default function ProfileScreen() {
         <View style={styles.confirmModalOverlay}>
           <View style={styles.viewPaymentModalContent}>
             <View style={styles.viewPaymentHeader}>
-              <Ionicons name="card" size={moderateScale(60)} color="#1C86FF" style={styles.confirmIcon} />
+              <Ionicons name="card" size={60} color="#1C86FF" style={styles.confirmIcon} />
               <Text style={styles.viewPaymentTitle}>{selectedPayment?.name}</Text>
             </View>
 
@@ -419,12 +406,20 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={() => setShowViewPaymentModal(false)}
-            >
-              <Text style={styles.confirmButtonText}>Close</Text>
-            </TouchableOpacity>
+            <View style={styles.viewPaymentButtonsRow}>
+              <TouchableOpacity
+                style={styles.deletePaymentButton}
+                onPress={() => handleDeletePayment(selectedPayment?.id)}
+              >
+                <Text style={styles.deletePaymentButtonText}>Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeModalButton}
+                onPress={() => setShowViewPaymentModal(false)}
+              >
+                <Text style={styles.confirmButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -441,7 +436,7 @@ export default function ProfileScreen() {
             <View style={styles.paymentModalHeader}>
               <Text style={styles.paymentModalTitle}>Add Payment Option</Text>
               <TouchableOpacity onPress={() => setShowPaymentModal(false)}>
-                <Ionicons name="close" size={moderateScale(28)} color="#666" />
+                <Ionicons name="close" size={28} color="#666" />
               </TouchableOpacity>
             </View>
 
@@ -519,7 +514,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: scaleFontSize(24),
+    fontSize: 24,
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
@@ -527,27 +522,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: wp(8),
-    paddingTop: moderateScale(30),
-    paddingBottom: moderateScale(40),
+    paddingHorizontal: 30,
+    paddingTop: 30,
+    paddingBottom: 40,
     alignItems: 'center',
   },
   addCircle: {
-    width: moderateScale(120),
-    height: moderateScale(120),
-    borderRadius: moderateScale(60),
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     borderWidth: 2,
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: moderateScale(30),
+    marginBottom: 30,
     overflow: 'hidden',
     backgroundColor: '#E3F2FD',
   },
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: moderateScale(60),
+    borderRadius: 60,
   },
   placeholderIcon: {
     justifyContent: 'center',
@@ -557,30 +552,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   inputGroup: {
-    marginBottom: moderateScale(12),
+    marginBottom: 12,
   },
   rowInputGroup: {
     flexDirection: 'row',
-    gap: moderateScale(12),
-    marginBottom: moderateScale(12),
+    gap: 12,
+    marginBottom: 12,
   },
   halfInput: {
     flex: 1,
   },
   label: {
-    fontSize: scaleFontSize(16),
+    fontSize: 16,
     color: 'black',
-    marginBottom: moderateScale(6),
+    marginBottom: 6,
     fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(12),
-    fontSize: scaleFontSize(16),
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
     fontFamily: 'SFProReg',
   },
   disabledInput: {
@@ -588,93 +583,72 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   textArea: {
-    minHeight: moderateScale(60),
-    paddingTop: moderateScale(12),
+    minHeight: 60,
+    paddingTop: 12,
   },
   paymentSection: {
-    marginTop: moderateScale(20),
-    marginBottom: moderateScale(10),
+    marginTop: 20,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: scaleFontSize(18),
+    fontSize: 18,
     fontFamily: 'SFProBold',
     color: 'black',
-    marginBottom: moderateScale(16),
+    marginBottom: 16,
   },
-  paymentCardsRow: {
+  paymentCardsContainer: {
     flexDirection: 'row',
-    gap: moderateScale(12),
-    justifyContent: 'space-between',
     flexWrap: 'wrap',
-  },
-  paymentCardsRowNarrow: {
-    gap: moderateScale(8),
+    justifyContent: 'flex-start',
+    gap: 12,
   },
   paymentCard: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: moderateScale(12),
-    width: moderateScale(100),
-    height: moderateScale(100),
+    borderRadius: 12,
+    width: 110,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    minWidth: moderateScale(90),
-    maxWidth: moderateScale(125),
-  },
-  paymentCardNarrow: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    minWidth: moderateScale(70),
-    maxWidth: moderateScale(90),
-    borderRadius: moderateScale(8),
   },
   paymentCardContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: moderateScale(10),
   },
   paymentCardLabel: {
-    fontSize: scaleFontSize(12),
+    fontSize: 12,
     fontFamily: 'SFProReg',
     color: '#333',
     textAlign: 'center',
-    paddingBottom: moderateScale(8),
-  },
-  paymentCardLabelSmall: {
-    fontSize: scaleFontSize(10),
-    paddingBottom: moderateScale(6),
+    paddingBottom: 8,
   },
   addPaymentCard: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: moderateScale(12),
-    width: moderateScale(100),
-    height: moderateScale(100),
+    borderRadius: 12,
+    width: 110,
+    height: 110,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    minWidth: moderateScale(90),
-    maxWidth: moderateScale(125),
   },
   buttonContainer: {
     flexDirection: 'column',
-    gap: moderateScale(12),
-    marginTop: moderateScale(20),
+    gap: 12,
+    marginTop: 20,
   },
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(20),
-    borderRadius: moderateScale(10),
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: scaleFontSize(20),
+    fontSize: 20,
     fontFamily: 'SFProReg',
   },
   logoutButton: {
@@ -682,13 +656,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(10),
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonText: {
     color: '#1C86FF',
-    fontSize: scaleFontSize(20),
+    fontSize: 20,
     fontFamily: 'SFProReg',
   },
   confirmModalOverlay: {
@@ -696,37 +670,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: moderateScale(20),
+    padding: 20,
   },
   confirmModalContent: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(30),
+    borderRadius: 16,
+    padding: 30,
     width: '90%',
-    maxWidth: moderateScale(400),
+    maxWidth: 400,
     alignItems: 'center',
   },
   confirmIcon: {
-    marginBottom: moderateScale(20),
+    marginBottom: 20,
   },
   confirmModalTitle: {
-    fontSize: scaleFontSize(22),
+    fontSize: 22,
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(12),
+    marginBottom: 12,
   },
   confirmModalText: {
-    fontSize: scaleFontSize(16),
+    fontSize: 16,
     fontFamily: 'SFProReg',
     color: '#666',
     textAlign: 'center',
-    marginBottom: moderateScale(24),
-    lineHeight: moderateScale(22),
+    marginBottom: 24,
+    lineHeight: 22,
   },
   confirmModalButtons: {
     flexDirection: 'row',
-    gap: moderateScale(12),
+    gap: 12,
     width: '100%',
   },
   cancelButton: {
@@ -734,20 +708,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(10),
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   cancelButtonText: {
     color: '#1C86FF',
-    fontSize: scaleFontSize(20),
+    fontSize: 20,
     fontFamily: 'SFProReg',
   },
   confirmButtonModal: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(10),
+    paddingVertical: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   logoutButtonModal: {
@@ -760,75 +734,94 @@ const styles = StyleSheet.create({
   },
   paymentModalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: moderateScale(20),
-    borderTopRightRadius: moderateScale(20),
-    padding: moderateScale(24),
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
     maxHeight: '80%',
   },
   paymentModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: moderateScale(20),
+    marginBottom: 20,
   },
   paymentModalTitle: {
-    fontSize: scaleFontSize(20),
+    fontSize: 20,
     fontFamily: 'SFProBold',
     color: '#1C86FF',
   },
   viewPaymentModalContent: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(30),
+    borderRadius: 16,
+    padding: 30,
     width: '90%',
-    maxWidth: moderateScale(400),
+    maxWidth: 400,
     alignItems: 'center',
   },
   viewPaymentHeader: {
     alignItems: 'center',
-    marginBottom: moderateScale(24),
+    marginBottom: 24,
   },
   viewPaymentTitle: {
-    fontSize: scaleFontSize(22),
+    fontSize: 22,
     fontFamily: 'SFProBold',
     color: '#1C86FF',
-    marginTop: moderateScale(12),
+    marginTop: 12,
   },
   viewPaymentDetails: {
     width: '100%',
-    gap: moderateScale(16),
-    marginBottom: moderateScale(24),
+    gap: 16,
+    marginBottom: 24,
   },
   paymentDetailRow: {
     width: '100%',
     backgroundColor: '#f5f5f5',
-    padding: moderateScale(16),
-    borderRadius: moderateScale(10),
+    padding: 16,
+    borderRadius: 10,
   },
   paymentDetailLabel: {
-    fontSize: scaleFontSize(12),
+    fontSize: 12,
     fontFamily: 'SFProReg',
     color: '#666',
-    marginBottom: moderateScale(4),
+    marginBottom: 4,
   },
   paymentDetailValue: {
-    fontSize: scaleFontSize(16),
+    fontSize: 16,
     fontFamily: 'SFProSB',
     color: 'black',
   },
-  closeModalButton: {
+  viewPaymentButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
     width: '100%',
+  },
+  deletePaymentButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  deletePaymentButtonText: {
+    color: '#FF6B6B',
+    fontSize: 20,
+    fontFamily: 'SFProReg',
+  },
+  closeModalButton: {
+    flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(10),
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
   addPaymentConfirmButton: {
     width: '100%',
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(10),
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: moderateScale(12),
+    marginTop: 12,
   },
 });

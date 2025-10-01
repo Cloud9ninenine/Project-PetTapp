@@ -1,7 +1,17 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
+import {
+  wp,
+  hp,
+  moderateScale,
+  scaleFontSize,
+  isSmallDevice,
+  isTablet,
+  getDeviceSize,
+  getResponsivePadding
+} from '@utils/responsive';
 
 const PAW_BACKGROUND = require('@assets/images/PetTapp pattern.png');
 
@@ -15,6 +25,8 @@ export default function WelcomeScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  const deviceSize = getDeviceSize();
+
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground
@@ -23,9 +35,21 @@ export default function WelcomeScreen() {
         imageStyle={styles.backgroundImageStyle}
         resizeMode="repeat"
       />
-      <View style={styles.content}>
-        <Text style={styles.title}>PetTapp</Text>
-        <Text style={styles.subtitle}>Pet care wellness, one tap away!</Text>
+      <View style={[styles.content, { paddingHorizontal: getResponsivePadding(wp(10)) }]}>
+        <Text style={[
+          styles.title,
+          deviceSize === 'small' && styles.titleSmall,
+          deviceSize === 'tablet' && styles.titleTablet,
+        ]}>
+          PetTapp
+        </Text>
+        <Text style={[
+          styles.subtitle,
+          deviceSize === 'small' && styles.subtitleSmall,
+          deviceSize === 'tablet' && styles.subtitleTablet,
+        ]}>
+          Pet care wellness, one tap away!
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -48,20 +72,40 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
+    paddingVertical: hp(5),
   },
 
   title: {
-    fontSize: scaleFontSize(isSmallDevice() ? 50 : 60),
+    fontSize: scaleFontSize(60),
     fontFamily: "SFProBold",
     color: '#1C86FF',
-    paddingHorizontal: wp(isSmallDevice() ? 12 : 16),
+    textAlign: 'center',
+    marginBottom: hp(1.5),
   },
+  titleSmall: {
+    fontSize: scaleFontSize(48),
+    marginBottom: hp(1),
+  },
+  titleTablet: {
+    fontSize: scaleFontSize(80),
+    marginBottom: hp(2),
+  },
+
   subtitle: {
     fontFamily: "SFProReg",
-    fontSize: scaleFontSize(isSmallDevice() ? 20 : 25),
+    fontSize: scaleFontSize(24),
     color: '#FF6F61',
     textAlign: 'center',
     marginTop: moderateScale(10),
+    paddingHorizontal: wp(5),
+  },
+  subtitleSmall: {
+    fontSize: scaleFontSize(18),
+    marginTop: moderateScale(8),
+  },
+  subtitleTablet: {
+    fontSize: scaleFontSize(32),
+    marginTop: moderateScale(15),
+    paddingHorizontal: wp(10),
   },
 });

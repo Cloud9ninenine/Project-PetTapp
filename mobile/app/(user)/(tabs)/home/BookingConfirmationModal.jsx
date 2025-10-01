@@ -9,9 +9,12 @@ import {
   Animated,
   Dimensions,
   Platform,
+  ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Picker } from '@react-native-picker/picker';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -20,11 +23,33 @@ export default function BookingConfirmationModal({
   visible,
   onClose,
   onConfirm,
-  serviceName,
-  serviceCategory,
-  servicePrice
+  bookingData,
 }) {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
+
+  // Mock pets data
+  const pets = [
+    { id: '1', name: 'Max', type: 'Dog', breed: 'Golden Retriever' },
+    { id: '2', name: 'Luna', type: 'Cat', breed: 'Persian' },
+    { id: '3', name: 'Charlie', type: 'Dog', breed: 'Beagle' },
+  ];
+
+  // Mock payment options
+  const [paymentOptions, setPaymentOptions] = useState([
+    { id: '1', name: 'Visa', cardNumber: '**** **** **** 1234', type: 'visa' },
+    { id: '2', name: 'Mastercard', cardNumber: '**** **** **** 5678', type: 'mastercard' },
+  ]);
+
+  const transportationOptions = [
+    { id: '1', label: 'Own Transportation', icon: 'car-outline' },
+    { id: '2', label: 'PetTapp Rider', icon: 'bicycle-outline' },
+    { id: '3', label: 'Walk-in', icon: 'walk-outline' },
+  ];
+
+  const [selectedPet, setSelectedPet] = useState('');
+  const [selectedTransportation, setSelectedTransportation] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [pickupAddress, setPickupAddress] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -48,6 +73,7 @@ export default function BookingConfirmationModal({
   }, [visible]);
 
   const getServiceImage = () => {
+    const serviceName = bookingData?.service?.name;
     if (serviceName === 'Animed Veterinary Clinic') {
       return require('@assets/images/serviceimages/17.png');
     } else if (serviceName === 'Vetfusion Animal Clinic') {
@@ -111,10 +137,27 @@ export default function BookingConfirmationModal({
   };
 
   const handleConfirm = () => {
-    onConfirm({
+    if (!selectedPet || !selectedTransportation || !selectedPayment) {
+      alert('Please fill all required fields');
+      return;
+    }
+
+    if (selectedTransportation === '2' && !pickupAddress) {
+      alert('Please enter pickup address for PetTapp Rider');
+      return;
+    }
+
+    const data = {
+      service: bookingData?.service,
+      pet: pets.find(p => p.id === selectedPet),
+      transportation: transportationOptions.find(t => t.id === selectedTransportation),
+      payment: paymentOptions.find(p => p.id === selectedPayment),
+      pickupAddress: selectedTransportation === '2' ? pickupAddress : null,
       date: formatDate(selectedDate),
-      time: formatTime(selectedTime)
-    });
+      time: formatTime(selectedTime),
+    };
+
+    onConfirm(data);
   };
 
   if (!visible) return null;
@@ -127,12 +170,12 @@ export default function BookingConfirmationModal({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity 
-          style={styles.overlayTouchable} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.overlayTouchable}
+          activeOpacity={1}
           onPress={onClose}
         />
-        
+
         <Animated.View
           style={[
             styles.modalContainer,
@@ -141,63 +184,174 @@ export default function BookingConfirmationModal({
             }
           ]}
         >
-          <View style={styles.handleBar} />
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.handleBar} />
 
-          <Text style={styles.modalTitle}>Book Confirmation</Text>
-          <Text style={styles.modalSubtitle}>
-            This service will be booked to {'\n'}the selected schedule.
-          </Text>
+            <Text style={styles.modalTitle}>Book Confirmation</Text>
+            <Text style={styles.modalSubtitle}>
+              This service will be booked to {'\n'}the selected schedule.
+            </Text>
 
-          <View style={styles.serviceCard}>
-            <Image source={getServiceImage()} style={styles.serviceImage} />
-            <View style={styles.serviceInfo}>
-              <Text style={styles.serviceName}>{serviceName}</Text>
-              <Text style={styles.serviceCategory}>{serviceCategory}</Text>
-              <Text style={styles.servicePrice}>{servicePrice}</Text>
-              <View style={styles.starsContainer}>
-                {renderStars()}
+            <View style={styles.serviceCard}>
+              <Image source={getServiceImage()} style={styles.serviceImage} />
+              <View style={styles.serviceInfo}>
+                <Text style={styles.serviceName}>{bookingData?.service?.name}</Text>
+                <Text style={styles.serviceCategory}>{bookingData?.service?.type}</Text>
+                <View style={styles.starsContainer}>
+                  {renderStars()}
+                </View>
               </View>
             </View>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Date</Text>
-            <TouchableOpacity style={styles.inputField} onPress={() => setShowDatePicker(true)}>
-              <Text style={styles.inputText}>
-                {formatDate(selectedDate)}
-              </Text>
-              <View style={styles.calendarIcon}>
-                <Text style={styles.calendarIconText}>📅</Text>
+            <View style={styles.divider} />
+
+            {/* Pet Selection */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Select Pet *</Text>
+              <View style={styles.pickerContainer}>
+                <Ionicons name="paw" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
+                <Picker
+                  selectedValue={selectedPet}
+                  onValueChange={(itemValue) => setSelectedPet(itemValue)}
+                  style={styles.picker}
+                  dropdownIconColor="#fff"
+                >
+                  <Picker.Item label="Choose your pet" value="" />
+                  {pets.map((pet) => (
+                    <Picker.Item
+                      key={pet.id}
+                      label={`${pet.name} (${pet.type} - ${pet.breed})`}
+                      value={pet.id}
+                    />
+                  ))}
+                </Picker>
               </View>
-            </TouchableOpacity>
-          </View>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Time</Text>
-            <TouchableOpacity style={styles.inputField} onPress={() => setShowTimePicker(true)}>
-              <Text style={styles.inputText}>
-                {formatTime(selectedTime)}
-              </Text>
-              <View style={styles.dropdownIcon}>
-                <Text style={styles.dropdownIconText}>⌄</Text>
+            {/* Transportation */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Transportation *</Text>
+              <View style={styles.transportationRow}>
+                {transportationOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      styles.transportationCard,
+                      selectedTransportation === option.id && styles.transportationCardSelected
+                    ]}
+                    onPress={() => setSelectedTransportation(option.id)}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={moderateScale(24)}
+                      color={selectedTransportation === option.id ? '#fff' : '#1C86FF'}
+                    />
+                    <Text style={[
+                      styles.transportationLabel,
+                      selectedTransportation === option.id && styles.transportationLabelSelected
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={styles.bookButton} 
-              onPress={handleConfirm}
-            >
-              <Text style={styles.bookButtonText}>Book</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.chatButton} 
-              onPress={onClose}
-            >
-              <Text style={styles.chatButtonText}>Chat</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Pickup Address (conditional) */}
+              {selectedTransportation === '2' && (
+                <View style={styles.addressInputContainer}>
+                  <Ionicons name="location-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <TextInput
+                    style={styles.addressInput}
+                    placeholder="Enter pickup address *"
+                    placeholderTextColor="#999"
+                    value={pickupAddress}
+                    onChangeText={setPickupAddress}
+                    multiline
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Payment Method */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Payment Method *</Text>
+              {paymentOptions.map((card) => (
+                <TouchableOpacity
+                  key={card.id}
+                  style={[
+                    styles.paymentCard,
+                    selectedPayment === card.id && styles.paymentCardSelected
+                  ]}
+                  onPress={() => setSelectedPayment(card.id)}
+                >
+                  <Ionicons
+                    name="card"
+                    size={moderateScale(28)}
+                    color={selectedPayment === card.id ? '#fff' : '#1C86FF'}
+                  />
+                  <View style={styles.cardDetails}>
+                    <Text style={[
+                      styles.paymentCardName,
+                      selectedPayment === card.id && styles.paymentCardNameSelected
+                    ]}>
+                      {card.name}
+                    </Text>
+                    <Text style={[
+                      styles.paymentCardNumber,
+                      selectedPayment === card.id && styles.paymentCardNumberSelected
+                    ]}>
+                      {card.cardNumber}
+                    </Text>
+                  </View>
+                  {selectedPayment === card.id && (
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Date */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Date</Text>
+              <TouchableOpacity style={styles.inputField} onPress={() => setShowDatePicker(true)}>
+                <Text style={styles.inputText}>
+                  {bookingData?.date || formatDate(selectedDate)}
+                </Text>
+                <View style={styles.calendarIcon}>
+                  <Text style={styles.calendarIconText}>📅</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Time */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Time</Text>
+              <TouchableOpacity style={styles.inputField} onPress={() => setShowTimePicker(true)}>
+                <Text style={styles.inputText}>
+                  {bookingData?.time || formatTime(selectedTime)}
+                </Text>
+                <View style={styles.dropdownIcon}>
+                  <Text style={styles.dropdownIconText}>⌄</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.bookButton}
+                onPress={handleConfirm}
+              >
+                <Text style={styles.bookButtonText}>Book</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.chatButton}
+                onPress={onClose}
+              >
+                <Text style={styles.chatButtonText}>Chat</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </Animated.View>
       </View>
 
@@ -238,10 +392,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: moderateScale(20),
     borderTopRightRadius: moderateScale(20),
-    paddingHorizontal: moderateScale(20),
-    paddingBottom: moderateScale(40),
+    paddingHorizontal: moderateScale(18),
+    paddingBottom: moderateScale(30),
     paddingTop: moderateScale(10),
-    minHeight: moderateScale(450),
+    maxHeight: screenHeight * 0.9,
   },
   handleBar: {
     width: moderateScale(40),
@@ -269,10 +423,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#f8f8f8',
     borderRadius: moderateScale(12),
-    padding: moderateScale(15),
-    marginBottom: moderateScale(30),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(12),
     borderWidth: 1,
     borderColor: '#1C86FF',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginBottom: moderateScale(15),
   },
   serviceImage: {
     width: moderateScale(60),
@@ -294,11 +453,6 @@ const styles = StyleSheet.create({
   serviceCategory: {
     fontSize: scaleFontSize(12),
     color: '#FF9B79',
-    marginBottom: moderateScale(4),
-  },
-  servicePrice: {
-    fontSize: scaleFontSize(12),
-    color: '#666',
     marginBottom: moderateScale(6),
   },
   starsContainer: {
@@ -306,10 +460,10 @@ const styles = StyleSheet.create({
     gap: moderateScale(1),
   },
   inputContainer: {
-    marginBottom: moderateScale(20),
+    marginBottom: moderateScale(12),
   },
   inputLabel: {
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(13),
     fontWeight: '600',
     color: '#333',
     marginBottom: moderateScale(8),
@@ -322,6 +476,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  inputIcon: {
+    marginRight: moderateScale(10),
   },
   inputText: {
     flex: 1,
@@ -351,8 +508,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
-    gap: moderateScale(15),
-    marginTop: moderateScale(20),
+    gap: moderateScale(12),
+    marginTop: moderateScale(15),
   },
   bookButton: {
     flex: 1,
@@ -380,177 +537,102 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarContainer: {
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(15),
-    padding: moderateScale(20),
-    width: '90%',
-    maxHeight: '80%',
-  },
-  pickerTitle: {
-    fontSize: scaleFontSize(20),
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    textAlign: 'center',
-    marginBottom: moderateScale(20),
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: moderateScale(20),
-  },
-  navButton: {
-    fontSize: scaleFontSize(24),
-    color: '#1C86FF',
-    fontWeight: 'bold',
+  // Picker styles
+  pickerContainer: {
+    backgroundColor: '#1C86FF',
+    borderRadius: moderateScale(8),
     paddingHorizontal: moderateScale(15),
-  },
-  monthYearText: {
-    fontSize: scaleFontSize(18),
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  daysOfWeekContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: moderateScale(10),
-  },
-  dayOfWeekText: {
-    fontSize: scaleFontSize(14),
-    fontWeight: 'bold',
-    color: '#666',
-    width: moderateScale(40),
-    textAlign: 'center',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-  },
-  emptyDay: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-  },
-  dayButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: moderateScale(20),
-    marginBottom: moderateScale(5),
   },
-  todayButton: {
-    backgroundColor: '#E3F2FD',
-  },
-  selectedDayButton: {
-    backgroundColor: '#1C86FF',
-  },
-  pastDayButton: {
-    opacity: 0.3,
-  },
-  dayText: {
-    fontSize: scaleFontSize(16),
-    color: '#333',
-  },
-  todayText: {
-    color: '#1C86FF',
-    fontWeight: 'bold',
-  },
-  selectedDayText: {
+  picker: {
+    flex: 1,
     color: '#fff',
-    fontWeight: 'bold',
+    height: moderateScale(50),
   },
-  pastDayText: {
-    color: '#999',
-  },
-  timePickerContainer: {
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(15),
-    padding: moderateScale(20),
-    width: '85%',
-    maxHeight: '70%',
-  },
-  timePickerContent: {
+  // Transportation styles
+  transportationRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    height: moderateScale(200),
+    gap: moderateScale(8),
+    marginBottom: moderateScale(8),
   },
-  timeColumn: {
+  transportationCard: {
     flex: 1,
     alignItems: 'center',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(6),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#E3F2FD',
+    borderWidth: 2,
+    borderColor: '#B3D9FF',
   },
-  timeColumnLabel: {
-    fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
+  transportationCardSelected: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+    borderWidth: 2,
+  },
+  transportationLabel: {
+    fontSize: scaleFontSize(10),
     color: '#1C86FF',
-    marginBottom: moderateScale(10),
+    marginTop: moderateScale(6),
+    textAlign: 'center',
+    fontWeight: '600',
   },
-  timeScrollView: {
-    maxHeight: moderateScale(150),
+  transportationLabelSelected: {
+    color: '#fff',
+    fontWeight: '700',
   },
-  timeOption: {
-    paddingVertical: moderateScale(10),
-    paddingHorizontal: moderateScale(20),
-    marginVertical: moderateScale(2),
+  addressInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: moderateScale(8),
+    padding: moderateScale(12),
     borderRadius: moderateScale(8),
-    backgroundColor: '#f8f8f8',
-    minWidth: moderateScale(60),
-    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    borderWidth: 1,
+    borderColor: '#B3D9FF',
   },
-  selectedTimeOption: {
-    backgroundColor: '#1C86FF',
-  },
-  timeOptionText: {
-    fontSize: scaleFontSize(16),
+  addressInput: {
+    flex: 1,
+    marginLeft: moderateScale(8),
+    fontSize: scaleFontSize(14),
     color: '#333',
-    fontWeight: '600',
+    minHeight: moderateScale(45),
+    textAlignVertical: 'top',
   },
-  selectedTimeText: {
-    color: '#fff',
-  },
-  periodContainer: {
+  // Payment card styles
+  paymentCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  periodOption: {
-    paddingVertical: moderateScale(10),
-    paddingHorizontal: moderateScale(20),
-    marginVertical: moderateScale(5),
+    padding: moderateScale(10),
     borderRadius: moderateScale(8),
-    backgroundColor: '#f8f8f8',
-    minWidth: moderateScale(60),
-    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    borderWidth: 2,
+    borderColor: '#B3D9FF',
+    marginBottom: moderateScale(8),
   },
-  timePickerButtons: {
-    marginTop: moderateScale(20),
-  },
-  timeConfirmButton: {
+  paymentCardSelected: {
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(15),
-    borderRadius: moderateScale(10),
-    alignItems: 'center',
-    marginBottom: moderateScale(10),
+    borderColor: '#1C86FF',
   },
-  timeConfirmText: {
-    fontSize: scaleFontSize(16),
-    color: '#fff',
-    fontWeight: 'bold',
+  cardDetails: {
+    flex: 1,
+    marginLeft: moderateScale(12),
   },
-  pickerCloseButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: moderateScale(15),
-    borderRadius: moderateScale(10),
-    alignItems: 'center',
-  },
-  pickerCloseText: {
-    fontSize: scaleFontSize(16),
-    color: '#666',
+  paymentCardName: {
+    fontSize: scaleFontSize(14),
     fontWeight: '600',
+    color: '#1C86FF',
+  },
+  paymentCardNameSelected: {
+    color: '#fff',
+  },
+  paymentCardNumber: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    marginTop: moderateScale(2),
+  },
+  paymentCardNumberSelected: {
+    color: 'rgba(255, 255, 255, 0.9)',
   },
 });

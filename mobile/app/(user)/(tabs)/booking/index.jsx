@@ -6,10 +6,11 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ImageBackground,
   useWindowDimensions,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import Header from "@components/Header";
@@ -96,7 +97,7 @@ const Bookings = () => {
     >
       {/* Icon inside circle */}
       <View style={styles.circlePlaceholder}>
-        <Ionicons name={item.icon} size={moderateScale(30)} color="#1C86FF" />
+        <Ionicons name={item.icon} size={hp(4)} color="#1C86FF" />
       </View>
 
       {/* Details */}
@@ -185,13 +186,14 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: moderateScale(15),
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(15),
     paddingHorizontal: moderateScale(15),
     borderRadius: moderateScale(10),
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#1C86FF',
-    height: moderateScale(50),
+    height: hp(6),
   },
   searchIcon: {
     marginRight: moderateScale(8),
@@ -215,12 +217,12 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(12),
     borderWidth: 1,
     borderColor: '#1C86FF',
-    minHeight: moderateScale(100),
+    minHeight: hp(12),
   },
   circlePlaceholder: {
-    width: moderateScale(75),
-    height: moderateScale(75),
-    borderRadius: moderateScale(50),
+    width: hp(9),
+    height: hp(9),
+    borderRadius: hp(4.5),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',

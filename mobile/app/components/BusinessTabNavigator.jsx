@@ -1,40 +1,7 @@
-// components/FooterTabs.jsx
+// components/BusinessTabNavigator.jsx
 import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { moderateScale, scaleFontSize } from "@utils/responsive";
-
-const userTabs = [
-  {
-    name: "home",
-    route: "/(user)/(tabs)/home",
-    label: "Home",
-    icon: require("@assets/images/service_icon/home icon.png"),
-  },
-  {
-    name: "messages",
-    route: "/(user)/(tabs)/messages",
-    label: "Messages",
-    icon: require("@assets/images/service_icon/message icon.png"),
-  },
-  {
-    name: "my-pets",
-    route: "/(user)/(tabs)/my-pets",
-    label: "My Pets",
-    icon: require("@assets/images/service_icon/Pet Icon.png"),
-  },
-  {
-    name: "booking",
-    route: "/(user)/(tabs)/booking",
-    label: "Booking",
-    icon: require("@assets/images/service_icon/calendar icon.png"),
-  },
-  {
-    name: "profile",
-    route: "/(user)/(tabs)/profile",
-    label: "Profile",
-    icon: require("@assets/images/service_icon/user icon.png"),
-  },
-];
 
 const businessTabs = [
   {
@@ -69,14 +36,10 @@ const businessTabs = [
   },
 ];
 
-export default function FooterTabs() {
+export default function BusinessTabNavigator() {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-
-  // Determine if we're in business or user mode
-  const isBusiness = pathname.includes("/(bsn)");
-  const tabs = isBusiness ? businessTabs : userTabs;
 
   // Determine if screen is very narrow (slim phone)
   const isVeryNarrow = width < 360;
@@ -84,7 +47,7 @@ export default function FooterTabs() {
 
   return (
     <View style={styles.container}>
-      {tabs.map((tab) => {
+      {businessTabs.map((tab) => {
         const isFocused = pathname.includes(tab.name);
 
         return (

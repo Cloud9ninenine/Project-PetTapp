@@ -5,12 +5,13 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ImageBackground,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 

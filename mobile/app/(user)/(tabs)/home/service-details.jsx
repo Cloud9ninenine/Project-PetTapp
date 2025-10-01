@@ -3,13 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   TouchableOpacity,
   ImageBackground,
   useWindowDimensions,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
@@ -24,16 +25,42 @@ export default function ServiceDetailsScreen() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Get image based on service name or ID
+  // Get image based on service type and name
   const getServiceImage = () => {
+    const serviceType = params.serviceType;
     const serviceName = params.name;
-    if (serviceName === 'Animed Veterinary Clinic') {
-      return require('@assets/images/serviceimages/17.png');
-    } else if (serviceName === 'Vetfusion Animal Clinic') {
-      return require('@assets/images/serviceimages/19.png');
-    } else {
-      return require('@assets/images/serviceimages/18.png'); // Default for PetCo
+
+    // Veterinary services
+    if (serviceType === 'veterinary' || !serviceType) {
+      if (serviceName === 'Animed Veterinary Clinic') {
+        return require('@assets/images/serviceimages/17.png');
+      } else if (serviceName === 'Vetfusion Animal Clinic') {
+        return require('@assets/images/serviceimages/19.png');
+      } else {
+        return require('@assets/images/serviceimages/18.png');
+      }
     }
+
+    // Grooming services
+    if (serviceType === 'grooming') {
+      return require('@assets/images/serviceimages/21.png');
+    }
+
+    // Boarding services
+    if (serviceType === 'boarding') {
+      if (serviceName === 'PetCity Daycare') {
+        return require('@assets/images/serviceimages/16.png');
+      }
+      return require('@assets/images/serviceimages/22.png');
+    }
+
+    // Delivery services
+    if (serviceType === 'delivery') {
+      return require('@assets/images/serviceimages/23.png');
+    }
+
+    // Default fallback
+    return require('@assets/images/serviceimages/18.png');
   };
 
   // Mock data - in a real app, you'd fetch this based on the service ID
@@ -89,15 +116,60 @@ export default function ServiceDetailsScreen() {
     return stars;
   };
 
+  // Create mock booking data for confirmation modal
+  const mockBookingData = {
+    service: {
+      name: serviceData.name,
+      type: serviceData.category,
+    },
+    pet: {
+      name: 'Your Pet',
+      type: 'Pet',
+    },
+    transportation: {
+      label: 'To be selected',
+    },
+    payment: {
+      name: 'To be selected',
+    },
+    date: new Date().toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    time: new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }),
+  };
+
   const handleBooking = () => {
     setShowBookingModal(true);
   };
 
   const handleConfirmBooking = () => {
     setShowBookingModal(false);
-    // Here you would typically handle the actual booking logic
-    // For now, we'll just close the modal
-    alert('Booking confirmed!');
+    // Navigate to service-scheduled page
+    router.push({
+      pathname: 'home/service-scheduled',
+      params: {
+        serviceName: serviceData.name,
+        date: new Date().toLocaleDateString('en-US', {
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        time: new Date().toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        }),
+        petName: 'Your Pet', // Default since no pet selection in service-details
+      },
+    });
   };
 
   const handleCancelBooking = () => {
@@ -230,9 +302,7 @@ export default function ServiceDetailsScreen() {
         visible={showBookingModal}
         onClose={handleCancelBooking}
         onConfirm={handleConfirmBooking}
-        serviceName={serviceData.name}
-        serviceCategory={serviceData.category}
-        servicePrice={serviceData.price}
+        bookingData={mockBookingData}
       />
     </SafeAreaView>
   );

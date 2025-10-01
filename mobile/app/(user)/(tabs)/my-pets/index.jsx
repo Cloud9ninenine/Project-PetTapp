@@ -3,13 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   Image,
   ImageBackground,
   useWindowDimensions,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Header from '@components/Header';
@@ -244,13 +245,13 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#1C86FF',
     borderStyle: 'dashed',
-    padding: moderateScale(32),
+    padding: moderateScale(15),
     alignItems: 'center',
     justifyContent: 'center',
   },
   addIconCircle: {
-    width: moderateScale(80),
-    height: moderateScale(80),
+    width: moderateScale(50),
+    height: moderateScale(50),
     borderRadius: moderateScale(40),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',

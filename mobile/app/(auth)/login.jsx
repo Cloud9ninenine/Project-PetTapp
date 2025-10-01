@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { Link, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function LoginScreen() {
@@ -34,10 +34,16 @@ export default function LoginScreen() {
     setTimeout(() => {
       setIsLoading(false);
 
+      // Check for business credentials
+      if (email.toLowerCase() === "business" && password === "business123") {
+        router.replace("/(bsn)/(tabs)/home");
+      }
       // 🟢 Fake condition: if email contains "new", go to setup
-      if (email.includes("new")) {
+      else if (email.includes("new")) {
         router.replace("/(auth)/initial-setup");
-      } else {
+      }
+      // Default user login
+      else {
         router.replace("/(user)/(tabs)/home");
       }
     }, 1000);

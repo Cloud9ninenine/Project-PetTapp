@@ -4,10 +4,10 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ImageBackground,
 } from "react-native";
 import { router } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function InitialSetupScreen() {

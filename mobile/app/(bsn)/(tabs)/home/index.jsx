@@ -6,157 +6,247 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  ImageBackground,
   Image,
-  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import SearchHeader from "@components/SearchHeader";
+import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 
-export default function HomeScreen() {
-  const [searchQuery, setSearchQuery] = useState("");
+export default function BusinessDashboard() {
   const router = useRouter();
+  const businessName = "PetCare Business";
 
-  const services = [
+  // Business services (similar to nearby services)
+  const businessServices = [
     {
       id: 1,
-      title: "Veterinary",
-      icon: require("@assets/images/service_icon/10.png"),
-      color: "#FF9B79",
-      route: "home/veterinary-services",
+      name: "Veterinary Check-up",
+      image: require("@assets/images/serviceimages/17.png"),
+      category: "Veterinary",
     },
     {
       id: 2,
-      title: "Grooming",
-      icon: require("@assets/images/service_icon/11.png"),
-      color: "#FF9B79",
-      route: "grooming-services",
+      name: "Pet Grooming",
+      image: require("@assets/images/serviceimages/21.png"),
+      category: "Grooming",
     },
     {
       id: 3,
-      title: "Boarding",
-      icon: require("@assets/images/service_icon/12.png"),
-      color: "#FF9B79",
-      route: "boarding-services",
+      name: "Pet Boarding",
+      image: require("@assets/images/serviceimages/22.png"),
+      category: "Boarding",
     },
     {
       id: 4,
-      title: "Delivery",
-      icon: require("@assets/images/service_icon/13.png"),
-      color: "#FF9B79",
-      route: "delivery-services",
+      name: "Pet Delivery",
+      image: require("@assets/images/serviceimages/23.png"),
+      category: "Delivery",
     },
   ];
 
-  const nearbyServices = [
+  // Business metrics cards
+  const businessMetrics = [
     {
       id: 1,
-      name: "PetCity Daycare",
-      image: require("@assets/images/serviceimages/16.png"),
-      rating: 4.8,
+      title: "Total Bookings",
+      value: "245",
+      icon: "calendar",
+      color: "#4CAF50",
+      route: "../booking",
     },
     {
       id: 2,
-      name: "Prinz Aviary",
-      image: require("@assets/images/serviceimages/14.png"),
-      rating: 4.9,
+      title: "Revenue",
+      value: "₱45.2K",
+      icon: "cash",
+      color: "#2196F3",
     },
     {
       id: 3,
-      name: "Petkeeper Co.",
-      image: require("@assets/images/serviceimages/15.png"),
-      rating: 4.7,
+      title: "Pending",
+      value: "12",
+      icon: "time",
+      color: "#FF9B79",
+    },
+    {
+      id: 4,
+      title: "Reviews",
+      value: "4.8⭐",
+      icon: "star",
+      color: "#FFD700",
     },
   ];
 
-  const handleServicePress = (service) => {
-    if (service.route) {
-      router.push(service.route);
+  // Today's appointments / Recent bookings
+  const todaysAppointments = [
+    {
+      id: 1,
+      customerName: "John Doe",
+      petName: "Max",
+      service: "Veterinary Check-up",
+      time: "10:00 AM",
+      status: "confirmed",
+      icon: "medical",
+    },
+    {
+      id: 2,
+      customerName: "Jane Smith",
+      petName: "Luna",
+      service: "Grooming",
+      time: "2:30 PM",
+      status: "pending",
+      icon: "cut",
+    },
+    {
+      id: 3,
+      customerName: "Mike Johnson",
+      petName: "Buddy",
+      service: "Pet Boarding",
+      time: "4:00 PM",
+      status: "confirmed",
+      icon: "home",
+    },
+  ];
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'confirmed':
+        return '#4CAF50';
+      case 'pending':
+        return '#FF9B79';
+      case 'cancelled':
+        return '#FF6B6B';
+      default:
+        return '#999';
     }
   };
 
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
+  const renderCustomTitle = () => (
+    <View style={styles.headerContent}>
+      <View style={styles.headerLeftContent}>
+        <TouchableOpacity style={styles.profileImageContainer}>
+          <View style={styles.profilePlaceholder}>
+            <Ionicons name="storefront" size={moderateScale(24)} color="#1C86FF" />
+          </View>
+        </TouchableOpacity>
 
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={moderateScale(12)} color="#FFD700" />);
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(12)} color="#FFD700" />);
-      } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(12)} color="#E0E0E0" />);
-      }
-    }
-    return stars;
-  };
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.welcomeText}>Welcome Back!</Text>
+          <Text style={styles.businessNameHeader}>{businessName}</Text>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
+
+      <Header
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderCustomTitle()}
+        showBack={false}
+        rightIcon="notifications-outline"
+        onRightIconPress={() => console.log("🔔 Business Notification")}
+      />
+
       <ScrollView showsVerticalScrollIndicator={false}>
-        <SearchHeader
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onNotifPress={() => console.log("🔔 Notification tapped")}
-        />
-
         <View style={styles.mainContent}>
-          {/* Featured Card */}
-          <View style={styles.featuredCard}>
-            <Image
-              source={require("@assets/images/serviceimages/Vet Care.png")}
-              style={styles.featuredImage}
-            />
-            <View style={styles.overlay}>
-              <Text style={styles.featuredTitle}>Wellness Check-up</Text>
-              <Text style={styles.featuredSubtitle}>Pet Clinic</Text>
-              <View style={styles.starsContainer}>{renderStars(4.9)}</View>
-            </View>
-            <View style={styles.playButton}>
-              <Text style={styles.playText}>▶</Text>
-            </View>
-          </View>
 
-          {/* Services Grid */}
-          <View style={styles.servicesGrid}>
-            {services.map((service) => (
+          {/* Business Metrics Grid */}
+          <View style={styles.metricsGrid}>
+            {businessMetrics.map((metric) => (
               <TouchableOpacity
-                key={service.id}
-                style={styles.serviceCard}
-                onPress={() => handleServicePress(service)}
+                key={metric.id}
+                style={styles.metricCard}
+                onPress={() => metric.route && router.push(metric.route)}
               >
-                <View
-                  style={[
-                    styles.serviceIconContainer,
-                    { backgroundColor: service.color },
-                  ]}
-                >
-                  <Image source={service.icon} style={styles.serviceIcon} />
+                <View style={[styles.metricIconContainer, { backgroundColor: metric.color }]}>
+                  <Ionicons name={metric.icon} size={moderateScale(24)} color="#fff" />
                 </View>
-                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.metricValue}>{metric.value}</Text>
+                <Text style={styles.metricTitle}>{metric.title}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Nearby Services Title */}
-          <Text style={styles.sectionTitle}>Nearby Services</Text>
+          {/* Today's Schedule Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Appointments</Text>
+            <TouchableOpacity onPress={() => router.push("../booking")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Nearby Services Grid */}
-          <View style={styles.nearbyGrid}>
-            {nearbyServices.map((service) => (
-              <View key={service.id} style={styles.nearbyCard}>
-                <Image source={service.image} style={styles.nearbyImage} />
-                <View style={styles.nearbyInfo}>
-                  <Text style={styles.nearbyName}>{service.name}</Text>
-                  <View style={styles.starsContainer}>
-                    {renderStars(service.rating)}
-                    <Text style={styles.ratingText}>({service.rating})</Text>
-                  </View>
+          {/* Appointments List */}
+          <View style={styles.appointmentsList}>
+            {todaysAppointments.map((appointment) => (
+              <TouchableOpacity
+                key={appointment.id}
+                style={styles.appointmentCard}
+                onPress={() => router.push("../booking")}
+              >
+                <View style={styles.appointmentIconContainer}>
+                  <Ionicons
+                    name={appointment.icon}
+                    size={moderateScale(28)}
+                    color="#1C86FF"
+                  />
                 </View>
-              </View>
+                <View style={styles.appointmentInfo}>
+                  <Text style={styles.appointmentCustomer}>{appointment.customerName}</Text>
+                  <Text style={styles.appointmentService}>
+                    {appointment.service} • {appointment.petName}
+                  </Text>
+                  <Text style={styles.appointmentTime}>⏰ {appointment.time}</Text>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(appointment.status) }
+                ]}>
+                  <Text style={styles.statusText}>
+                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
             ))}
+          </View>
+
+          {/* My Services Section */}
+          <View style={styles.servicesSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>My Services</Text>
+              <TouchableOpacity onPress={() => router.push("../my-services")}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.servicesGrid}>
+              {businessServices.map((service) => (
+                <TouchableOpacity
+                  key={service.id}
+                  style={styles.serviceCard}
+                  onPress={() => router.push("../my-services")}
+                >
+                  <View style={styles.serviceCardInner}>
+                    <View style={styles.serviceImageContainer}>
+                      <Image source={service.image} style={styles.serviceImage} />
+                    </View>
+                  </View>
+                  <View style={styles.serviceCardInfo}>
+                    <Text style={styles.serviceName}>{service.name}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -167,138 +257,209 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#f8f9fa",
+  },
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+  backgroundImageStyle: {
+    opacity: 0.05,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flex: 1,
+  },
+  headerLeftContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  profileImageContainer: {
+    marginRight: moderateScale(12),
+  },
+  profilePlaceholder: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
+    backgroundColor: "#E3F2FD",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  welcomeText: {
+    fontSize: scaleFontSize(12),
+    color: "#fff",
+    fontFamily: "SFProReg",
+  },
+  businessNameHeader: {
+    fontSize: scaleFontSize(16),
+    fontWeight: "bold",
+    color: "#fff",
+    fontFamily: "SFProBold",
   },
   mainContent: {
-    alignItems: "center",
     paddingHorizontal: wp(5),
+    paddingTop: moderateScale(20),
     paddingBottom: moderateScale(100),
   },
-  featuredCard: {
-    position: "relative",
-    borderRadius: moderateScale(16),
-    overflow: "hidden",
-    height: hp(24),
-    width: "100%",
-    marginTop: moderateScale(20),
-    marginBottom: moderateScale(30),
-  },
-  featuredImage: {
-    width: "100%",
-    height: "100%",
-  },
-  overlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    padding: moderateScale(16),
-  },
-  featuredTitle: {
-    fontSize: scaleFontSize(20),
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: moderateScale(4),
-  },
-  featuredSubtitle: {
-    fontSize: scaleFontSize(14),
-    color: "#fff",
-    opacity: 0.9,
-    marginBottom: moderateScale(8),
-  },
-  playButton: {
-    position: "absolute",
-    top: moderateScale(16),
-    right: moderateScale(16),
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  playText: {
-    color: "#fff",
-    fontSize: scaleFontSize(16),
-  },
-  servicesGrid: {
+  metricsGrid: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginBottom: moderateScale(30),
-  },
-  serviceCard: {
-    alignItems: "center",
-    flex: 1,
-  },
-  serviceIconContainer: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(15),
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: moderateScale(8),
-  },
-  serviceIcon: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    tintColor: "#fff",
-  },
-  serviceTitle: {
-    fontSize: scaleFontSize(12),
-    color: "#333",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  sectionTitle: {
-    fontSize: scaleFontSize(20),
-    fontWeight: "bold",
-    color: "#1C86FF",
-    marginBottom: moderateScale(20),
-    textAlign: "center",
-  },
-  nearbyGrid: {
-    flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    width: "100%",
-    gap: moderateScale(10),
+    marginBottom: moderateScale(30),
+    gap: moderateScale(12),
   },
-  nearbyCard: {
-    flex: 1,
+  metricCard: {
+    width: "48%",
     backgroundColor: "#fff",
-    borderRadius: moderateScale(12),
-    overflow: "hidden",
-    elevation: 2,
+    borderRadius: moderateScale(16),
+    padding: moderateScale(16),
+    alignItems: "center",
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  nearbyImage: {
-    width: "100%",
-    height: hp(10),
-  },
-  nearbyInfo: {
-    padding: moderateScale(10),
+  metricIconContainer: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    justifyContent: "center",
     alignItems: "center",
+    marginBottom: moderateScale(10),
   },
-  nearbyName: {
-    fontSize: scaleFontSize(12),
-    fontWeight: "600",
+  metricValue: {
+    fontSize: scaleFontSize(24),
+    fontWeight: "bold",
     color: "#333",
     marginBottom: moderateScale(4),
+  },
+  metricTitle: {
+    fontSize: scaleFontSize(12),
+    color: "#666",
     textAlign: "center",
   },
-  starsContainer: {
+  sectionHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: moderateScale(1),
+    marginBottom: moderateScale(15),
   },
-  ratingText: {
-    fontSize: scaleFontSize(10),
+  sectionTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: "bold",
+    color: "#1C86FF",
+    marginBottom: moderateScale(15),
+  },
+  viewAllText: {
+    fontSize: scaleFontSize(14),
+    color: "#1C86FF",
+    fontWeight: "600",
+  },
+  appointmentsList: {
+    marginBottom: moderateScale(30),
+  },
+  appointmentCard: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(12),
+    alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  appointmentIconContainer: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: "#E3F2FD",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: moderateScale(12),
+  },
+  appointmentInfo: {
+    flex: 1,
+  },
+  appointmentCustomer: {
+    fontSize: scaleFontSize(15),
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: moderateScale(4),
+  },
+  appointmentService: {
+    fontSize: scaleFontSize(13),
     color: "#666",
-    marginLeft: moderateScale(4),
-    fontWeight: "500",
+    marginBottom: moderateScale(4),
+  },
+  appointmentTime: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+  },
+  statusBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+  },
+  statusText: {
+    fontSize: scaleFontSize(11),
+    color: "#fff",
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  servicesSection: {
+    width: "100%",
+  },
+  servicesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: moderateScale(12),
+  },
+  serviceCard: {
+    width: "48%",
+    marginBottom: moderateScale(15),
+  },
+  serviceCardInner: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: moderateScale(12),
+    overflow: "hidden",
+    backgroundColor: "#fff",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  serviceImageContainer: {
+    width: "100%",
+    height: "100%",
+  },
+  serviceImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  serviceCardInfo: {
+    backgroundColor: "transparent",
+    paddingTop: moderateScale(8),
+    alignItems: "center",
+  },
+  serviceName: {
+    fontSize: scaleFontSize(13),
+    fontWeight: "600",
+    color: "#1C86FF",
+    textAlign: "center",
+    fontFamily: "SFProMedium",
   },
 });

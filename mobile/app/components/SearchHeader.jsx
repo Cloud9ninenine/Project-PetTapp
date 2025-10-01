@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hp, wp, moderateScale, scaleFontSize } from "@utils/responsive";
 
-export default function SearchHeader({ searchQuery, setSearchQuery }) {
+export default function SearchHeader({ searchQuery, setSearchQuery, onNotifPress }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -23,7 +23,7 @@ export default function SearchHeader({ searchQuery, setSearchQuery }) {
       </View>
 
       {/* Notification bell */}
-      <TouchableOpacity style={styles.bellContainer}>
+      <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
         <Ionicons name="notifications-outline" size={moderateScale(22)} color="#1E90FF" />
       </TouchableOpacity>
     </View>

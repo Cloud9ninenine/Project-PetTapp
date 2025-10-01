@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -13,6 +12,8 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";

@@ -15,35 +15,35 @@ import { Ionicons } from '@expo/vector-icons';
 import SearchHeader from '@components/SearchHeader';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
-export default function VeterinaryServicesScreen() {
+export default function BoardingServicesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
 
-  const veterinaryServices = [
+  const boardingServices = [
     {
       id: 1,
-      name: 'PetCo Animal Clinic',
+      name: 'Happy Tails Pet Hotel',
       price: 'Price (₱xx,xxx)',
       rating: 4.9,
-      image: require('@assets/images/serviceimages/18.png'),
+      image: require('@assets/images/serviceimages/22.png'),
       description:
         'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
     },
     {
       id: 2,
-      name: 'Animed Veterinary Clinic',
+      name: 'PetCity Daycare',
       price: 'Price (₱xx,xxx)',
       rating: 4.8,
-      image: require('@assets/images/serviceimages/17.png'),
+      image: require('@assets/images/serviceimages/16.png'),
       description:
         'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
     },
     {
       id: 3,
-      name: 'Vetfusion Animal Clinic',
+      name: 'Cozy Paws Boarding',
       price: 'Price (₱xx,xxx)',
       rating: 4.7,
-      image: require('@assets/images/serviceimages/19.png'),
+      image: require('@assets/images/serviceimages/22.png'),
       description:
         'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
     },
@@ -87,13 +87,13 @@ export default function VeterinaryServicesScreen() {
 
       {/* 🔹 Category Title */}
       <View style={styles.categoryContainer}>
-        <Text style={styles.categoryText}>Veterinary</Text>
-        <Text style={styles.subcategoryText}>(180 Search results)</Text>
+        <Text style={styles.categoryText}>Boarding</Text>
+        <Text style={styles.subcategoryText}>(95 Search results)</Text>
       </View>
 
       {/* 🔹 Services List */}
       <ScrollView style={styles.scrollView}>
-        {veterinaryServices.map((service) => (
+        {boardingServices.map((service) => (
           <TouchableOpacity
             key={service.id}
             style={styles.serviceCard}
@@ -106,8 +106,8 @@ export default function VeterinaryServicesScreen() {
                   price: service.price,
                   rating: service.rating,
                   description: service.description,
-                  category: 'Veterinary Service',
-                  serviceType: 'veterinary',
+                  category: 'Pet Boarding',
+                  serviceType: 'boarding',
                 },
               })
             }

@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   ImageBackground,
@@ -13,6 +12,8 @@ import {
   Easing,
   PanResponder,
 } from "react-native";
+
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SearchHeader from "@components/SearchHeader";
@@ -91,8 +92,8 @@ export default function HomeScreen() {
 
     Animated.timing(translateX, {
       toValue: -toIndex * SLIDE_WIDTH,
-      duration: 700,
-      easing: Easing.inOut(Easing.ease),
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
@@ -197,21 +198,21 @@ export default function HomeScreen() {
       title: "Grooming",
       icon: require("@assets/images/service_icon/11.png"),
       color: "#FF9B79",
-      route: "grooming-services",
+      route: "home/grooming-services",
     },
     {
       id: 3,
       title: "Boarding",
       icon: require("@assets/images/service_icon/12.png"),
       color: "#FF9B79",
-      route: "boarding-services",
+      route: "home/boarding-services",
     },
     {
       id: 4,
       title: "Delivery",
       icon: require("@assets/images/service_icon/13.png"),
       color: "#FF9B79",
-      route: "delivery-services",
+      route: "home/delivery-services",
     },
   ];
 
@@ -221,23 +222,60 @@ export default function HomeScreen() {
       name: "PetCity Daycare",
       image: require("@assets/images/serviceimages/16.png"),
       rating: 4.8,
+      type: "Pet Boarding",
+      address: "123 Pet Street, Quezon City",
+      distance: "1.2 km",
+      coordinates: {
+        latitude: 14.6507,
+        longitude: 121.0494,
+      },
     },
     {
       id: 2,
       name: "Prinz Aviary",
       image: require("@assets/images/serviceimages/14.png"),
       rating: 4.9,
+      type: "Pet Store",
+      address: "456 Bird Avenue, Makati City",
+      distance: "2.5 km",
+      coordinates: {
+        latitude: 14.5547,
+        longitude: 121.0244,
+      },
     },
     {
       id: 3,
       name: "Petkeeper Co.",
       image: require("@assets/images/serviceimages/15.png"),
       rating: 4.7,
+      type: "Veterinary Clinic",
+      address: "789 Animal Road, Pasig City",
+      distance: "3.0 km",
+      coordinates: {
+        latitude: 14.5764,
+        longitude: 121.0851,
+      },
     },
   ];
 
   const handleServicePress = (service) => {
     if (service.route) router.push(service.route);
+  };
+
+  const handleNearbyServicePress = (service) => {
+    router.push({
+      pathname: 'home/nearby-service-map',
+      params: {
+        id: service.id,
+        name: service.name,
+        type: service.type,
+        rating: service.rating,
+        address: service.address,
+        distance: service.distance,
+        latitude: service.coordinates.latitude,
+        longitude: service.coordinates.longitude,
+      },
+    });
   };
 
   const renderStars = (rating) => {
@@ -266,7 +304,7 @@ export default function HomeScreen() {
       <SearchHeader
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        onNotifPress={() => console.log("🔔 Notification tapped")}
+        onNotifPress={() => router.push("/(user)/(tabs)/notification")}
       />
       <ImageBackground
         source={require("@assets/images/PetTapp pattern.png")}
@@ -286,7 +324,13 @@ export default function HomeScreen() {
                 }}
               >
                 {extendedImages.map((item, idx) => (
-                  <View key={`slide-${idx}-${item.id}`} style={styles.carouselSlide}>
+                  <View
+                    key={`slide-${idx}-${item.id}`}
+                    style={[
+                      styles.carouselSlide,
+                      { width: SLIDE_WIDTH }
+                    ]}
+                  >
                     <Image source={item.image} style={styles.featuredImage} resizeMode="cover" />
                     <View style={styles.carouselTextContainer}>
                       <Text style={styles.featuredTitle}>{item.title}</Text>
@@ -337,7 +381,11 @@ export default function HomeScreen() {
             {/* Nearby Services Grid */}
             <View style={styles.nearbyGrid}>
               {nearbyServices.map((service) => (
-                <View key={service.id} style={styles.nearbyCardWrapper}>
+                <TouchableOpacity
+                  key={service.id}
+                  style={styles.nearbyCardWrapper}
+                  onPress={() => handleNearbyServicePress(service)}
+                >
                   <View style={styles.nearbyCard}>
                     <View style={styles.nearbyImageContainer}>
                       <Image source={service.image} style={styles.nearbyImage} />
@@ -349,7 +397,7 @@ export default function HomeScreen() {
                       {renderStars(service.rating)}
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
