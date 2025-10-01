@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Header from '@components/Header';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,7 +153,7 @@ export default function MessagesScreen() {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+        <Ionicons name="search" size={moderateScale(20)} color="#999" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
@@ -173,7 +174,7 @@ export default function MessagesScreen() {
         />
       ) : (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
+          <Ionicons name="chatbubbles-outline" size={moderateScale(64)} color="#ccc" />
           <Text style={styles.emptyTitle}>No messages yet</Text>
           <Text style={styles.emptySubtitle}>
             {searchQuery ? 'No results found' : 'Start a conversation with a service provider'}
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
@@ -209,21 +210,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 20,
-    paddingHorizontal: 15,
-    borderRadius: 12,
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(20),
+    paddingHorizontal: moderateScale(15),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: '#1C86FF',
-    height:50,
+    height: moderateScale(50),
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: moderateScale(8),
   },
   searchInput: {
     flex: 1,
-    height: 44,
-    fontSize: 16,
+    height: moderateScale(44),
+    fontSize: scaleFontSize(16),
     color: '#333',
   },
   chatList: {
@@ -231,30 +232,30 @@ const styles = StyleSheet.create({
   },
 
   cardHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
   },
 
   headerContent: {
-  flex: 1,
+    flex: 1,
   },
 
   chatCard: {
-  backgroundColor: '#fff',
-  marginHorizontal: 16,
-  marginVertical: 8,
-  borderRadius: 10,
-  borderWidth: 1,
-  borderColor: '#1C86FF',  
-  padding: 16,
+    backgroundColor: '#fff',
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    padding: moderateScale(16),
   },
 
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: 12,
+    width: moderateScale(56),
+    height: moderateScale(56),
+    borderRadius: moderateScale(28),
+    marginRight: moderateScale(12),
   },
   chatContent: {
     flex: 1,
@@ -264,19 +265,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
   },
   chatName: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: '700',
     color: '#333',
   },
   categoryText: {
-  fontSize: 12,
-  color: '#666',
+    fontSize: scaleFontSize(12),
+    color: '#666',
   },
   timestamp: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#999',
   },
   cardBody: {
@@ -291,39 +292,39 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     flex: 1,
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#444',
-    marginRight: 10,
+    marginRight: moderateScale(10),
   },
   unreadBadge: {
     backgroundColor: '#1C86FF',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: moderateScale(10),
+    minWidth: moderateScale(20),
+    height: moderateScale(20),
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: moderateScale(6),
   },
   unreadText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     fontWeight: 'bold',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: wp(10),
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: '600',
     color: '#333',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#999',
     textAlign: 'center',
   },

@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const { width } = Dimensions.get('window');
 
@@ -68,11 +69,11 @@ export default function ServiceDetailsScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={16} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(16)} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={16} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(16)} color="#FFD700" />);
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={16} color="#E0E0E0" />);
+        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(16)} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -211,66 +212,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    paddingTop: 20,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(15),
+    paddingTop: moderateScale(20),
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   backButtonText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: 'bold',
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'center',
   },
   favoriteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   favoriteIcon: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
   },
   scrollView: {
     flex: 1,
   },
   serviceImage: {
     width: '100%',
-    height: 250,
+    height: moderateScale(250),
     resizeMode: 'cover',
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginTop: -20,
-    borderRadius: 8,
+    marginHorizontal: wp(5),
+    marginTop: moderateScale(-20),
+    borderRadius: moderateScale(8),
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: moderateScale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: moderateScale(15),
     alignItems: 'center',
     backgroundColor: '#fff',
   },
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: '600',
     color: '#666',
   },
@@ -287,25 +288,25 @@ const styles = StyleSheet.create({
   },
   serviceInfo: {
     backgroundColor: '#fff',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
+    margin: wp(5),
+    padding: moderateScale(20),
+    borderRadius: moderateScale(12),
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: moderateScale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
   },
   serviceName: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   serviceCategory: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#FF9B79',
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -314,110 +315,110 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
+    gap: moderateScale(1),
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#666',
-    marginLeft: 8,
+    marginLeft: moderateScale(8),
     fontWeight: '500',
   },
   tabContent: {
     backgroundColor: '#fff',
-    margin: 20,
+    margin: wp(5),
     marginTop: 0,
-    padding: 20,
-    borderRadius: 12,
+    padding: moderateScale(20),
+    borderRadius: moderateScale(12),
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: moderateScale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+    marginBottom: moderateScale(15),
   },
   description: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#666',
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
   },
   reviewCard: {
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    paddingBottom: 15,
-    marginBottom: 15,
+    paddingBottom: moderateScale(15),
+    marginBottom: moderateScale(15),
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   reviewUser: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     fontWeight: 'bold',
     color: '#333',
   },
   reviewDate: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#999',
   },
   reviewRating: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   reviewComment: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#666',
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
   bottomActions: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(15),
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: moderateScale(-2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
   },
   priceContainer: {
     flex: 1,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#1C86FF',
   },
   bookButton: {
     backgroundColor: '#1C86FF',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginRight: 10,
+    paddingHorizontal: moderateScale(30),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(25),
+    marginRight: moderateScale(10),
   },
   bookButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },
   chatButton: {
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(25),
   },
   chatButtonText: {
     color: '#1C86FF',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },
 });

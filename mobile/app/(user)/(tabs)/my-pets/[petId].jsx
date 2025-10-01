@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from '@components/Header';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const SPECIES_OPTIONS = [
   { label: 'Select species', value: '' },
@@ -293,7 +294,7 @@ export default function PetDetailScreen() {
               <Image source={{ uri: petImage }} style={styles.petImage} />
             ) : (
               <View style={styles.placeholderIcon}>
-                <Ionicons name="paw" size={50} color="#1C86FF" />
+                <Ionicons name="paw" size={moderateScale(50)} color="#1C86FF" />
               </View>
             )}
           </TouchableOpacity>
@@ -319,7 +320,7 @@ export default function PetDetailScreen() {
                   <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
                     {petInfo.birthday || 'MM/DD/YYYY'}
                   </Text>
-                  <Ionicons name="calendar-outline" size={20} color="#666" style={styles.dateIcon} />
+                  <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
                 </View>
               </TouchableOpacity>
             </View>
@@ -334,7 +335,7 @@ export default function PetDetailScreen() {
                 <Text style={[styles.dropdownText, !petInfo.species && styles.placeholderText]}>
                   {getSpeciesLabel()}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
               </TouchableOpacity>
             </View>
 
@@ -349,7 +350,7 @@ export default function PetDetailScreen() {
                 <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
                   {getBreedLabel()}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
               </TouchableOpacity>
             </View>
 
@@ -364,7 +365,7 @@ export default function PetDetailScreen() {
                   <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
                     {getGenderLabel()}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
                 </TouchableOpacity>
               </View>
 
@@ -521,7 +522,7 @@ export default function PetDetailScreen() {
       >
         <View style={styles.confirmModalOverlay}>
           <View style={styles.confirmModalContent}>
-            <Ionicons name="checkmark-circle" size={60} color="#1C86FF" style={styles.confirmIcon} />
+            <Ionicons name="checkmark-circle" size={moderateScale(60)} color="#1C86FF" style={styles.confirmIcon} />
             <Text style={styles.confirmModalTitle}>Confirm Update</Text>
             <Text style={styles.confirmModalText}>
               Are you sure you want to save these changes to {petInfo.name}'s information?
@@ -553,7 +554,7 @@ export default function PetDetailScreen() {
       >
         <View style={styles.confirmModalOverlay}>
           <View style={styles.confirmModalContent}>
-            <Ionicons name="trash" size={60} color="#dc3545" style={styles.confirmIcon} />
+            <Ionicons name="trash" size={moderateScale(60)} color="#dc3545" style={styles.confirmIcon} />
             <Text style={styles.confirmModalTitle}>Delete Pet</Text>
             <Text style={styles.confirmModalText}>
               Are you sure you want to delete {petInfo.name}? This action cannot be undone.
@@ -603,7 +604,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
@@ -611,27 +612,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 30,
-    paddingTop: 30,
-    paddingBottom: 40,
+    paddingHorizontal: wp(4),
+    paddingTop: moderateScale(30),
+    paddingBottom: moderateScale(40),
     alignItems: 'center',
   },
   addCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: moderateScale(120),
+    height: moderateScale(120),
+    borderRadius: moderateScale(60),
     borderWidth: 2,
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: moderateScale(30),
     overflow: 'hidden',
     backgroundColor: '#E3F2FD',
   },
   petImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 60,
+    borderRadius: moderateScale(60),
   },
   placeholderIcon: {
     justifyContent: 'center',
@@ -641,30 +642,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   rowInputGroup: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: moderateScale(12),
+    marginBottom: moderateScale(12),
   },
   halfInput: {
     flex: 1,
   },
   label: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     color: 'black',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
   },
   dateInputContainer: {
@@ -673,13 +674,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
   },
   dateInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
     color: '#333',
   },
@@ -687,21 +688,21 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   dateIcon: {
-    paddingHorizontal: 12,
+    paddingHorizontal: moderateScale(12),
   },
   dropdownButton: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   dropdownText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     color: '#333',
     fontFamily: 'SFProReg',
   },
@@ -712,39 +713,39 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   textArea: {
-    minHeight: 80,
-    paddingTop: 12,
+    minHeight: moderateScale(80),
+    paddingTop: moderateScale(12),
   },
   buttonContainer: {
     flexDirection: 'column',
-    gap: 12,
-    marginTop: 10,
+    gap: moderateScale(12),
+    marginTop: moderateScale(10),
   },
   deleteButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   deleteButtonText: {
     color: '#1C86FF',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
     fontWeight: '600',
   },
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
   },
   modalOverlay: {
@@ -752,77 +753,77 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: moderateScale(12),
+    padding: moderateScale(20),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: moderateScale(400),
     maxHeight: '70%',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   modalOption: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(16),
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   modalOptionText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
     color: '#333',
   },
   modalCloseButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: moderateScale(20),
   },
   confirmModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   confirmModalContent: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 30,
+    borderRadius: moderateScale(16),
+    padding: moderateScale(30),
     width: '90%',
-    maxWidth: 400,
+    maxWidth: moderateScale(400),
     alignItems: 'center',
   },
   confirmIcon: {
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   confirmModalTitle: {
-    fontSize: 22,
+    fontSize: scaleFontSize(22),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   confirmModalText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
+    marginBottom: moderateScale(24),
+    lineHeight: moderateScale(22),
   },
   confirmModalButtons: {
     flexDirection: 'row',
-    gap: 12,
+    gap: moderateScale(12),
     width: '100%',
   },
   cancelButton: {
@@ -830,21 +831,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   cancelButtonText: {
     color: '#1C86FF',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
     fontWeight: '600',
   },
   confirmButtonModal: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   deleteButtonModal: {

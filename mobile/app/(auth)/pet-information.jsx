@@ -17,6 +17,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 const SPECIES_OPTIONS = [
   { label: 'Select species', value: '' },
@@ -229,7 +230,7 @@ export default function PetInformationScreen() {
               {petImage ? (
                 <Image source={{ uri: petImage }} style={styles.petImage} />
               ) : (
-                <Ionicons name="add" size={36} color="#1C86FF" />
+                <Ionicons name="add" size={moderateScale(36)} color="#1C86FF" />
               )}
             </TouchableOpacity>
 
@@ -254,7 +255,7 @@ export default function PetInformationScreen() {
                     <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
                       {petInfo.birthday || 'MM/DD/YYYY'}
                     </Text>
-                    <Ionicons name="calendar-outline" size={20} color="#666" style={styles.dateIcon} />
+                    <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
                   </View>
                 </TouchableOpacity>
               </View>
@@ -269,7 +270,7 @@ export default function PetInformationScreen() {
                   <Text style={[styles.dropdownText, !petInfo.species && styles.placeholderText]}>
                     {getSpeciesLabel()}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
                 </TouchableOpacity>
               </View>
 
@@ -284,7 +285,7 @@ export default function PetInformationScreen() {
                   <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
                     {getBreedLabel()}
                   </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
                 </TouchableOpacity>
               </View>
 
@@ -397,55 +398,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 50,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(40),
     alignItems: 'center',
   },
   pageTitle: {
-    fontSize: 40,
+    fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   addCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
     borderWidth: 2,
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: moderateScale(30),
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
   petImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 50,
+    borderRadius: moderateScale(50),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   label: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     color: 'black',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: 'black',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProReg',
   },
   dateInputContainer: {
@@ -454,13 +455,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: 'black',
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
   },
   dateInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProReg',
     color: '#333',
   },
@@ -468,21 +469,21 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   dateIcon: {
-    paddingHorizontal: 12,
+    paddingHorizontal: moderateScale(12),
   },
   dropdownButton: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: 'black',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   dropdownText: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     color: '#333',
     fontFamily: 'SFProReg',
   },
@@ -494,22 +495,22 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: moderateScale(10),
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
   skipButton: {
-    marginTop: 20,
+    marginTop: moderateScale(20),
   },
   skipButtonText: {
     color: 'black',
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     fontFamily: 'SFProReg',
     textDecorationLine: 'underline',
   },
@@ -518,39 +519,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: moderateScale(12),
+    padding: moderateScale(20),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: moderateScale(400),
     maxHeight: '70%',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   modalOption: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(16),
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   modalOptionText: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
     color: '#333',
   },
   modalCloseButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: moderateScale(20),
   },
 });

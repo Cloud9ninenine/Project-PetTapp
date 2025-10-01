@@ -3,6 +3,8 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { wp, moderateScale, scaleFontSize } from "@utils/responsive";
 
 const Header = ({
   title = "",
@@ -16,9 +18,10 @@ const Header = ({
   customTitle = null,
 }) => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.header, { backgroundColor }]}>
+    <View style={[styles.header, { backgroundColor, paddingTop: insets.top + moderateScale(10) }]}>
       {/* Left side: Back button or custom component */}
       <View style={styles.side}>
         {showBack ? (
@@ -26,7 +29,7 @@ const Header = ({
             style={styles.backButton}
             onPress={onBackPress || (() => router.back())}
           >
-            <Ionicons name="arrow-back" size={28} color={titleColor} />
+            <Ionicons name="arrow-back" size={moderateScale(28)} color={titleColor} />
           </TouchableOpacity>
         ) : (
           leftComponent
@@ -51,24 +54,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    height: 110,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingBottom: 20,
-    paddingTop: 50,
-    gap: 13,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(20),
+    paddingBottom: moderateScale(20),
+    gap: moderateScale(13),
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
   },
-  backButton: { padding: 5 },
+  backButton: { padding: moderateScale(5) },
   headerTitle: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontWeight: "bold",
     flex: 1,
     textAlign: "center",
   },
   side: {
-    width: 45,
+    width: moderateScale(45),
     alignItems: "center",
     justifyContent: "center",
   },

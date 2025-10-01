@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function ConversationScreen() {
   const router = useRouter();
@@ -200,7 +201,7 @@ export default function ConversationScreen() {
       {/* Custom Messenger-style Header */}
       <View style={styles.messengerHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={28} color="#fff" />
+          <Ionicons name="arrow-back" size={moderateScale(28)} color="#fff" />
         </TouchableOpacity>
         <Image source={clinicInfo.avatar} style={styles.headerAvatar} />
         <View style={styles.headerInfo}>
@@ -226,7 +227,7 @@ export default function ConversationScreen() {
 
         <View style={styles.inputContainer}>
           <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-            <Ionicons name="image-outline" size={24} color="#1C86FF" />
+            <Ionicons name="image-outline" size={moderateScale(24)} color="#1C86FF" />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -241,7 +242,7 @@ export default function ConversationScreen() {
             onPress={handleSend}
             disabled={!messageText.trim()}
           >
-            <Ionicons name="send" size={20} color="#fff" />
+            <Ionicons name="send" size={moderateScale(20)} color="#fff" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -258,35 +259,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1C86FF',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingBottom: 20,
-    paddingTop: 50,
-    height: 110,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(20),
+    paddingBottom: moderateScale(20),
+    paddingTop: moderateScale(50),
+    height: moderateScale(110),
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
   },
   backButton: {
-    padding: 5,
-    marginRight: 8,
+    padding: moderateScale(5),
+    marginRight: moderateScale(8),
   },
   headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
+    marginRight: moderateScale(12),
   },
   headerInfo: {
     flex: 1,
   },
   headerName: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 2,
+    marginBottom: moderateScale(2),
   },
   headerStatus: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#e3f2fd',
   },
   keyboardView: {
@@ -296,12 +297,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(12),
   },
   messageContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
     alignItems: 'flex-end',
   },
   userMessageContainer: {
@@ -311,34 +312,34 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    marginRight: moderateScale(8),
   },
   userAvatarPlaceholder: {
-    width: 32,
-    marginLeft: 8,
+    width: moderateScale(32),
+    marginLeft: moderateScale(8),
   },
   messageBubble: {
     maxWidth: '70%',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 18,
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(18),
   },
   userBubble: {
     backgroundColor: '#1C86FF',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: moderateScale(4),
   },
   vetBubble: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: moderateScale(4),
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
   messageText: {
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: scaleFontSize(15),
+    lineHeight: moderateScale(20),
   },
   userText: {
     color: '#fff',
@@ -347,8 +348,8 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   messageTime: {
-    fontSize: 11,
-    marginTop: 4,
+    fontSize: scaleFontSize(11),
+    marginTop: moderateScale(4),
   },
   userTime: {
     color: '#e3f2fd',
@@ -359,8 +360,8 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
@@ -369,25 +370,25 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    maxHeight: 100,
-    marginRight: 8,
+    borderRadius: moderateScale(20),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(10),
+    fontSize: scaleFontSize(15),
+    maxHeight: moderateScale(100),
+    marginRight: moderateScale(8),
   },
   attachButton: {
-    width: 40,
-    height: 40,
+    width: moderateScale(40),
+    height: moderateScale(40),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 4,
+    marginRight: moderateScale(4),
   },
   sendButton: {
     backgroundColor: '#1C86FF',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -395,13 +396,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   imageBubble: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: moderateScale(4),
+    paddingVertical: moderateScale(4),
   },
   messageImage: {
-    width: 200,
-    height: 150,
-    borderRadius: 12,
-    marginBottom: 4,
+    width: moderateScale(200),
+    height: moderateScale(150),
+    borderRadius: moderateScale(12),
+    marginBottom: moderateScale(4),
   },
 });

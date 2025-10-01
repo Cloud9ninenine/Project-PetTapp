@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import SearchHeader from '@components/SearchHeader';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function VeterinaryServicesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,14 +55,14 @@ export default function VeterinaryServicesScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={14} color="#FF9B79" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(14)} color="#FF9B79" />);
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
-          <Ionicons key={i} name="star-half" size={14} color="#FF9B79" />
+          <Ionicons key={i} name="star-half" size={moderateScale(14)} color="#FF9B79" />
         );
       } else {
         stars.push(
-          <Ionicons key={i} name="star-outline" size={14} color="#E0E0E0" />
+          <Ionicons key={i} name="star-outline" size={moderateScale(14)} color="#E0E0E0" />
         );
       }
     }
@@ -135,76 +136,75 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
 
-  backgroundimg: { 
-  ...StyleSheet.absoluteFillObject,
-  transform: [{ scale: 1.5 }], 
- },
- 
-backgroundImageStyle: { opacity: 0.1 },
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+
+  backgroundImageStyle: { opacity: 0.1 },
 
   categoryContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 5,
+    paddingHorizontal: wp(5),
+    paddingTop: moderateScale(5),
   },
   categoryText: {
-    fontSize: 30,
+    fontSize: scaleFontSize(30),
     fontFamily:"SFProBold",
     color: '#1C86FF',
   },
   subcategoryText: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#FF9B79',
-    marginTop: -12,
+    marginTop: moderateScale(-12),
     fontFamily:"SFProReg"
   },
   scrollView: {
     flex: 1,
-    marginTop: 10,
-    
+    marginTop: moderateScale(10),
   },
   serviceCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 10,
-    marginHorizontal: 15,
-    marginVertical: 8,
-    padding: 10,
+    borderRadius: moderateScale(10),
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(8),
+    padding: moderateScale(10),
     borderWidth: 1,
     borderColor: '#1C86FF',
     alignItems: 'flex-start',
   },
   serviceImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 8,
-    marginRight: 12,
+    width: moderateScale(150),
+    height: moderateScale(150),
+    borderRadius: moderateScale(8),
+    marginRight: moderateScale(12),
   },
   serviceContent: {
     flex: 1,
   },
   serviceName: {
-    fontSize: 22,
+    fontSize: scaleFontSize(22),
     fontFamily:"SFProMedium",
     color: '#1C86FF',
   },
   servicePrice: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#FF9B79',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   ratingText: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: 'black',
-    marginLeft: 4,
+    marginLeft: moderateScale(4),
   },
   serviceDescription: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: 'black',
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
 });

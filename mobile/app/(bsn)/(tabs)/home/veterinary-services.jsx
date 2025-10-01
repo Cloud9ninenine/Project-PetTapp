@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import SearchHeader from '@components/SearchHeader';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function VeterinaryServicesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,11 +55,11 @@ export default function VeterinaryServicesScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={12} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(12)} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={12} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(12)} color="#FFD700" />);
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />);
+        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(12)} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -125,127 +126,127 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingBottom: 10,
-    gap: 13,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(20),
+    paddingBottom: moderateScale(10),
+    gap: moderateScale(13),
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
   },
   backButtonContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   backButton: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: 'bold',
   },
   searchContainer: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
+    borderRadius: moderateScale(15),
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: moderateScale(12),
   },
   searchInput: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     color: '#333',
   },
   bellContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   bellIcon: {
-    width: 40,
-    height: 40,
+    width: moderateScale(40),
+    height: moderateScale(40),
     tintColor: '#fff',
   },
   categoryContainer: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(15),
   },
   categoryText: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   subcategoryText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#666',
   },
   servicesContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: wp(5),
   },
   scrollView: {
     flex: 1,
-    paddingBottom: 100, // Add padding for bottom navigation
+    paddingBottom: moderateScale(100),
   },
   serviceCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginVertical: 8,
-    marginHorizontal: 20,
+    borderRadius: moderateScale(12),
+    marginVertical: moderateScale(8),
+    marginHorizontal: wp(5),
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: moderateScale(2) },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: moderateScale(4),
   },
   serviceImage: {
     width: '100%',
-    height: 200,
+    height: moderateScale(200),
     resizeMode: 'cover',
   },
   serviceContent: {
-    padding: 15,
+    padding: moderateScale(15),
   },
   serviceName: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   serviceCategory: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#FF9B79',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   servicePrice: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#666',
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
+    gap: moderateScale(1),
   },
   ratingText: {
-    fontSize: 10,
+    fontSize: scaleFontSize(10),
     color: '#666',
-    marginLeft: 4,
+    marginLeft: moderateScale(4),
     fontWeight: '500',
   },
   serviceDescription: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#666',
-    lineHeight: 16,
+    lineHeight: moderateScale(16),
   },
 });

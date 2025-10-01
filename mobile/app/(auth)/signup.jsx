@@ -11,9 +11,11 @@ import {
   Image,
   ImageBackground,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function SignUpScreen() {
   const [username, setUsername] = useState("");
@@ -194,7 +196,7 @@ export default function SignUpScreen() {
                 style={styles.passwordInput}
               />
               <TouchableOpacity style={styles.eyeWrap} onPress={() => setShowPassword((s) => !s)}>
-                <Ionicons name={showPassword ? "eye" : "eye-off"} size={20} color="#333" />
+                <Ionicons name={showPassword ? "eye" : "eye-off"} size={moderateScale(20)} color="#333" />
               </TouchableOpacity>
             </View>
             {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
@@ -213,7 +215,7 @@ export default function SignUpScreen() {
                 style={styles.passwordInput}
               />
               <TouchableOpacity style={styles.eyeWrap} onPress={() => setShowConfirm((s) => !s)}>
-                <Ionicons name={showConfirm ? "eye" : "eye-off"} size={20} color="#333" />
+                <Ionicons name={showConfirm ? "eye" : "eye-off"} size={moderateScale(20)} color="#333" />
               </TouchableOpacity>
             </View>
             {errors.confirmPassword ? (
@@ -255,19 +257,19 @@ export default function SignUpScreen() {
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Google")}
                 >
-                  <Ionicons name="logo-google" size={24} color="#fff" />
+                  <Ionicons name="logo-google" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Facebook")}
                 >
-                  <Ionicons name="logo-facebook" size={24} color="#fff" />
+                  <Ionicons name="logo-facebook" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Apple")}
                 >
-                  <Ionicons name="logo-apple" size={24} color="#fff" />
+                  <Ionicons name="logo-apple" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
               </View>
           </View>
@@ -284,46 +286,46 @@ export default function SignUpScreen() {
 
 /* Styles */
 const styles = StyleSheet.create({
-  backgroundimg: { 
-  ...StyleSheet.absoluteFillObject,
-  transform: [{ scale: 1.5 }], 
- },
- 
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+
   backgroundImageStyle: { opacity: 0.1 },
-  
+
   keyboardView: { flex: 1 },
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 50,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
   },
 
   title: {
-    fontSize: 48,
+    fontSize: scaleFontSize(isSmallDevice() ? 38 : 48),
     color: "#1C86FF",
     textAlign: "center",
     fontFamily: "SFProBold",
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
 
-  form: { marginBottom: 10 },
+  form: { marginBottom: moderateScale(10) },
 
   label: {
-  fontSize: 18,
-  color: "#black",
-  marginBottom: 4,
-  fontFamily: "SFProSB",
-},
+    fontSize: scaleFontSize(16),
+    color: "#black",
+    marginBottom: moderateScale(4),
+    fontFamily: "SFProSB",
+  },
 
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "black",
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
-    marginBottom: 10,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(18),
+    marginBottom: moderateScale(10),
   },
 
   passwordContainer: {
@@ -331,55 +333,55 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "black",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     backgroundColor: "#fff",
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 20,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(12),
+    fontSize: scaleFontSize(18),
   },
 
-  eyeWrap: { paddingHorizontal: 20 },
+  eyeWrap: { paddingHorizontal: moderateScale(20) },
 
-  alreadyRow: { alignSelf: "flex-end", marginBottom: 12 },
-  alreadyText: { color: "black", fontSize: 14, textDecorationLine: 'underline', },
+  alreadyRow: { alignSelf: "flex-end", marginBottom: moderateScale(12) },
+  alreadyText: { color: "black", fontSize: scaleFontSize(14), textDecorationLine: 'underline', },
 
   confirmButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: moderateScale(14),
   },
   disabledButton: { opacity: 0.6 },
-  confirmText: { color: "#fff", fontSize: 16, fontFamily: "SFProBold" },
+  confirmText: { color: "#fff", fontSize: scaleFontSize(16), fontFamily: "SFProBold" },
 
   socialLogin: { alignItems: "center" },
-  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 10 },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: moderateScale(10) },
   divider: { flex: 1, height: 1, backgroundColor: "black" },
-  orContinueWith: { fontSize: 13, color: "#black", marginHorizontal: 14, fontFamily: "SFProMedium" },
+  orContinueWith: { fontSize: scaleFontSize(13), color: "#black", marginHorizontal: moderateScale(14), fontFamily: "SFProMedium" },
 
   socialButtons: {
     flexDirection: "row",
-    gap: 16,
+    gap: moderateScale(16),
   },
 
   socialButton: {
-    width: 50,
-    height: 50,
+    width: moderateScale(50),
+    height: moderateScale(50),
     backgroundColor: "#000",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     justifyContent: "center",
     alignItems: "center",
   },
-  socialIconPlaceholder: { width: 28, height: 28, backgroundColor: "#fff" },
+  socialIconPlaceholder: { width: moderateScale(28), height: moderateScale(28), backgroundColor: "#fff" },
 
   errorText: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: "red",
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
 });

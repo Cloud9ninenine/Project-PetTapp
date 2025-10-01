@@ -8,7 +8,7 @@ import {
   ScrollView,
   Image,
   ImageBackground,
-  Dimensions,
+  useWindowDimensions,
   Animated,
   Easing,
   PanResponder,
@@ -16,10 +16,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SearchHeader from "@components/SearchHeader";
-
-const { width } = Dimensions.get("window");
-// Use a rounded integer slide width to avoid sub-pixel gaps
-const SLIDE_WIDTH = Math.round(width - 32);
+import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -27,6 +24,8 @@ export default function HomeScreen() {
   const [activeSlide, setActiveSlide] = useState(0);
 
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const SLIDE_WIDTH = Math.round(width - moderateScale(32));
   const translateX = useRef(new Animated.Value(0)).current;
 
   // real carousel images
@@ -248,14 +247,14 @@ export default function HomeScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={12} color="#ff9b79" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(12)} color="#ff9b79" />);
       } else if (i === fullStars && hasHalfStar) {
         stars.push(
-          <Ionicons key={i} name="star-half" size={12} color="#ff9b79" />
+          <Ionicons key={i} name="star-half" size={moderateScale(12)} color="#ff9b79" />
         );
       } else {
         stars.push(
-          <Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />
+          <Ionicons key={i} name="star-outline" size={moderateScale(12)} color="#E0E0E0" />
         );
       }
     }
@@ -360,7 +359,7 @@ export default function HomeScreen() {
   );
 }
 
-// ===================== styles (unchanged except kept for context) =====================
+// ===================== styles =====================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -370,21 +369,20 @@ const styles = StyleSheet.create({
   backgroundImageStyle: { opacity: 0.1 },
   mainContent: {
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingHorizontal: wp(4),
+    paddingBottom: moderateScale(20),
   },
   featuredCard: {
     position: "relative",
-    height: 240,
+    height: hp(28),
     width: "100%",
-    marginTop: 20,
-    marginBottom: 30,
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(30),
     overflow: "hidden",
   },
   carouselSlide: {
-    width: SLIDE_WIDTH,
-    height: 240,
-    borderRadius: 16,
+    height: hp(28),
+    borderRadius: moderateScale(16),
     overflow: "hidden",
     marginHorizontal: 0,
   },
@@ -394,21 +392,21 @@ const styles = StyleSheet.create({
   },
   carouselTextContainer: {
     position: "absolute",
-    bottom: 16,
-    left: 16,
-    right: 16,
+    bottom: moderateScale(16),
+    left: moderateScale(16),
+    right: moderateScale(16),
   },
   featuredTitle: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
   },
   featuredSubtitle: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: "#fff",
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
@@ -416,52 +414,52 @@ const styles = StyleSheet.create({
   },
   pagination: {
     position: "absolute",
-    bottom: 12,
+    bottom: moderateScale(12),
     alignSelf: "center",
     flexDirection: "row",
-    gap: 6,
+    gap: moderateScale(6),
   },
   paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
     backgroundColor: "rgba(255, 255, 255, 0.5)",
   },
   paginationDotActive: {
     backgroundColor: "#fff",
-    width: 24,
+    width: moderateScale(24),
   },
   servicesGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
     width: "100%",
-    marginBottom: 15,
+    marginBottom: moderateScale(15),
   },
   serviceCard: {
     alignItems: "center",
     flex: 1,
   },
   serviceIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 15,
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(15),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   serviceIcon: {
-    width: 30,
-    height: 30,
+    width: moderateScale(30),
+    height: moderateScale(30),
     tintColor: "#fff",
   },
   serviceTitle: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: "#333",
     textAlign: "center",
     fontWeight: "500",
   },
   sectionTitle: {
-    fontSize: 30,
+    fontSize: scaleFontSize(30),
     fontFamily: "SFProBold",
     color: "#1C86FF",
     textAlign: "center",
@@ -470,18 +468,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    gap: 10,
+    gap: moderateScale(10),
   },
   nearbyCardWrapper: {
     flex: 1,
   },
   nearbyCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     borderWidth: 2,
     borderColor: "#1C86FF",
     overflow: "hidden",
-    height: 150,
+    height: hp(18),
   },
   nearbyImageContainer: {
     flex: 1,
@@ -494,19 +492,19 @@ const styles = StyleSheet.create({
   },
   nearbyCardInfo: {
     backgroundColor: "transparent",
-    paddingTop: 8,
+    paddingTop: moderateScale(8),
     alignItems: "center",
   },
   nearbyName: {
-    fontSize: 13,
+    fontSize: scaleFontSize(13),
     fontWeight: "600",
     color: "#1C86FF",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
   },
   nearbyStarsContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 2,
+    gap: moderateScale(2),
   },
 });

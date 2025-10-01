@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function AccountCreatedScreen() {
   const handleContinueToLogin = () => {
@@ -27,7 +28,7 @@ export default function AccountCreatedScreen() {
 
       <View style={styles.content}>
         {/* Checkmark */}
-        <Ionicons name="checkmark-circle" size={120} color="#1C86FF" style={styles.icon} />
+        <Ionicons name="checkmark-circle" size={moderateScale(120)} color="#1C86FF" style={styles.icon} />
 
 
         {/* Title + Subtitle */}
@@ -61,38 +62,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 50,
+    paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
   },
 
   icon: {
     marginBottom: 0,
   },
   title: {
-    fontSize: 40,
+    fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     fontFamily: "SFProBold",
     color: "#1C86FF",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   subtitle: {
-    fontSize: 20,
+    fontSize: scaleFontSize(18),
     fontFamily: "SFProReg",
     color: "black",
     textAlign: "center",
-    marginBottom: 40,
-    lineHeight: 24,
+    marginBottom: moderateScale(40),
+    lineHeight: moderateScale(24),
   },
 
   continueButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: "center",
     width: "100%",
   },
   continueButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily:"SFProReg"
   },
 });

@@ -11,9 +11,11 @@ import {
   Alert,
   Image,
   ImageBackground,
+  useWindowDimensions,
 } from "react-native";
 import { Link, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -104,7 +106,7 @@ export default function LoginScreen() {
                 >
                   <Ionicons
                     name={isPasswordVisible ? "eye" : "eye-off"}
-                    size={20}
+                    size={moderateScale(20)}
                     color="#666"
                   />
                 </TouchableOpacity>
@@ -151,19 +153,19 @@ export default function LoginScreen() {
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Google")}
                 >
-                  <Ionicons name="logo-google" size={24} color="#fff" />
+                  <Ionicons name="logo-google" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Facebook")}
                 >
-                  <Ionicons name="logo-facebook" size={24} color="#fff" />
+                  <Ionicons name="logo-facebook" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.socialButton}
                   onPress={() => handleSocialLogin("Apple")}
                 >
-                  <Ionicons name="logo-apple" size={24} color="#fff" />
+                  <Ionicons name="logo-apple" size={moderateScale(24)} color="#fff" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -175,12 +177,12 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   backgroundimg: {
-      ...StyleSheet.absoluteFillObject, // fills screen
-  transform: [{ scale: 1.5 }],     // light zoom
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
   },
 
   backgroundImageStyle: {
-    opacity: 0.1, // only background fades, not content
+    opacity: 0.1,
   },
 
   keyboardView: {
@@ -189,37 +191,37 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 50,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
   },
   header: {
     alignItems: "center",
   },
   logo: {
-    width: 250,
-    height: 250,
-    marginBottom: -75, 
+    width: wp(isSmallDevice() ? 50 : 60),
+    height: wp(isSmallDevice() ? 50 : 60),
+    marginBottom: moderateScale(-65),
   },
   title: {
-    fontSize: 50,
+    fontSize: scaleFontSize(isSmallDevice() ? 40 : 50),
     color: "#1C86FF",
-    marginTop: 2, // smaller gap
+    marginTop: moderateScale(2),
     fontFamily: "SFProBold",
   },
   label: {
-    fontSize: 20,
+    fontSize: scaleFontSize(18),
     color: "#000",
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: "SFProSB"
   },
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "black",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
-    marginBottom: 16,
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(18),
+    marginBottom: moderateScale(16),
     fontFamily:"SFProReg"
   },
   passwordContainer: {
@@ -228,44 +230,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "black",
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: moderateScale(12),
+    marginBottom: moderateScale(12),
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(18),
     fontFamily:"SFProReg"
   },
   eyeButton: {
-    padding: 20,
+    padding: moderateScale(20),
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   forgotPasswordText: {
     color: "Black",
-    fontSize: 13,
+    fontSize: scaleFontSize(13),
     fontFamily: "SFProReg",
     textDecorationLine: 'underline',
   },
   buttonRow: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 10,
+    gap: moderateScale(12),
+    marginBottom: moderateScale(10),
   },
   loginButton: {
     flex: 1,
     backgroundColor: "#1C86FF",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(8),
     alignItems: "center",
   },
   loginButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: scaleFontSize(16),
     fontFamily: "SFProReg",
   },
   signupButton: {
@@ -273,46 +275,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#1C86FF",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(8),
     alignItems: "center",
   },
   signupButtonText: {
     color: "#1C86FF",
-    fontSize: 18,
+    fontSize: scaleFontSize(16),
     fontWeight: "600",
     fontFamily: "SFProReg",
   },
   socialLogin: {
     alignItems: "center",
   },
-  // --- Divider row
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 20,
+    marginVertical: moderateScale(20),
   },
   divider: {
     flex: 1,
     height: 1.2,
     backgroundColor: "black",
-
   },
   orContinueWith: {
-    fontSize: 13,
+    fontSize: scaleFontSize(13),
     color: "black",
     fontFamily: "SFProMedium",
-    marginHorizontal: 14,
+    marginHorizontal: moderateScale(14),
   },
   socialButtons: {
     flexDirection: "row",
-    gap: 16,
+    gap: moderateScale(16),
   },
   socialButton: {
-    width: 50,
-    height: 50,
+    width: moderateScale(50),
+    height: moderateScale(50),
     backgroundColor: "#000",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     justifyContent: "center",
     alignItems: "center",
   },

@@ -14,6 +14,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 const BUSINESS_TYPE_OPTIONS = [
   { label: 'Select business type', value: '' },
@@ -131,7 +132,7 @@ export default function BusinessInformationAdditionalScreen() {
               >
                 <Ionicons
                   name={validId ? "checkmark-circle" : "cloud-upload-outline"}
-                  size={24}
+                  size={moderateScale(24)}
                   color={validId ? "#28a745" : "#1C86FF"}
                 />
                 <Text style={[styles.uploadButtonText, validId && styles.uploadedText]}>
@@ -149,7 +150,7 @@ export default function BusinessInformationAdditionalScreen() {
               >
                 <Ionicons
                   name={birLicense ? "checkmark-circle" : "cloud-upload-outline"}
-                  size={24}
+                  size={moderateScale(24)}
                   color={birLicense ? "#28a745" : "#1C86FF"}
                 />
                 <Text style={[styles.uploadButtonText, birLicense && styles.uploadedText]}>
@@ -168,7 +169,7 @@ export default function BusinessInformationAdditionalScreen() {
                 <Text style={[styles.dropdownText, !businessType && styles.placeholderText]}>
                   {getBusinessTypeLabel()}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
               </TouchableOpacity>
             </View>
 
@@ -236,42 +237,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 50,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(40),
   },
   pageTitle: {
-    fontSize: 36,
+    fontSize: scaleFontSize(isSmallDevice() ? 30 : 36),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: moderateScale(40),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   label: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     color: 'black',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: 'SFProSB',
   },
   dropdownButton: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   dropdownText: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     color: '#333',
     fontFamily: 'SFProReg',
   },
@@ -282,15 +283,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(16),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: moderateScale(12),
   },
   uploadButtonText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     color: '#1C86FF',
     fontFamily: 'SFProReg',
     flex: 1,
@@ -300,33 +301,33 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 10,
+    gap: moderateScale(12),
+    marginTop: moderateScale(10),
   },
   backButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   backButtonText: {
     color: '#1C86FF',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
   modalOverlay: {
@@ -334,39 +335,39 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: moderateScale(12),
+    padding: moderateScale(20),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: moderateScale(400),
     maxHeight: '70%',
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   modalOption: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(16),
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   modalOptionText: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
     color: '#333',
   },
   modalCloseButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: moderateScale(20),
   },
 });

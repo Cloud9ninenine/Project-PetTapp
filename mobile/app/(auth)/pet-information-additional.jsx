@@ -11,6 +11,7 @@ import {
   ImageBackground,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function PetInformationAdditionalScreen() {
   const params = useLocalSearchParams();
@@ -130,81 +131,81 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 50,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(40),
     alignItems: 'center',
   },
   pageTitle: {
-    fontSize: 40,
+    fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: moderateScale(40),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   label: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     color: 'black',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: 'black',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProReg',
   },
   textArea: {
-    height: 120,
-    paddingTop: 14,
+    height: moderateScale(120),
+    paddingTop: moderateScale(14),
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 10,
+    gap: moderateScale(12),
+    marginTop: moderateScale(10),
   },
   backButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   backButtonText: {
     color: '#1C86FF',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
   skipButton: {
-    marginTop: 20,
+    marginTop: moderateScale(20),
   },
   skipButtonText: {
     color: 'black',
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     fontFamily: 'SFProReg',
     textDecorationLine: 'underline',
   },

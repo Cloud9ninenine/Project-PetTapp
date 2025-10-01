@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   Image,
   ImageBackground,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Header from '@components/Header';
+import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function MyPetsScreen() {
   const router = useRouter();
@@ -77,7 +79,7 @@ export default function MyPetsScreen() {
             <Image source={{ uri: item.avatar }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <Ionicons name="paw" size={40} color="#1C86FF" />
+              <Ionicons name="paw" size={moderateScale(40)} color="#1C86FF" />
             </View>
           )}
         </View>
@@ -92,18 +94,18 @@ export default function MyPetsScreen() {
           </Text>
           <View style={styles.detailsRow}>
             <View style={styles.detailItem}>
-              <Ionicons name="calendar-outline" size={14} color="#666" />
+              <Ionicons name="calendar-outline" size={moderateScale(14)} color="#666" />
               <Text style={styles.detailText}>{item.age}</Text>
             </View>
             <View style={styles.detailItem}>
-              <Ionicons name="male-female-outline" size={14} color="#666" />
+              <Ionicons name="male-female-outline" size={moderateScale(14)} color="#666" />
               <Text style={styles.detailText}>{item.gender}</Text>
             </View>
           </View>
         </View>
 
         {/* Arrow */}
-        <Ionicons name="chevron-forward" size={24} color="#1C86FF" />
+        <Ionicons name="chevron-forward" size={moderateScale(24)} color="#1C86FF" />
       </View>
     </TouchableOpacity>
   );
@@ -115,7 +117,7 @@ export default function MyPetsScreen() {
       onPress={() => router.push('/(user)/(tabs)/my-pets/add-pet')}
     >
       <View style={styles.addIconCircle}>
-        <Ionicons name="add" size={40} color="#1C86FF" />
+        <Ionicons name="add" size={moderateScale(40)} color="#1C86FF" />
       </View>
       <Text style={styles.addPetText}>Add New Pet</Text>
     </TouchableOpacity>
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
@@ -176,33 +178,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingVertical: 16,
+    paddingVertical: moderateScale(16),
   },
   petCard: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: '#1C86FF',
-    padding: 16,
+    padding: moderateScale(16),
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: moderateScale(12),
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
   },
   avatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
@@ -211,52 +213,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   petName: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
   },
   speciesBreed: {
-    fontSize: 13,
+    fontSize: scaleFontSize(13),
     color: '#1C86FF',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
   },
   detailsRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: moderateScale(16),
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: moderateScale(4),
   },
   detailText: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#666',
   },
   addPetCard: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 10,
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
     borderWidth: 2,
     borderColor: '#1C86FF',
     borderStyle: 'dashed',
-    padding: 32,
+    padding: moderateScale(32),
     alignItems: 'center',
     justifyContent: 'center',
   },
   addIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: moderateScale(80),
+    height: moderateScale(80),
+    borderRadius: moderateScale(40),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   addPetText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: '600',
     color: '#1C86FF',
   },

@@ -12,6 +12,7 @@ import {
   ImageBackground,
 } from "react-native";
 import { router } from "expo-router";
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -108,72 +109,72 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.5 }],
   },
   backgroundImageStyle: {
-    opacity: 0.1, // 🔹 faint paw prints
+    opacity: 0.1,
   },
 
   keyboardView: { flex: 1 },
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 50,
+    paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
   },
 
   title: {
-    fontSize: 40,
+    fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     color: "#1C86FF",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
     fontFamily: "SFProBold",
   },
   subtitle: {
-    fontSize: 19,
+    fontSize: scaleFontSize(17),
     color: "#333",
     textAlign: "center",
-    marginBottom: 50,
-    lineHeight: 20,
+    marginBottom: moderateScale(50),
+    lineHeight: moderateScale(20),
   },
 
-  inputGroup: { marginBottom: 20 },
+  inputGroup: { marginBottom: moderateScale(20) },
   label: {
-    fontSize: 18,
+    fontSize: scaleFontSize(16),
     color: "#333",
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: "SFProSB",
   },
   input: {
     backgroundColor: "#fff",
     borderWidth: 1.5,
     borderColor: "black",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    borderRadius: moderateScale(8),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(18),
   },
 
   sendCodeButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   sendCodeButtonText: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: scaleFontSize(16),
     fontFamily: "SFProReg",
   },
 
   backToLoginButton: {
     backgroundColor: "#fff",
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: "#000",
   },
   backToLoginButtonText: {
     color: "#000",
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: "SFProSB",
   },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ImageBackground, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 const PAW_BACKGROUND = require('@assets/images/PetTapp pattern.png');
 
@@ -44,23 +45,23 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    flex: 1, // 👈 takes full height
-    justifyContent: 'center', // 👈 centers vertically
-    alignItems: 'center', // 👈 centers horizontally
-    paddingHorizontal: 50,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
   },
 
   title: {
-    fontSize: 60,
+    fontSize: scaleFontSize(isSmallDevice() ? 50 : 60),
     fontFamily: "SFProBold",
     color: '#1C86FF',
-    paddingHorizontal: 60,
+    paddingHorizontal: wp(isSmallDevice() ? 12 : 16),
   },
   subtitle: {
     fontFamily: "SFProReg",
-    fontSize: 25,
+    fontSize: scaleFontSize(isSmallDevice() ? 20 : 25),
     color: '#FF6F61',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: moderateScale(10),
   },
 });

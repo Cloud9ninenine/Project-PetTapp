@@ -8,14 +8,13 @@ import {
   Image,
   TouchableOpacity,
   ImageBackground,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
 import Header from '@components/Header';
-
-const { width } = Dimensions.get('window');
+import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 
 export default function ServiceDetailsScreen() {
@@ -80,11 +79,11 @@ export default function ServiceDetailsScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={16} color="#ff9b79" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(16)} color="#ff9b79" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={16} color="#ff9b79" />);
+        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(16)} color="#ff9b79" />);
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={16} color="#ff9b79" />);
+        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(16)} color="#ff9b79" />);
       }
     }
     return stars;
@@ -171,7 +170,7 @@ export default function ServiceDetailsScreen() {
           <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
             <Ionicons
               name={isFavorite ? "heart" : "heart-outline"}
-              size={28}
+              size={moderateScale(28)}
               color="#fff"
             />
           </TouchableOpacity>
@@ -245,11 +244,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
 
-  backgroundimg: { 
-  ...StyleSheet.absoluteFillObject,
-  transform: [{ scale: 1.5 }], 
- },
- 
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+
   backgroundImageStyle: { opacity: 0.1 },
 
   titleContainer: {
@@ -257,7 +256,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: "SFProBold",
     textAlign: 'center',
     textDecorationLine: 'underline',
@@ -267,19 +266,19 @@ const styles = StyleSheet.create({
   },
   serviceImage: {
     width: "90%",
-    height: 300,
+    height: hp(35),
     resizeMode: 'cover',
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 15,
-    borderRadius: 12,
+    marginHorizontal: wp(5),
+    marginTop: moderateScale(10),
+    marginBottom: moderateScale(15),
+    borderRadius: moderateScale(12),
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    borderRadius: 8,
+    marginHorizontal: wp(5),
+    marginBottom: moderateScale(10),
+    borderRadius: moderateScale(8),
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
@@ -289,7 +288,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: moderateScale(15),
     alignItems: 'center',
     backgroundColor: '#fff',
   },
@@ -297,7 +296,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: '600',
     color: '#666',
   },
@@ -305,7 +304,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   serviceCategory: {
-    fontSize: 30,
+    fontSize: scaleFontSize(30),
     color: '#FF9B79',
     fontFamily:"SFProBold",
   },
@@ -316,20 +315,20 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
+    gap: moderateScale(1),
   },
   ratingText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#1C86FF',
-    marginLeft: 8,
+    marginLeft: moderateScale(8),
     fontWeight: '500',
   },
   tabContent: {
     backgroundColor: '#fff',
-    margin: 20,
+    margin: wp(5),
     marginTop: 0,
-    padding: 20,
-    borderRadius: 12,
+    padding: moderateScale(20),
+    borderRadius: moderateScale(12),
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -337,92 +336,92 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#333',
-    marginTop: 15,
-    marginBottom: 10,
+    marginTop: moderateScale(15),
+    marginBottom: moderateScale(10),
   },
   description: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: 'black',
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
   },
   reviewCard: {
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    paddingBottom: 15,
-    marginBottom: 15,
+    paddingBottom: moderateScale(15),
+    marginBottom: moderateScale(15),
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: moderateScale(5),
   },
   reviewUser: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     fontWeight: 'bold',
     color: '#333',
   },
   reviewDate: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: '#999',
   },
   reviewRating: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   reviewComment: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#666',
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
   bottomActions: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(15),
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -5 },
     shadowOpacity: 0.5,
     shadowRadius: 4,
-    borderTopLeftRadius:12,
-    borderTopRightRadius:12,
+    borderTopLeftRadius: moderateScale(12),
+    borderTopRightRadius: moderateScale(12),
   },
   priceContainer: {
     flex: 1,
   },
   priceText: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#1C86FF',
   },
   bookButton: {
     backgroundColor: '#1C86FF',
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 10,
+    paddingHorizontal: moderateScale(30),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+    marginRight: moderateScale(10),
   },
   bookButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },
   chatButton: {
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#1C86FF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(8),
   },
   chatButtonText: {
     color: '#1C86FF',
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },
 });

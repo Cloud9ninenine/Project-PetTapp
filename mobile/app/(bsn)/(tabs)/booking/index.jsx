@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import Header from "@components/Header";
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const Bookings = () => {
   const [searchText, setSearchText] = useState('');
@@ -67,7 +68,7 @@ const Bookings = () => {
     >
       {/* Icon inside circle */}
       <View style={styles.circlePlaceholder}>
-        <Ionicons name={item.icon} size={24} color="#4A90E2" />
+        <Ionicons name={item.icon} size={moderateScale(24)} color="#4A90E2" />
       </View>
 
       {/* Details */}
@@ -90,7 +91,7 @@ const Bookings = () => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#C7C7CC" style={styles.searchIcon} />
+        <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search"
@@ -119,77 +120,77 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#2196F3',
-    paddingVertical: 20,
+    paddingVertical: moderateScale(20),
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    paddingTop: 50,
-    gap: 13,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(20),
+    paddingTop: moderateScale(50),
+    gap: moderateScale(13),
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: scaleFontSize(22),
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 15,
-    paddingHorizontal: 15,
-    borderRadius: 10,
+    margin: moderateScale(15),
+    paddingHorizontal: moderateScale(15),
+    borderRadius: moderateScale(10),
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: moderateScale(8),
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    paddingVertical: 10,
+    fontSize: scaleFontSize(16),
+    paddingVertical: moderateScale(10),
     color: '#333',
   },
   listContent: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
+    paddingHorizontal: wp(4),
+    paddingBottom: moderateScale(20),
   },
   scheduleItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 12,
+    borderRadius: moderateScale(10),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(12),
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   circlePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: moderateScale(15),
   },
   scheduleDetails: {
     flex: 1,
   },
   scheduleTitle: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontWeight: 'bold',
     color: '#333333',
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
   },
   scheduleDateTime: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: '#777777',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     fontWeight: '600',
   },
 });

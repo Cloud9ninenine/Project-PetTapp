@@ -8,6 +8,7 @@ import {
   ImageBackground,
 } from "react-native";
 import { router } from "expo-router";
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function InitialSetupScreen() {
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -59,44 +60,44 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.5 }],
   },
   backgroundImageStyle: {
-    opacity: 0.1, // subtle paw prints like your reference
+    opacity: 0.1,
   },
 
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 50,
+    paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
   },
 
   title: {
-    fontSize: 40,
+    fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     color: "#1C86FF",
     textAlign: "center",
     fontFamily:"SFProBold",
-    marginBottom: -15,
+    marginBottom: moderateScale(-15),
   },
-  
+
   subtitle: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily: "SFProReg",
     color: "black",
     textAlign: "center",
-    marginBottom: 30,
+    marginBottom: moderateScale(30),
   },
 
   button: {
     backgroundColor: "#1C86FF",
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     width: "100%",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: moderateScale(28),
   },
 
   buttonText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     fontFamily:"SFProReg",
   },
 });

@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "@components/Header";
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const ScheduleDetail = () => {
   const router = useRouter();
@@ -128,7 +129,7 @@ const ScheduleDetail = () => {
         {/* Clinic Info */}
         <View style={styles.clinicSection}>
           <View style={styles.clinicLogo}>
-            <Ionicons name="business-outline" size={36} color="#C7C7CC" />
+            <Ionicons name="business-outline" size={moderateScale(36)} color="#C7C7CC" />
           </View>
           <Text style={styles.clinicName}>{scheduleDetail.clinic}</Text>
           <Text style={styles.serviceName}>{scheduleDetail.service}</Text>
@@ -176,75 +177,75 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
-  content: { padding: 20 },
+  content: { padding: moderateScale(20) },
   statusBar: {
     width: "100%",
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(8),
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
-  statusBarText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
-  clinicSection: { alignItems: "center", marginBottom: 20 },
+  statusBarText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
+  clinicSection: { alignItems: "center", marginBottom: moderateScale(20) },
   clinicLogo: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: moderateScale(70),
+    height: moderateScale(70),
+    borderRadius: moderateScale(35),
     backgroundColor: "#F0F0F0",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
-  clinicName: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  serviceName: { fontSize: 14, color: "#666" },
+  clinicName: { fontSize: scaleFontSize(18), fontWeight: "bold", color: "#333" },
+  serviceName: { fontSize: scaleFontSize(14), color: "#666" },
   detailsBox: {
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 30,
+    borderRadius: moderateScale(12),
+    padding: moderateScale(10),
+    marginBottom: moderateScale(30),
   },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: moderateScale(10),
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  detailLabel: { fontSize: 15, fontWeight: "500", color: "#333" },
-  detailValue: { fontSize: 15, color: "#555" },
+  detailLabel: { fontSize: scaleFontSize(15), fontWeight: "500", color: "#333" },
+  detailValue: { fontSize: scaleFontSize(15), color: "#555" },
   bookingIdContainer: { flexDirection: "row", alignItems: "center" },
   copyButton: {
-    marginLeft: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    marginLeft: moderateScale(10),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
     borderWidth: 1,
     borderColor: "#2196F3",
   },
-  copyButtonText: { color: "#2196F3", fontSize: 12, fontWeight: "600" },
-  actionButtonsContainer: { gap: 12 },
+  copyButtonText: { color: "#2196F3", fontSize: scaleFontSize(12), fontWeight: "600" },
+  actionButtonsContainer: { gap: moderateScale(12) },
   fullButton: {
     backgroundColor: "#2196F3",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(8),
     alignItems: "center",
   },
-  fullButtonText: { color: "#FFF", fontSize: 16, fontWeight: "600" },
+  fullButtonText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
   fullButtonOutline: {
     backgroundColor: "#2196F3",
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(8),
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#2196F3",
   },
-  fullButtonOutlineText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  fullButtonOutlineText: { color: "#fff", fontSize: scaleFontSize(16), fontWeight: "600" },
 });
 
 export default ScheduleDetail;

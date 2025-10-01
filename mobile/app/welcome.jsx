@@ -4,13 +4,12 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Dimensions,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useFonts } from 'expo-font';
-
-const { width, height } = Dimensions.get('window');
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function WelcomeScreen() {
   const [loaded] = useFonts({
@@ -53,23 +52,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 100,
+    paddingTop: moderateScale(100),
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   logo: {
-    width: 500,
-    height: 500,
-    marginBottom: -170,
+    width: wp(isSmallDevice() ? 100 : 120),
+    height: wp(isSmallDevice() ? 100 : 120),
+    marginBottom: moderateScale(-150),
   },
   appName: {
-    fontSize: 72,
+    fontSize: scaleFontSize(isSmallDevice() ? 60 : 72),
     color: '#FFFFFF',
     letterSpacing: 2,
     textAlign: 'center',
-    fontFamily: 'SFProBold', // 👈 must match the key in useFonts
+    fontFamily: 'SFProBold',
   },
 
 });

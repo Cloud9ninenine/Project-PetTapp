@@ -7,13 +7,12 @@ import {
   SafeAreaView,
   ScrollView,
   Image,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import SearchHeader from "@components/SearchHeader";
-
-const { width } = Dimensions.get("window");
+import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -84,11 +83,11 @@ export default function HomeScreen() {
 
     for (let i = 0; i < 5; i++) {
       if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={12} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star" size={moderateScale(12)} color="#FFD700" />);
       } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={12} color="#FFD700" />);
+        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(12)} color="#FFD700" />);
       } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={12} color="#E0E0E0" />);
+        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(12)} color="#E0E0E0" />);
       }
     }
     return stars;
@@ -172,17 +171,17 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingHorizontal: wp(5),
+    paddingBottom: moderateScale(100),
   },
   featuredCard: {
     position: "relative",
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     overflow: "hidden",
-    height: 200,
+    height: hp(24),
     width: "100%",
-    marginTop: 20,
-    marginBottom: 30,
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(30),
   },
   featuredImage: {
     width: "100%",
@@ -194,81 +193,81 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "rgba(0, 0, 0, 0.6)",
-    padding: 16,
+    padding: moderateScale(16),
   },
   featuredTitle: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: "bold",
     color: "#fff",
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
   },
   featuredSubtitle: {
-    fontSize: 14,
+    fontSize: scaleFontSize(14),
     color: "#fff",
     opacity: 0.9,
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   playButton: {
     position: "absolute",
-    top: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    top: moderateScale(16),
+    right: moderateScale(16),
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     justifyContent: "center",
     alignItems: "center",
   },
   playText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
   },
   servicesGrid: {
     flexDirection: "row",
     justifyContent: "space-around",
     width: "100%",
-    marginBottom: 30,
+    marginBottom: moderateScale(30),
   },
   serviceCard: {
     alignItems: "center",
     flex: 1,
   },
   serviceIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 15,
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(15),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   serviceIcon: {
-    width: 30,
-    height: 30,
+    width: moderateScale(30),
+    height: moderateScale(30),
     tintColor: "#fff",
   },
   serviceTitle: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     color: "#333",
     textAlign: "center",
     fontWeight: "500",
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: scaleFontSize(20),
     fontWeight: "bold",
     color: "#1C86FF",
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
     textAlign: "center",
   },
   nearbyGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    gap: 10,
+    gap: moderateScale(10),
   },
   nearbyCard: {
     flex: 1,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     overflow: "hidden",
     elevation: 2,
     shadowColor: "#000",
@@ -278,28 +277,28 @@ const styles = StyleSheet.create({
   },
   nearbyImage: {
     width: "100%",
-    height: 80,
+    height: hp(10),
   },
   nearbyInfo: {
-    padding: 10,
+    padding: moderateScale(10),
     alignItems: "center",
   },
   nearbyName: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     fontWeight: "600",
     color: "#333",
-    marginBottom: 4,
+    marginBottom: moderateScale(4),
     textAlign: "center",
   },
   starsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 1,
+    gap: moderateScale(1),
   },
   ratingText: {
-    fontSize: 10,
+    fontSize: scaleFontSize(10),
     color: "#666",
-    marginLeft: 4,
+    marginLeft: moderateScale(4),
     fontWeight: "500",
   },
 });

@@ -1,6 +1,7 @@
 // components/FooterTabs.jsx
-import { View, TouchableOpacity, Image, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions } from "react-native";
 import { useRouter, usePathname } from "expo-router";
+import { moderateScale, scaleFontSize } from "@utils/responsive";
 
 const tabs = [
   {
@@ -38,6 +39,11 @@ const tabs = [
 export default function FooterTabs() {
   const router = useRouter();
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
+
+  // Determine if screen is very narrow (slim phone)
+  const isVeryNarrow = width < 360;
+  const isNarrow = width < 400;
 
   return (
     <View style={styles.container}>
@@ -49,7 +55,8 @@ export default function FooterTabs() {
             key={tab.name}
             style={[
               styles.tab,
-              isFocused && styles.tabActive
+              isFocused && styles.tabActive,
+              isVeryNarrow && styles.tabNarrow
             ]}
             onPress={() => router.replace(tab.route)}
             activeOpacity={0.7}
@@ -58,14 +65,17 @@ export default function FooterTabs() {
               source={tab.icon}
               style={[
                 styles.icon,
+                isVeryNarrow && styles.iconSmall,
                 { tintColor: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
               ]}
             />
             <Text
               style={[
                 styles.label,
+                isNarrow && styles.labelNarrow,
                 { color: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
               ]}
+              numberOfLines={1}
             >
               {tab.label}
             </Text>
@@ -82,17 +92,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     backgroundColor: "#1C86FF",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: 85,
-    paddingHorizontal: 10,
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    height: moderateScale(85),
+    paddingHorizontal: moderateScale(4),
   },
   tab: {
     alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    minWidth: 75,
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(8),
+    borderRadius: moderateScale(12),
+    minWidth: moderateScale(60),
+    flex: 1,
+  },
+  tabNarrow: {
+    paddingHorizontal: moderateScale(4),
+    paddingVertical: moderateScale(8),
+    minWidth: moderateScale(50),
   },
   tabActive: {
     backgroundColor: "#fff",
@@ -103,13 +119,21 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   icon: {
-    width: 26,
-    height: 26,
+    width: moderateScale(26),
+    height: moderateScale(26),
     resizeMode: "contain",
   },
+  iconSmall: {
+    width: moderateScale(22),
+    height: moderateScale(22),
+  },
   label: {
-    fontSize: 12,
+    fontSize: scaleFontSize(12),
     fontWeight: "500",
-    marginTop: 4,
+    marginTop: moderateScale(4),
+  },
+  labelNarrow: {
+    fontSize: scaleFontSize(10),
+    marginTop: moderateScale(2),
   },
 });

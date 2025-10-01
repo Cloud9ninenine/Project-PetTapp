@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function BusinessInformationScreen() {
   const [businessInfo, setBusinessInfo] = useState({
@@ -132,7 +133,7 @@ export default function BusinessInformationScreen() {
             {businessImage ? (
               <Image source={{ uri: businessImage }} style={styles.businessImage} />
             ) : (
-              <Ionicons name="add" size={36} color="#1C86FF" />
+              <Ionicons name="add" size={moderateScale(36)} color="#1C86FF" />
             )}
           </TouchableOpacity>
 
@@ -185,7 +186,7 @@ export default function BusinessInformationScreen() {
                     <Text style={[styles.timeInput, !businessInfo.openingTime && styles.placeholderTextInput]}>
                       {businessInfo.openingTime || 'Opening'}
                     </Text>
-                    <Ionicons name="time-outline" size={20} color="#666" style={styles.timeIcon} />
+                    <Ionicons name="time-outline" size={moderateScale(20)} color="#666" style={styles.timeIcon} />
                   </View>
                 </TouchableOpacity>
 
@@ -197,7 +198,7 @@ export default function BusinessInformationScreen() {
                     <Text style={[styles.timeInput, !businessInfo.closingTime && styles.placeholderTextInput]}>
                       {businessInfo.closingTime || 'Closing'}
                     </Text>
-                    <Ionicons name="time-outline" size={20} color="#666" style={styles.timeIcon} />
+                    <Ionicons name="time-outline" size={moderateScale(20)} color="#666" style={styles.timeIcon} />
                   </View>
                 </TouchableOpacity>
               </View>
@@ -246,60 +247,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 50,
-    paddingTop: 40,
-    paddingBottom: 40,
+    paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    paddingTop: moderateScale(40),
+    paddingBottom: moderateScale(40),
     alignItems: 'center',
   },
   pageTitle: {
-    fontSize: 36,
+    fontSize: scaleFontSize(isSmallDevice() ? 30 : 36),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: moderateScale(20),
   },
   addCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
     borderWidth: 2,
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: moderateScale(30),
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
   businessImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 50,
+    borderRadius: moderateScale(50),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: moderateScale(12),
   },
   label: {
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     color: 'black',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
     fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProReg',
   },
   textArea: {
-    height: 90,
-    paddingTop: 14,
+    height: moderateScale(90),
+    paddingTop: moderateScale(14),
   },
   timeInputContainer: {
     flexDirection: 'row',
@@ -307,13 +308,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
   },
   timeInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 20,
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    fontSize: scaleFontSize(20),
     fontFamily: 'SFProReg',
     color: '#333',
   },
@@ -321,31 +322,31 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   timeIcon: {
-    paddingHorizontal: 12,
+    paddingHorizontal: moderateScale(12),
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: moderateScale(12),
   },
   timeWrapper: {
     flex: 1,
   },
   timeSeparator: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     color: '#1C86FF',
     fontFamily: 'SFProBold',
   },
   confirmButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 16,
-    borderRadius: 10,
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: moderateScale(10),
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
   },
 });

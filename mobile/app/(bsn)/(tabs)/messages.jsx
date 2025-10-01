@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function MessagesScreen() {
   return (
@@ -26,16 +27,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: wp(5),
   },
   title: {
-    fontSize: 24,
+    fontSize: scaleFontSize(24),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: 8,
+    marginBottom: moderateScale(8),
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: scaleFontSize(16),
     color: '#666',
   },
 });
