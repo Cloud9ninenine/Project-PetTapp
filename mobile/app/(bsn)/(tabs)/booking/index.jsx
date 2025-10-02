@@ -105,7 +105,7 @@ const CustomerBookings = () => {
     <TouchableOpacity
       style={styles.bookingItem}
       onPress={() => router.push({
-        pathname: "../booking/ScheduleDetail",
+        pathname: "../booking/AppointmentDetails",
         params: {
           ...item,
           businessName: 'Your Business', // Add business context

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,17 +7,25 @@ import {
   ScrollView,
   Alert,
   ImageBackground,
+  Modal,
+  Platform,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 const AppointmentDetail = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const [rescheduleModal, setRescheduleModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -79,10 +87,15 @@ const AppointmentDetail = () => {
 
   const handleChat = () => {
     router.push({
-      pathname: `/(bsn)/(tabs)/messages/${appointmentDetail.id}`,
+      pathname: '/(bsn)/(tabs)/messages/chat',
       params: {
+        customerId: appointmentDetail.id,
         customerName: appointmentDetail.customerName,
-        fromAppointment: 'true',
+        petName: appointmentDetail.petName,
+        service: appointmentDetail.service,
+        date: params.date,
+        time: params.time,
+        startConversation: 'true',
       }
     });
   };
@@ -95,7 +108,45 @@ const AppointmentDetail = () => {
   };
 
   const handleReschedule = () => {
-    Alert.alert("Reschedule", "Reschedule appointment functionality");
+    setRescheduleModal(true);
+  };
+
+  const handleDateChange = (event, date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
+  const handleTimeChange = (event, time) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (time) {
+      setSelectedTime(time);
+    }
+  };
+
+  const confirmReschedule = () => {
+    const formattedDate = selectedDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    const formattedTime = selectedTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    setRescheduleModal(false);
+    Alert.alert(
+      'Reschedule Confirmed',
+      `Appointment rescheduled to ${formattedDate} at ${formattedTime}`,
+      [{ text: 'OK' }]
+    );
   };
 
   const handleComplete = () => {
@@ -225,6 +276,97 @@ const AppointmentDetail = () => {
         {/* Action Buttons */}
         {renderActionButtons()}
       </ScrollView>
+
+      {/* Reschedule Modal */}
+      <Modal
+        visible={rescheduleModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setRescheduleModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reschedule Appointment</Text>
+              <TouchableOpacity onPress={() => setRescheduleModal(false)}>
+                <Ionicons name="close" size={moderateScale(28)} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Select New Date & Time</Text>
+
+              {/* Date Selection */}
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.dateTimeButtonText}>
+                  {selectedDate.toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </Text>
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+              </TouchableOpacity>
+
+              {/* Time Selection */}
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.dateTimeButtonText}>
+                  {selectedTime.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
+                </Text>
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+              </TouchableOpacity>
+
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => setRescheduleModal(false)}
+                >
+                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalConfirmButton}
+                  onPress={confirmReschedule}
+                >
+                  <Text style={styles.modalConfirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Time Picker */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={selectedTime}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleTimeChange}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -363,6 +505,88 @@ const styles = StyleSheet.create({
     gap: moderateScale(8),
   },
   completeButtonText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(20),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+  },
+  modalBody: {
+    padding: moderateScale(20),
+  },
+  modalSectionTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(15),
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: moderateScale(15),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    marginBottom: moderateScale(15),
+    gap: moderateScale(10),
+  },
+  dateTimeButtonText: {
+    flex: 1,
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    fontWeight: '500',
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    marginTop: moderateScale(20),
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingVertical: moderateScale(15),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  modalCancelButtonText: {
+    color: '#666',
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+  },
+  modalConfirmButton: {
+    flex: 1,
+    backgroundColor: '#1C86FF',
+    paddingVertical: moderateScale(15),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+  },
+  modalConfirmButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+  },
 });
 
 export default AppointmentDetail;

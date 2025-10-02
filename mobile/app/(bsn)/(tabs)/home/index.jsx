@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
   ImageBackground,
-  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,33 +15,49 @@ import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 
 export default function BusinessDashboard() {
   const router = useRouter();
-  const businessName = "PetCare Business";
+  const businessName = "Pawsome Pet Care";
 
-  // Business services (similar to nearby services)
+  // Business services
   const businessServices = [
     {
       id: 1,
       name: "Veterinary Check-up",
-      image: require("@assets/images/serviceimages/17.png"),
       category: "Veterinary",
+      price: "₱500",
+      duration: "30 mins",
+      icon: "medical",
+      color: "#4CAF50",
+      available: true,
     },
     {
       id: 2,
       name: "Pet Grooming",
-      image: require("@assets/images/serviceimages/21.png"),
       category: "Grooming",
+      price: "₱800",
+      duration: "1 hour",
+      icon: "cut",
+      color: "#2196F3",
+      available: true,
     },
     {
       id: 3,
       name: "Pet Boarding",
-      image: require("@assets/images/serviceimages/22.png"),
       category: "Boarding",
+      price: "₱1,200/day",
+      duration: "Full day",
+      icon: "home",
+      color: "#FF9B79",
+      available: true,
     },
     {
       id: 4,
-      name: "Pet Delivery",
-      image: require("@assets/images/serviceimages/23.png"),
-      category: "Delivery",
+      name: "Vaccination",
+      category: "Veterinary",
+      price: "₱300",
+      duration: "15 mins",
+      icon: "medical",
+      color: "#4CAF50",
+      available: false,
     },
   ];
 
@@ -62,6 +77,7 @@ export default function BusinessDashboard() {
       value: "₱45.2K",
       icon: "cash",
       color: "#2196F3",
+      route: "../profile/revenue",
     },
     {
       id: 3,
@@ -125,6 +141,7 @@ export default function BusinessDashboard() {
 
   const renderCustomTitle = () => (
     <View style={styles.headerContent}>
+      {/* Left Side */}
       <View style={styles.headerLeftContent}>
         <TouchableOpacity style={styles.profileImageContainer}>
           <View style={styles.profilePlaceholder}>
@@ -137,6 +154,18 @@ export default function BusinessDashboard() {
           <Text style={styles.businessNameHeader}>{businessName}</Text>
         </View>
       </View>
+
+      {/* Right Side - Notifications */}
+      <TouchableOpacity
+        style={styles.notificationButton}
+        onPress={() => router.push("/(bsn)/(tabs)/profile/notifications")}
+      >
+        <Ionicons
+          name="notifications-outline"
+          size={moderateScale(26)}
+          color="#fff"
+        />
+      </TouchableOpacity>
     </View>
   );
 
@@ -154,8 +183,6 @@ export default function BusinessDashboard() {
         titleColor="#fff"
         customTitle={renderCustomTitle()}
         showBack={false}
-        rightIcon="notifications-outline"
-        onRightIconPress={() => console.log("🔔 Business Notification")}
       />
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -229,24 +256,35 @@ export default function BusinessDashboard() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.servicesGrid}>
-              {businessServices.map((service) => (
-                <TouchableOpacity
-                  key={service.id}
-                  style={styles.serviceCard}
-                  onPress={() => router.push("../my-services")}
-                >
-                  <View style={styles.serviceCardInner}>
-                    <View style={styles.serviceImageContainer}>
-                      <Image source={service.image} style={styles.serviceImage} />
-                    </View>
+            {businessServices.slice(0, 3).map((service) => (
+              <TouchableOpacity
+                key={service.id}
+                style={styles.serviceCard}
+                onPress={() => router.push("../my-services")}
+              >
+                <View style={[styles.serviceIconContainer, { backgroundColor: service.color }]}>
+                  <Ionicons name={service.icon} size={moderateScale(28)} color="#fff" />
+                </View>
+
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceName}>{service.name}</Text>
+                  <Text style={styles.serviceCategory}>{service.category}</Text>
+                  <View style={styles.serviceDetails}>
+                    <Text style={styles.servicePrice}>{service.price}</Text>
+                    <Text style={styles.serviceDuration}> • {service.duration}</Text>
                   </View>
-                  <View style={styles.serviceCardInfo}>
-                    <Text style={styles.serviceName}>{service.name}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+
+                <View style={[
+                  styles.availabilityBadge,
+                  service.available ? styles.availableBadge : styles.unavailableBadge
+                ]}>
+                  <Text style={styles.availabilityText}>
+                    {service.available ? 'Available' : 'Unavailable'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -275,7 +313,7 @@ const styles = StyleSheet.create({
   headerLeftContent: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    marginRight: moderateScale(16),
   },
   profileImageContainer: {
     marginRight: moderateScale(12),
@@ -289,7 +327,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTextContainer: {
-    flex: 1,
+    justifyContent: "center",
+  },
+  notificationButton: {
+    padding: moderateScale(8),
   },
   welcomeText: {
     fontSize: scaleFontSize(12),
@@ -305,7 +346,7 @@ const styles = StyleSheet.create({
   mainContent: {
     paddingHorizontal: wp(5),
     paddingTop: moderateScale(20),
-    paddingBottom: moderateScale(100),
+    paddingBottom: moderateScale(30),
   },
   metricsGrid: {
     flexDirection: "row",
@@ -419,47 +460,68 @@ const styles = StyleSheet.create({
   servicesSection: {
     width: "100%",
   },
-  servicesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: moderateScale(12),
-  },
   serviceCard: {
-    width: "48%",
-    marginBottom: moderateScale(15),
-  },
-  serviceCardInner: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: moderateScale(12),
-    overflow: "hidden",
+    flexDirection: "row",
     backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(12),
+    alignItems: "center",
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
-  serviceImageContainer: {
-    width: "100%",
-    height: "100%",
-  },
-  serviceImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  serviceCardInfo: {
-    backgroundColor: "transparent",
-    paddingTop: moderateScale(8),
+  serviceIconContainer: {
+    width: moderateScale(55),
+    height: moderateScale(55),
+    borderRadius: moderateScale(28),
+    justifyContent: "center",
     alignItems: "center",
+    marginRight: moderateScale(12),
+  },
+  serviceInfo: {
+    flex: 1,
   },
   serviceName: {
+    fontSize: scaleFontSize(16),
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: moderateScale(4),
+  },
+  serviceCategory: {
     fontSize: scaleFontSize(13),
+    color: "#666",
+    marginBottom: moderateScale(4),
+  },
+  serviceDetails: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  servicePrice: {
+    fontSize: scaleFontSize(14),
     fontWeight: "600",
     color: "#1C86FF",
-    textAlign: "center",
-    fontFamily: "SFProMedium",
+  },
+  serviceDuration: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+  },
+  availabilityBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+  },
+  availableBadge: {
+    backgroundColor: "#4CAF50",
+  },
+  unavailableBadge: {
+    backgroundColor: "#FF6B6B",
+  },
+  availabilityText: {
+    fontSize: scaleFontSize(11),
+    color: "#fff",
+    fontWeight: "600",
   },
 });

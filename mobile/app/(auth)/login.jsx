@@ -38,6 +38,10 @@ export default function LoginScreen() {
       if (email.toLowerCase() === "business" && password === "business123") {
         router.replace("/(bsn)/(tabs)/home");
       }
+      // Check for rider credentials
+      else if (email.toLowerCase() === "rider" && password === "rider123") {
+        router.replace("/(rider)/(tabs)/home");
+      }
       // 🟢 Fake condition: if email contains "new", go to setup
       else if (email.includes("new")) {
         router.replace("/(auth)/initial-setup");

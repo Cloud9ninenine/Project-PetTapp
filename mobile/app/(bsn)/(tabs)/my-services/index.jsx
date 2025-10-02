@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ImageBackground,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from "@components/Header";
@@ -21,6 +22,7 @@ export default function MyServicesScreen() {
       category: 'Veterinary',
       price: '₱500',
       duration: '30 mins',
+      description: 'Comprehensive health check-up for your pet',
       icon: 'medical',
       color: '#4CAF50',
       available: true,
@@ -31,6 +33,7 @@ export default function MyServicesScreen() {
       category: 'Grooming',
       price: '₱800',
       duration: '1 hour',
+      description: 'Professional grooming services',
       icon: 'cut',
       color: '#2196F3',
       available: true,
@@ -41,6 +44,7 @@ export default function MyServicesScreen() {
       category: 'Boarding',
       price: '₱1,200/day',
       duration: 'Full day',
+      description: 'Safe and comfortable boarding facilities',
       icon: 'home',
       color: '#FF9B79',
       available: true,
@@ -51,28 +55,66 @@ export default function MyServicesScreen() {
       category: 'Veterinary',
       price: '₱300',
       duration: '15 mins',
-      icon: 'fitness',
-      color: '#9C27B0',
+      description: 'Essential vaccinations for pets',
+      icon: 'medical',
+      color: '#4CAF50',
       available: false,
     },
   ]);
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingService, setEditingService] = useState(null);
 
   const handleAddService = (newService) => {
-    const service = {
-      id: String(services.length + 1),
-      ...newService,
-      available: true,
-    };
-    setServices([...services, service]);
+    if (editingService) {
+      // Update existing service
+      setServices(services.map(service =>
+        service.id === editingService.id ? { ...service, ...newService } : service
+      ));
+      setEditingService(null);
+    } else {
+      // Add new service
+      const service = {
+        id: Date.now().toString(),
+        ...newService,
+        available: true,
+      };
+      setServices([...services, service]);
+    }
     setShowAddModal(false);
+  };
+
+  const handleEditService = (service) => {
+    setEditingService(service);
+    setShowAddModal(true);
+  };
+
+  const handleDeleteService = (id) => {
+    Alert.alert(
+      'Delete Service',
+      'Are you sure you want to delete this service?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setServices(services.filter(service => service.id !== id));
+          },
+        },
+      ]
+    );
   };
 
   const toggleAvailability = (id) => {
     setServices(services.map(service =>
       service.id === id ? { ...service, available: !service.available } : service
     ));
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setEditingService(null);
   };
 
   const renderTitle = () => (
@@ -127,17 +169,34 @@ export default function MyServicesScreen() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.availabilityToggle,
-                  service.available ? styles.availableToggle : styles.unavailableToggle
-                ]}
-                onPress={() => toggleAvailability(service.id)}
-              >
-                <Text style={styles.toggleText}>
-                  {service.available ? 'Available' : 'Unavailable'}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.serviceActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.availabilityToggle,
+                    service.available ? styles.availableToggle : styles.unavailableToggle
+                  ]}
+                  onPress={() => toggleAvailability(service.id)}
+                >
+                  <Text style={styles.toggleText}>
+                    {service.available ? 'Available' : 'Unavailable'}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleEditService(service)}
+                  >
+                    <Ionicons name="create-outline" size={moderateScale(20)} color="#1C86FF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteService(service.id)}
+                  >
+                    <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           ))}
         </View>
@@ -154,8 +213,9 @@ export default function MyServicesScreen() {
 
       <AddServiceModal
         visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={handleCloseModal}
         onAddService={handleAddService}
+        editingService={editingService}
       />
     </SafeAreaView>
   );
@@ -229,7 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     padding: moderateScale(15),
     marginBottom: moderateScale(12),
-    alignItems: 'center',
+    alignItems: 'flex-start',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -271,6 +331,10 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: '#999',
   },
+  serviceActions: {
+    alignItems: 'flex-end',
+    gap: moderateScale(8),
+  },
   availabilityToggle: {
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(6),
@@ -286,6 +350,26 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(11),
     color: '#fff',
     fontWeight: '600',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: moderateScale(8),
+  },
+  editButton: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    backgroundColor: '#FFEBEE',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addButton: {
     flexDirection: 'row',

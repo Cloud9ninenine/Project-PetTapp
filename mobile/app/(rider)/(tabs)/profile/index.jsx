@@ -14,64 +14,70 @@ import { useRouter } from 'expo-router';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
-export default function BusinessProfileScreen() {
+export default function RiderProfileScreen() {
   const router = useRouter();
-  const businessInfo = {
-    name: 'PetCare Business',
-    type: 'Veterinary & Grooming Services',
-    phone: '+63 912 345 6789',
-    email: 'contact@petcare.com',
-    address: '123 Pet Street, Manila City',
-    hours: 'Mon-Sat: 8:00 AM - 6:00 PM',
+
+  const riderInfo = {
+    name: 'Juan Dela Cruz',
+    phone: '+63 917 555 1234',
+    email: 'juan.delacruz@email.com',
+    vehicleType: 'Motorcycle',
+    plateNumber: 'ABC 1234',
     rating: 4.8,
-    totalReviews: 245,
+    totalDeliveries: 342,
     verified: true,
   };
-
-  const renderTitle = () => (
-    <View style={styles.titleContainer}>
-      <Text style={styles.titleText}>Business Profile</Text>
-    </View>
-  );
 
   const settingsOptions = [
     {
       id: '1',
-      title: 'Business Information',
-      icon: 'business',
-      color: '#1C86FF',
+      title: 'Personal Information',
+      icon: 'person',
+      color: '#FF6B35',
+      route: '/rider-info',
     },
     {
       id: '2',
-      title: 'Operating Hours',
-      icon: 'time',
+      title: 'Vehicle Details',
+      icon: 'bicycle',
       color: '#4CAF50',
+      route: '/vehicle-details',
     },
     {
       id: '3',
-      title: 'Payment Settings',
-      icon: 'card',
-      color: '#FF9B79',
+      title: 'Payment Method',
+      icon: 'wallet',
+      color: '#2196F3',
+      route: '/payment-method',
     },
     {
       id: '4',
-      title: 'Notifications',
-      icon: 'notifications',
-      color: '#2196F3',
+      title: 'Delivery History',
+      icon: 'time',
+      color: '#9C27B0',
+      route: '/delivery-history',
     },
     {
       id: '5',
-      title: 'Staff Management',
-      icon: 'people',
-      color: '#9C27B0',
+      title: 'Help & Support',
+      icon: 'help-circle',
+      color: '#FFC107',
+      route: '/support',
     },
     {
       id: '6',
-      title: 'Reviews & Ratings',
-      icon: 'star',
-      color: '#FFD700',
+      title: 'Settings',
+      icon: 'settings',
+      color: '#607D8B',
+      route: '/settings',
     },
   ];
+
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText}>Profile</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,32 +88,37 @@ export default function BusinessProfileScreen() {
         resizeMode="repeat"
       />
       <Header
-        backgroundColor="#1C86FF"
+        backgroundColor="#FF6B35"
         titleColor="#fff"
         customTitle={renderTitle()}
         showBack={false}
       />
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Business Card */}
-        <View style={styles.businessCard}>
-          <View style={styles.businessIconContainer}>
-            <Ionicons name="storefront" size={moderateScale(50)} color="#1C86FF" />
-            {businessInfo.verified && (
+        {/* Rider Card */}
+        <View style={styles.riderCard}>
+          <View style={styles.riderIconContainer}>
+            <Ionicons name="person" size={moderateScale(50)} color="#FF6B35" />
+            {riderInfo.verified && (
               <View style={styles.verifiedBadge}>
                 <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
               </View>
             )}
           </View>
 
-          <Text style={styles.businessName}>{businessInfo.name}</Text>
-          <Text style={styles.businessType}>{businessInfo.type}</Text>
+          <Text style={styles.riderName}>{riderInfo.name}</Text>
+          <Text style={styles.vehicleType}>{riderInfo.vehicleType}</Text>
 
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={moderateScale(18)} color="#FFD700" />
-            <Text style={styles.ratingText}>
-              {businessInfo.rating} ({businessInfo.totalReviews} reviews)
-            </Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="star" size={moderateScale(18)} color="#FFD700" />
+              <Text style={styles.statText}>{riderInfo.rating}</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="bicycle" size={moderateScale(18)} color="#FF6B35" />
+              <Text style={styles.statText}>{riderInfo.totalDeliveries} deliveries</Text>
+            </View>
           </View>
         </View>
 
@@ -116,23 +127,18 @@ export default function BusinessProfileScreen() {
           <Text style={styles.sectionTitle}>Contact Information</Text>
 
           <View style={styles.infoRow}>
-            <Ionicons name="call" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.infoText}>{businessInfo.phone}</Text>
+            <Ionicons name="call" size={moderateScale(20)} color="#FF6B35" />
+            <Text style={styles.infoText}>{riderInfo.phone}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="mail" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.infoText}>{businessInfo.email}</Text>
+            <Ionicons name="mail" size={moderateScale(20)} color="#FF6B35" />
+            <Text style={styles.infoText}>{riderInfo.email}</Text>
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="location" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.infoText}>{businessInfo.address}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Ionicons name="time" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.infoText}>{businessInfo.hours}</Text>
+            <Ionicons name="car" size={moderateScale(20)} color="#FF6B35" />
+            <Text style={styles.infoText}>{riderInfo.plateNumber}</Text>
           </View>
         </View>
 
@@ -145,19 +151,7 @@ export default function BusinessProfileScreen() {
               key={option.id}
               style={styles.settingCard}
               onPress={() => {
-                if (option.title === 'Business Information') {
-                  Alert.alert('Business Information', `Name: ${businessInfo.name}\nType: ${businessInfo.type}\nPhone: ${businessInfo.phone}\nEmail: ${businessInfo.email}`);
-                } else if (option.title === 'Operating Hours') {
-                  Alert.alert('Operating Hours', businessInfo.hours);
-                } else if (option.title === 'Payment Settings') {
-                  Alert.alert('Payment Settings', 'Payment methods:\n• GCash\n• PayMaya\n• Bank Transfer\n• Cash on Delivery');
-                } else if (option.title === 'Notifications') {
-                  Alert.alert('Notifications', 'Push notifications: Enabled\nEmail notifications: Enabled\nSMS alerts: Disabled');
-                } else if (option.title === 'Staff Management') {
-                  Alert.alert('Staff Management', 'Total staff: 5\nActive: 4\nOn leave: 1');
-                } else if (option.title === 'Reviews & Ratings') {
-                  Alert.alert('Reviews & Ratings', `Average rating: ${businessInfo.rating}⭐\nTotal reviews: ${businessInfo.totalReviews}\n\nRecent reviews:\n• "Excellent service!" - 5⭐\n• "Very professional" - 5⭐\n• "Great experience" - 4⭐`);
-                }
+                Alert.alert('Coming Soon', `${option.title} feature will be available soon!`);
               }}
             >
               <View style={[styles.settingIconContainer, { backgroundColor: option.color }]}>
@@ -221,7 +215,7 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(20),
     paddingBottom: moderateScale(100),
   },
-  businessCard: {
+  riderCard: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(16),
     padding: moderateScale(25),
@@ -233,12 +227,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  businessIconContainer: {
+  riderIconContainer: {
     position: 'relative',
     width: moderateScale(100),
     height: moderateScale(100),
     borderRadius: moderateScale(50),
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#FFE5DB',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: moderateScale(15),
@@ -251,26 +245,36 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     padding: moderateScale(2),
   },
-  businessName: {
+  riderName: {
     fontSize: scaleFontSize(24),
     fontWeight: 'bold',
-    color: '#1C86FF',
+    color: '#FF6B35',
     marginBottom: moderateScale(4),
     textAlign: 'center',
   },
-  businessType: {
+  vehicleType: {
     fontSize: scaleFontSize(14),
     color: '#666',
-    marginBottom: moderateScale(12),
+    marginBottom: moderateScale(15),
     textAlign: 'center',
   },
-  ratingContainer: {
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(20),
+  },
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: moderateScale(6),
   },
-  ratingText: {
-    fontSize: scaleFontSize(14),
+  statDivider: {
+    width: 1,
+    height: moderateScale(20),
+    backgroundColor: '#E0E0E0',
+  },
+  statText: {
+    fontSize: scaleFontSize(13),
     color: '#333',
     fontWeight: '500',
   },
@@ -288,7 +292,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: scaleFontSize(18),
     fontWeight: 'bold',
-    color: '#1C86FF',
+    color: '#FF6B35',
     marginBottom: moderateScale(15),
   },
   infoRow: {

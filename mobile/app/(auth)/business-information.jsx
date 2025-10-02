@@ -24,6 +24,7 @@ export default function BusinessInformationScreen() {
     businessName: '',
     address: '',
     phoneNumber: '',
+    email: '',
     openingTime: '',
     closingTime: '',
   });
@@ -94,9 +95,9 @@ export default function BusinessInformationScreen() {
 
   const handleNext = () => {
     // Validate fields
-    const { businessName, address, phoneNumber, openingTime, closingTime } = businessInfo;
+    const { businessName, address, phoneNumber, email, openingTime, closingTime } = businessInfo;
 
-    if (!businessName || !address || !phoneNumber || !openingTime || !closingTime) {
+    if (!businessName || !address || !phoneNumber || !email || !openingTime || !closingTime) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -105,6 +106,13 @@ export default function BusinessInformationScreen() {
     const phoneRegex = /^[\d\s\-\+\(\)]+$/;
     if (!phoneRegex.test(phoneNumber)) {
       Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
@@ -174,6 +182,19 @@ export default function BusinessInformationScreen() {
                 onChangeText={(value) => updateBusinessInfo('phoneNumber', value)}
                 placeholder="Enter phone number"
                 keyboardType="phone-pad"
+              />
+            </View>
+
+            {/* Email Address */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email Address</Text>
+              <TextInput
+                style={styles.input}
+                value={businessInfo.email}
+                onChangeText={(value) => updateBusinessInfo('email', value)}
+                placeholder="Enter email address"
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </View>
 
