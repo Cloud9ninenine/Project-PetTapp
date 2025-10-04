@@ -42,13 +42,17 @@ export default function LoginScreen() {
       else if (email.toLowerCase() === "rider" && password === "rider123") {
         router.replace("/(rider)/(tabs)/home");
       }
-      // 🟢 Fake condition: if email contains "new", go to setup
-      else if (email.includes("new")) {
+      // Check for new user credentials (initial setup)
+      else if (email.toLowerCase() === "newuser" && password === "newuser123") {
         router.replace("/(auth)/initial-setup");
       }
-      // Default user login
-      else {
+      // Check for regular user credentials
+      else if (email.toLowerCase() === "user" && password === "user123") {
         router.replace("/(user)/(tabs)/home");
+      }
+      // Invalid credentials
+      else {
+        Alert.alert("Login Failed", "Invalid credentials. Try:\nuser/user123\nbusiness/business123\nnewuser/newuser123");
       }
     }, 1000);
   };
@@ -202,25 +206,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
   header: {
     alignItems: "center",
+    marginBottom: hp(2),
   },
   logo: {
-    width: wp(isSmallDevice() ? 50 : 60),
-    height: wp(isSmallDevice() ? 50 : 60),
-    marginBottom: moderateScale(-65),
+    width: moderateScale(isSmallDevice() ? 160 : 180),
+    height: moderateScale(isSmallDevice() ? 160 : 180),
+    marginBottom: moderateScale(-70),
   },
   title: {
     fontSize: scaleFontSize(isSmallDevice() ? 40 : 50),
     color: "#1C86FF",
-    marginTop: moderateScale(2),
+    marginTop: moderateScale(5),
     fontFamily: "SFProBold",
+  },
+  form: {
+    width: "100%",
+    marginBottom: hp(2),
   },
   label: {
     fontSize: scaleFontSize(18),
     color: "#000",
-    marginBottom: moderateScale(6),
+    marginBottom: hp(0.5),
     fontFamily: "SFProSB"
   },
   input: {
@@ -228,11 +240,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "black",
     borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
-    marginBottom: moderateScale(16),
-    fontFamily:"SFProReg"
+    marginBottom: hp(2),
+    fontFamily:"SFProReg",
+    width: "100%",
   },
   passwordContainer: {
     flexDirection: "row",
@@ -241,21 +254,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "black",
     borderRadius: moderateScale(12),
-    marginBottom: moderateScale(12),
+    marginBottom: hp(1.5),
+    width: "100%",
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
     fontFamily:"SFProReg"
   },
   eyeButton: {
-    padding: moderateScale(20),
+    padding: moderateScale(12),
+    paddingHorizontal: wp(4),
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginBottom: moderateScale(10),
+    marginBottom: hp(1),
   },
   forgotPasswordText: {
     color: "Black",
@@ -265,15 +280,18 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: "row",
-    gap: moderateScale(12),
-    marginBottom: moderateScale(10),
+    gap: wp(3),
+    marginBottom: hp(1),
+    width: "100%",
   },
   loginButton: {
     flex: 1,
     backgroundColor: "#1C86FF",
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(8),
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: hp(5.5),
   },
   loginButtonText: {
     color: "#fff",
@@ -285,9 +303,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#1C86FF",
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(8),
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: hp(5.5),
   },
   signupButtonText: {
     color: "#1C86FF",
@@ -297,11 +317,13 @@ const styles = StyleSheet.create({
   },
   socialLogin: {
     alignItems: "center",
+    width: "100%",
   },
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: moderateScale(20),
+    marginVertical: hp(2),
+    width: "100%",
   },
   divider: {
     flex: 1,
@@ -312,11 +334,13 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(13),
     color: "black",
     fontFamily: "SFProMedium",
-    marginHorizontal: moderateScale(14),
+    marginHorizontal: wp(3),
   },
   socialButtons: {
     flexDirection: "row",
-    gap: moderateScale(16),
+    gap: wp(4),
+    justifyContent: "center",
+    alignItems: "center",
   },
   socialButton: {
     width: moderateScale(50),

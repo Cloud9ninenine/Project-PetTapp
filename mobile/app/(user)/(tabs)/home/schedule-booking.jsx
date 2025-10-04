@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: hp(1.8),
     borderRadius: moderateScale(12),
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1C86FF',
   },
   bookButtonText: {
     color: '#fff',

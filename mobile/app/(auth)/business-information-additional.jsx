@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 const BUSINESS_TYPE_OPTIONS = [
   { label: 'Select business type', value: '' },
@@ -238,26 +238,30 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
-    paddingTop: moderateScale(40),
-    paddingBottom: moderateScale(40),
+    paddingTop: hp(5),
+    paddingBottom: hp(5),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
   pageTitle: {
     fontSize: scaleFontSize(isSmallDevice() ? 30 : 36),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(40),
+    marginBottom: hp(4),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: moderateScale(12),
+    marginBottom: hp(1.5),
+    width: "100%",
   },
   label: {
     fontSize: scaleFontSize(18),
     color: 'black',
-    marginBottom: moderateScale(6),
+    marginBottom: hp(0.5),
     fontFamily: 'SFProSB',
   },
   dropdownButton: {
@@ -265,11 +269,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#1C86FF',
     borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: "100%",
   },
   dropdownText: {
     fontSize: scaleFontSize(20),
@@ -284,11 +289,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#1C86FF',
     borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(16),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.8),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(12),
+    gap: wp(3),
+    width: "100%",
   },
   uploadButtonText: {
     fontSize: scaleFontSize(16),
@@ -301,17 +307,20 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: moderateScale(12),
-    marginTop: moderateScale(10),
+    gap: wp(3),
+    marginTop: hp(1.5),
+    width: "100%",
   },
   backButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: hp(5.5),
   },
   backButtonText: {
     color: '#1C86FF',
@@ -321,9 +330,11 @@ const styles = StyleSheet.create({
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: hp(5.5),
   },
   confirmButtonText: {
     color: '#fff',
@@ -335,14 +346,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: moderateScale(20),
+    padding: wp(5),
   },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
-    padding: moderateScale(20),
+    padding: wp(5),
     width: '100%',
-    maxWidth: moderateScale(400),
+    maxWidth: wp(90),
     maxHeight: '70%',
   },
   modalTitle: {
@@ -350,11 +361,11 @@ const styles = StyleSheet.create({
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(20),
+    marginBottom: hp(2.5),
   },
   modalOption: {
-    paddingVertical: moderateScale(16),
-    paddingHorizontal: moderateScale(16),
+    paddingVertical: hp(1.8),
+    paddingHorizontal: wp(4),
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -365,9 +376,11 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: moderateScale(20),
+    justifyContent: 'center',
+    marginTop: hp(2.5),
+    minHeight: hp(5.5),
   },
 });

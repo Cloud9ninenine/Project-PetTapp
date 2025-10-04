@@ -11,17 +11,17 @@ export default function IndexScreen() {
   const checkAuthStatus = async () => {
     // TODO: Implement actual auth check logic here
     // For now, we'll redirect to welcome screen after a brief delay
-    
+
     try {
       // Example: Check for stored auth token
       // const token = await AsyncStorage.getItem('authToken');
       // const isValidToken = await validateToken(token);
-      
+
       // For demo purposes, show welcome screen first
       setTimeout(() => {
         router.replace('/welcome');
       }, 1500);
-      
+
       // If authenticated, redirect to main app:
       // router.replace('/(user)/(tabs)');
     } catch (error) {

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function UserInformationScreen() {
   const [userInfo, setUserInfo] = useState({
@@ -178,44 +178,46 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
-    paddingTop: moderateScale(40),
-    paddingBottom: moderateScale(40),
+    paddingTop: hp(5),
+    paddingBottom: hp(5),
     alignItems: 'center',
+    width: "100%",
   },
   pageTitle: {
     fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(20),
+    marginBottom: hp(2.5),
   },
   addCircle: {
-    width: moderateScale(100),
-    height: moderateScale(100),
-    borderRadius: moderateScale(50),
+    width: wp(25),
+    height: wp(25),
+    borderRadius: wp(12.5),
     borderWidth: 2,
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: moderateScale(30),
+    marginBottom: hp(3.5),
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
   profileImage: {
     width: '100%',
     height: '100%',
-    borderRadius: moderateScale(50),
+    borderRadius: wp(12.5),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: moderateScale(12),
+    marginBottom: hp(1.5),
+    width: "100%",
   },
   label: {
     fontSize: scaleFontSize(16),
     color: 'black',
-    marginBottom: moderateScale(6),
+    marginBottom: hp(0.5),
     fontFamily: 'SFProSB',
   },
   input: {
@@ -223,21 +225,25 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'black',
     borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
+    width: "100%",
   },
   textArea: {
-    height: moderateScale(90),
-    paddingTop: moderateScale(14),
+    height: hp(11),
+    paddingTop: hp(1.5),
   },
   confirmButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
-    marginTop: moderateScale(10),
+    justifyContent: 'center',
+    marginTop: hp(1.5),
+    width: "100%",
+    minHeight: hp(6),
   },
   confirmButtonText: {
     color: '#fff',

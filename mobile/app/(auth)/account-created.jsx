@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function AccountCreatedScreen() {
   const handleContinueToLogin = () => {
@@ -63,6 +63,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
 
   icon: {
@@ -73,23 +76,25 @@ const styles = StyleSheet.create({
     fontFamily: "SFProBold",
     color: "#1C86FF",
     textAlign: "center",
-    marginBottom: moderateScale(8),
+    marginBottom: hp(1),
   },
   subtitle: {
     fontSize: scaleFontSize(18),
     fontFamily: "SFProReg",
     color: "black",
     textAlign: "center",
-    marginBottom: moderateScale(40),
+    marginBottom: hp(5),
     lineHeight: moderateScale(24),
   },
 
   continueButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(10),
     alignItems: "center",
+    justifyContent: "center",
     width: "100%",
+    minHeight: hp(5.5),
   },
   continueButtonText: {
     color: "#fff",

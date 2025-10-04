@@ -114,8 +114,8 @@ const ScheduleDetail = () => {
             <Text style={styles.sideBySideButtonText}>Chat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleRate}>
-            <Ionicons name="star-outline" size={moderateScale(20)} color="#ff9b79" />
-            <Text style={[styles.sideBySideButtonOutlineText, { color: "#ff9b79" }]}>Rate</Text>
+            <Ionicons name="star-outline" size={moderateScale(20)} color="#1C86FF" />
+            <Text style={[styles.sideBySideButtonOutlineText, { color: "#1C86FF" }]}>Rate</Text>
           </TouchableOpacity>
         </View>
       );
@@ -129,8 +129,8 @@ const ScheduleDetail = () => {
             <Text style={styles.sideBySideButtonText}>Chat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleCancel}>
-            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#FF6B6B" />
-            <Text style={[styles.sideBySideButtonOutlineText, { color: "#FF6B6B" }]}>Cancel</Text>
+            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+            <Text style={[styles.sideBySideButtonOutlineText, { color: "#1C86FF" }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
       );

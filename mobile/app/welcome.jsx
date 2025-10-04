@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function WelcomeScreen() {
   const [loaded] = useFonts({
@@ -50,18 +50,19 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: moderateScale(100),
+    width: "100%",
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: "100%",
   },
   logo: {
-    width: wp(isSmallDevice() ? 100 : 120),
-    height: wp(isSmallDevice() ? 100 : 120),
-    marginBottom: moderateScale(-150),
+    width: moderateScale(isSmallDevice() ? 250 : 300),
+    height: moderateScale(isSmallDevice() ? 250 : 300),
+    marginBottom: moderateScale(-120),
   },
   appName: {
     fontSize: scaleFontSize(isSmallDevice() ? 60 : 72),
@@ -69,6 +70,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textAlign: 'center',
     fontFamily: 'SFProBold',
+    marginTop: moderateScale(20),
   },
 
 });

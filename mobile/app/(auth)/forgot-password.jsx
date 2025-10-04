@@ -13,7 +13,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -118,28 +118,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
 
   title: {
     fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     color: "#1C86FF",
     textAlign: "center",
-    marginBottom: moderateScale(8),
+    marginBottom: hp(1),
     fontFamily: "SFProBold",
   },
   subtitle: {
     fontSize: scaleFontSize(17),
     color: "#333",
     textAlign: "center",
-    marginBottom: moderateScale(50),
-    lineHeight: moderateScale(20),
+    marginBottom: hp(6),
+    lineHeight: scaleFontSize(22),
+    paddingHorizontal: wp(5),
   },
 
-  inputGroup: { marginBottom: moderateScale(20) },
+  inputGroup: {
+    marginBottom: hp(2.5),
+    width: "100%",
+  },
   label: {
     fontSize: scaleFontSize(16),
     color: "#333",
-    marginBottom: moderateScale(6),
+    marginBottom: hp(0.5),
     fontFamily: "SFProSB",
   },
   input: {
@@ -147,17 +154,21 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "black",
     borderRadius: moderateScale(8),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
+    width: "100%",
   },
 
   sendCodeButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(10),
     alignItems: "center",
-    marginBottom: moderateScale(12),
+    justifyContent: "center",
+    marginBottom: hp(1.5),
+    width: "100%",
+    minHeight: hp(5.5),
   },
   sendCodeButtonText: {
     color: "#fff",
@@ -167,11 +178,14 @@ const styles = StyleSheet.create({
 
   backToLoginButton: {
     backgroundColor: "#fff",
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(10),
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1.5,
     borderColor: "#000",
+    width: "100%",
+    minHeight: hp(5.5),
   },
   backToLoginButtonText: {
     color: "#000",

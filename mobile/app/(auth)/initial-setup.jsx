@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 
 export default function InitialSetupScreen() {
   const [selectedProfile, setSelectedProfile] = useState(null);
@@ -68,6 +68,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: wp(isSmallDevice() ? 10 : 13),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
 
   title: {
@@ -75,7 +78,7 @@ const styles = StyleSheet.create({
     color: "#1C86FF",
     textAlign: "center",
     fontFamily:"SFProBold",
-    marginBottom: moderateScale(-15),
+    marginBottom: hp(-1.5),
   },
 
   subtitle: {
@@ -83,16 +86,18 @@ const styles = StyleSheet.create({
     fontFamily: "SFProReg",
     color: "black",
     textAlign: "center",
-    marginBottom: moderateScale(30),
+    marginBottom: hp(4),
   },
 
   button: {
     backgroundColor: "#1C86FF",
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     width: "100%",
     alignItems: "center",
-    marginBottom: moderateScale(28),
+    justifyContent: "center",
+    marginBottom: hp(3),
+    minHeight: hp(6),
   },
 
   buttonText: {

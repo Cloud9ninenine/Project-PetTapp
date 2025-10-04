@@ -172,7 +172,7 @@ export default function NearbyServiceMapScreen() {
         {/* Placeholder Notice */}
         <View style={styles.placeholderNotice}>
           <Ionicons name="information-circle" size={moderateScale(18)} color="#1C86FF" />
-          <Text style={styles.placeholderText}>Map Placeholder - Google Maps will be integrated</Text>
+          <Text style={styles.placeholderText}>Map Placeholder</Text>
         </View>
 
         {/* Zoom Controls */}
@@ -561,16 +561,19 @@ const styles = StyleSheet.create({
   },
   bookButtonFull: {
     flexDirection: 'row',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#fff',
     paddingVertical: hp(1.8),
     borderRadius: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#1C86FF',
   },
   bookButtonText: {
-    color: '#fff',
+    color: '#1C86FF',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
+
     marginLeft: moderateScale(6),
   },
   // Get Directions Modal Styles

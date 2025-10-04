@@ -299,6 +299,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
 
   title: {
@@ -306,15 +309,18 @@ const styles = StyleSheet.create({
     color: "#1C86FF",
     textAlign: "center",
     fontFamily: "SFProBold",
-    marginBottom: moderateScale(20),
+    marginBottom: hp(2.5),
   },
 
-  form: { marginBottom: moderateScale(10) },
+  form: {
+    marginBottom: hp(1),
+    width: "100%",
+  },
 
   label: {
     fontSize: scaleFontSize(16),
     color: "#black",
-    marginBottom: moderateScale(4),
+    marginBottom: hp(0.5),
     fontFamily: "SFProSB",
   },
 
@@ -323,10 +329,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "black",
     borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
-    marginBottom: moderateScale(10),
+    marginBottom: hp(1.2),
+    width: "100%",
   },
 
   passwordContainer: {
@@ -336,38 +343,74 @@ const styles = StyleSheet.create({
     borderColor: "black",
     borderRadius: moderateScale(10),
     backgroundColor: "#fff",
-    marginBottom: moderateScale(10),
+    marginBottom: hp(1.2),
+    width: "100%",
   },
   passwordInput: {
     flex: 1,
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(12),
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
   },
 
-  eyeWrap: { paddingHorizontal: moderateScale(20) },
+  eyeWrap: {
+    paddingHorizontal: wp(4),
+  },
 
-  alreadyRow: { alignSelf: "flex-end", marginBottom: moderateScale(12) },
-  alreadyText: { color: "black", fontSize: scaleFontSize(14), textDecorationLine: 'underline', },
+  alreadyRow: {
+    alignSelf: "flex-end",
+    marginBottom: hp(1.5),
+  },
+  alreadyText: {
+    color: "black",
+    fontSize: scaleFontSize(14),
+    textDecorationLine: 'underline',
+  },
 
   confirmButton: {
     backgroundColor: "#1C86FF",
-    paddingVertical: moderateScale(14),
+    paddingVertical: hp(1.5),
     borderRadius: moderateScale(10),
     alignItems: "center",
-    marginBottom: moderateScale(14),
+    justifyContent: "center",
+    marginBottom: hp(1.5),
+    width: "100%",
+    minHeight: hp(5.5),
   },
   disabledButton: { opacity: 0.6 },
-  confirmText: { color: "#fff", fontSize: scaleFontSize(16), fontFamily: "SFProBold" },
+  confirmText: {
+    color: "#fff",
+    fontSize: scaleFontSize(16),
+    fontFamily: "SFProBold",
+  },
 
-  socialLogin: { alignItems: "center" },
-  dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: moderateScale(10) },
-  divider: { flex: 1, height: 1, backgroundColor: "black" },
-  orContinueWith: { fontSize: scaleFontSize(13), color: "#black", marginHorizontal: moderateScale(14), fontFamily: "SFProMedium" },
+  socialLogin: {
+    alignItems: "center",
+    width: "100%",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: hp(1.5),
+    width: "100%",
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "black",
+  },
+  orContinueWith: {
+    fontSize: scaleFontSize(13),
+    color: "#black",
+    marginHorizontal: wp(3),
+    fontFamily: "SFProMedium",
+  },
 
   socialButtons: {
     flexDirection: "row",
-    gap: moderateScale(16),
+    gap: wp(4),
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   socialButton: {
@@ -378,11 +421,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  socialIconPlaceholder: { width: moderateScale(28), height: moderateScale(28), backgroundColor: "#fff" },
+  socialIconPlaceholder: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+    backgroundColor: "#fff",
+  },
 
   errorText: {
     fontSize: scaleFontSize(12),
     color: "red",
-    marginBottom: moderateScale(8),
+    marginBottom: hp(1),
   },
 });

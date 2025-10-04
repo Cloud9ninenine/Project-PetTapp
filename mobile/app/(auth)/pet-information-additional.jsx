@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { wp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
+import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
 
 export default function PetInformationAdditionalScreen() {
   const params = useLocalSearchParams();
@@ -132,27 +132,31 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: wp(isSmallDevice() ? 8 : 13),
-    paddingTop: moderateScale(40),
-    paddingBottom: moderateScale(40),
+    paddingTop: hp(5),
+    paddingBottom: hp(5),
     alignItems: 'center',
+    maxWidth: wp(100),
+    alignSelf: "center",
+    width: "100%",
   },
   pageTitle: {
     fontSize: scaleFontSize(isSmallDevice() ? 35 : 40),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(40),
+    marginBottom: hp(5),
   },
   formSection: {
     width: '100%',
   },
   inputGroup: {
-    marginBottom: moderateScale(12),
+    marginBottom: hp(1.5),
+    width: "100%",
   },
   label: {
-    fontSize: scaleFontSize(18),
+    fontSize: scaleFontSize(16),
     color: 'black',
-    marginBottom: moderateScale(6),
+    marginBottom: hp(0.5),
     fontFamily: 'SFProSB',
   },
   input: {
@@ -160,48 +164,54 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'black',
     borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
-    fontSize: scaleFontSize(20),
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.5),
+    fontSize: scaleFontSize(18),
     fontFamily: 'SFProReg',
+    width: "100%",
   },
   textArea: {
-    height: moderateScale(120),
-    paddingTop: moderateScale(14),
+    height: hp(15),
+    paddingTop: hp(1.5),
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: moderateScale(12),
-    marginTop: moderateScale(10),
+    gap: wp(3),
+    marginTop: hp(1.5),
+    width: "100%",
   },
   backButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: hp(6),
   },
   backButtonText: {
     color: '#1C86FF',
-    fontSize: scaleFontSize(18),
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
   },
   confirmButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(16),
+    paddingVertical: hp(1.8),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: hp(6),
   },
   confirmButtonText: {
     color: '#fff',
-    fontSize: scaleFontSize(18),
+    fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
   },
   skipButton: {
-    marginTop: moderateScale(20),
+    marginTop: hp(2.5),
   },
   skipButtonText: {
     color: 'black',
