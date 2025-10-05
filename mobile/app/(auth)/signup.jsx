@@ -11,12 +11,15 @@ import {
   ImageBackground,
   ActivityIndicator,
   useWindowDimensions,
+  Alert,
+  Switch,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
+import apiClient from "../config/api";
 
 export default function SignUpScreen() {
   const [username, setUsername] = useState("");
@@ -26,6 +29,7 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [role, setRole] = useState("pet-owner"); // default role is "pet-owner"
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -80,6 +84,15 @@ export default function SignUpScreen() {
     } else if (password.length < 6) {
       newErr.password = "Password must be at least 6 characters";
       ok = false;
+    } else if (!/(?=.*[A-Z])/.test(password)) {
+      newErr.password = "Password must contain at least one uppercase letter";
+      ok = false;
+    } else if (!/(?=.*\d)/.test(password)) {
+      newErr.password = "Password must contain at least one number";
+      ok = false;
+    } else if (!/(?=.*[@$!%*?&#])/.test(password)) {
+      newErr.password = "Password must contain at least one special character (@$!%*?&#)";
+      ok = false;
     }
 
     if (!confirmPassword) {
@@ -109,10 +122,78 @@ export default function SignUpScreen() {
     if (!ok) return;
 
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const response = await apiClient.post('/auth/register', {
+        username: username.trim(),
+        email: email.trim(),
+        password: password,
+        role: role
+      });
+
+      // 201 - Registration successful
+      if (response.status === 201) {
+        router.replace("account-created");
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+
+        // 409 - Email or Username already exists
+        if (status === 409) {
+          const message = data?.message || "";
+
+          if (message.toLowerCase().includes("email")) {
+            setErrors((prev) => ({
+              ...prev,
+              email: data?.message || "Email already exists"
+            }));
+            Alert.alert("Registration Failed", "This email is already registered. Please use a different email.");
+          } else if (message.toLowerCase().includes("username")) {
+            setErrors((prev) => ({
+              ...prev,
+              username: data?.message || "Username already exists"
+            }));
+            Alert.alert("Registration Failed", "Username already exists. Please choose a different username.");
+          } else {
+            Alert.alert("Registration Failed", data?.message || "User already exists.");
+          }
+        }
+        // 422 - Validation errors
+        else if (status === 422) {
+          const validationErrors = data?.errors || {};
+          const newErrors = { username: "", email: "", password: "", confirmPassword: "" };
+
+          if (validationErrors.username) {
+            newErrors.username = validationErrors.username;
+          }
+          if (validationErrors.email) {
+            newErrors.email = validationErrors.email;
+          }
+          if (validationErrors.password) {
+            newErrors.password = validationErrors.password;
+          }
+
+          setErrors(newErrors);
+          Alert.alert("Validation Error", data?.message || "Please check your input and try again.");
+        }
+        // Other errors
+        else {
+          const errorMessage = data?.message || data?.error || "An error occurred during registration";
+          Alert.alert("Registration Failed", errorMessage);
+        }
+      } else if (error.request) {
+        // Request made but no response
+        Alert.alert("Network Error", "Please check your connection and try again.");
+      } else {
+        Alert.alert("Error", "An unexpected error occurred.");
+      }
+    } finally {
       setIsLoading(false);
-      router.replace("account-created");
-    }, 1200);
+    }
   };
 
   const onUsernameBlur = () => {
@@ -222,6 +303,30 @@ export default function SignUpScreen() {
             {errors.confirmPassword ? (
               <Text style={styles.errorText}>{errors.confirmPassword}</Text>
             ) : null}
+
+            {/* Role Selection */}
+            <Text style={styles.label}>Account Type</Text>
+            <Text style={styles.accountTypeSubtitle}>Select the type of account you want to create.</Text>
+
+            <View style={styles.roleOption}>
+              <View style={styles.roleContent}>
+                <Text style={styles.roleTitle}>
+                  {role === "pet-owner" ? "Pet Owner" : "Business Owner"}
+                </Text>
+                <Text style={styles.roleDescription}>
+                  {role === "pet-owner"
+                    ? "Find and book services for your pets."
+                    : "Offer pet services and manage bookings."}
+                </Text>
+              </View>
+              <Switch
+                value={role === "business-owner"}
+                onValueChange={(value) => setRole(value ? "business-owner" : "pet-owner")}
+                trackColor={{ false: "#1C86FF", true: "#ff9b79" }}
+                thumbColor="#fff"
+                ios_backgroundColor="#D1D5DB"
+              />
+            </View>
           </View>
 
           {/* Already have account */}
@@ -327,7 +432,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "black",
+    borderColor: "#E0E0E0",
     borderRadius: moderateScale(10),
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
@@ -340,7 +445,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "black",
+    borderColor: "#E0E0E0",
     borderRadius: moderateScale(10),
     backgroundColor: "#fff",
     marginBottom: hp(1.2),
@@ -431,5 +536,44 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: "red",
     marginBottom: hp(1),
+  },
+
+  accountTypeSubtitle: {
+    fontSize: scaleFontSize(12),
+    color: "#666",
+    marginBottom: hp(0.8),
+    fontFamily: "SFProReg",
+  },
+
+  roleOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: wp(4),
+    paddingVertical: hp(1.2),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    backgroundColor: "#fff",
+    marginBottom: hp(1.2),
+  },
+
+  roleContent: {
+    flex: 1,
+    marginRight: wp(3),
+  },
+
+  roleTitle: {
+    fontSize: scaleFontSize(14),
+    color: "#000",
+    fontFamily: "SFProSB",
+    marginBottom: hp(0.2),
+  },
+
+  roleDescription: {
+    fontSize: scaleFontSize(11),
+    color: "#666",
+    fontFamily: "SFProReg",
+    lineHeight: scaleFontSize(14),
   },
 });

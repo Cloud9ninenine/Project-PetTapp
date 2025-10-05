@@ -11,11 +11,13 @@ import {
   Image,
   ImageBackground,
   useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Link, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
+import apiClient from "../config/api";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -31,30 +33,78 @@ export default function LoginScreen() {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Step 1: Login to verify credentials
+      const loginResponse = await apiClient.post('/auth/login', {
+        email: email.trim(),
+        password: password,
+      });
 
-      // Check for business credentials
-      if (email.toLowerCase() === "business" && password === "business123") {
-        router.replace("/(bsn)/(tabs)/home");
+      // 200 - Login successful
+      if (loginResponse.status === 200) {
+        // Step 2: Get refresh token
+        const refreshResponse = await apiClient.post('/auth/refresh');
+
+        if (refreshResponse.status === 200) {
+          const { token } = refreshResponse.data;
+
+          // Store token if needed (you can use AsyncStorage or secure storage)
+          // await AsyncStorage.setItem('authToken', token);
+
+          // Step 3: Get user data and role
+          const meResponse = await apiClient.get('/auth/me');
+
+          if (meResponse.status === 200) {
+            console.log('User data from /auth/me:', meResponse.data);
+
+            // Try to get role from different possible locations in the response
+            const role = meResponse.data.user.role 
+
+            // Navigate based on role
+            if (role === "business-owner") {
+              router.replace("/(bsn)/(tabs)/home");
+            } else if (role === "pet-owner") {
+              router.replace("/(user)/(tabs)/home");
+            } else {
+              // Fallback for any other roles
+              console.log('Full response data:', JSON.stringify(meResponse.data, null, 2));
+              Alert.alert("Error", `Unknown user role: ${role}. Please contact support.`);
+            }
+          }
+        }
       }
-      // Check for rider credentials
-      else if (email.toLowerCase() === "rider" && password === "rider123") {
-        router.replace("/(rider)/(tabs)/home");
+    } catch (error) {
+      console.error('Login error:', error);
+
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+
+        // 401 - Invalid credentials
+        if (status === 401) {
+          Alert.alert("Login Failed", data?.message || "Invalid email or password.");
+        }
+        // 404 - User not found
+        else if (status === 404) {
+          Alert.alert("Login Failed", "User not found. Please check your email or sign up.");
+        }
+        // 422 - Validation errors
+        else if (status === 422) {
+          Alert.alert("Validation Error", data?.message || "Please check your input and try again.");
+        }
+        // Other errors
+        else {
+          Alert.alert("Login Failed", data?.message || "An error occurred during login.");
+        }
+      } else if (error.request) {
+        // Request made but no response
+        Alert.alert("Network Error", "Please check your connection and try again.");
+      } else {
+        Alert.alert("Error", "An unexpected error occurred.");
       }
-      // Check for new user credentials (initial setup)
-      else if (email.toLowerCase() === "newuser" && password === "newuser123") {
-        router.replace("/(auth)/initial-setup");
-      }
-      // Check for regular user credentials
-      else if (email.toLowerCase() === "user" && password === "user123") {
-        router.replace("/(user)/(tabs)/home");
-      }
-      // Invalid credentials
-      else {
-        Alert.alert("Login Failed", "Invalid credentials. Try:\nuser/user123\nbusiness/business123\nnewuser/newuser123");
-      }
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -141,9 +191,11 @@ export default function LoginScreen() {
                 onPress={handleLogin}
                 disabled={isLoading}
               >
-                <Text style={styles.loginButtonText}>
-                  {isLoading ? "Logging in..." : "Login"}
-                </Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Login</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

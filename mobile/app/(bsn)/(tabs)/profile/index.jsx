@@ -10,11 +10,13 @@ import {
   Alert,
   Modal,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "../../../config/api";
 
 export default function BusinessProfileScreen() {
   const router = useRouter();
@@ -29,6 +31,7 @@ export default function BusinessProfileScreen() {
     sunday: { open: false, start: '8:00 AM', end: '6:00 PM' },
   });
   const [openForHolidays, setOpenForHolidays] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const businessInfo = {
     name: 'Pawsome Pet Care',
     type: 'Veterinary Services',
@@ -185,7 +188,7 @@ export default function BusinessProfileScreen() {
         {/* Logout Button */}
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => {
+          onPress={async () => {
             Alert.alert(
               'Logout',
               'Are you sure you want to logout?',
@@ -194,14 +197,33 @@ export default function BusinessProfileScreen() {
                 {
                   text: 'Logout',
                   style: 'destructive',
-                  onPress: () => router.replace('/(auth)/login'),
+                  onPress: async () => {
+                    setIsLoggingOut(true);
+                    try {
+                      await apiClient.post('/auth/logout');
+                      router.replace('/(auth)/login');
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      // Still redirect to login even if API call fails
+                      router.replace('/(auth)/login');
+                    } finally {
+                      setIsLoggingOut(false);
+                    }
+                  },
                 },
               ]
             );
           }}
+          disabled={isLoggingOut}
         >
-          <Ionicons name="log-out-outline" size={moderateScale(22)} color="#FF6B6B" />
-          <Text style={styles.logoutText}>Logout</Text>
+          {isLoggingOut ? (
+            <ActivityIndicator color="#FF6B6B" />
+          ) : (
+            <>
+              <Ionicons name="log-out-outline" size={moderateScale(22)} color="#FF6B6B" />
+              <Text style={styles.logoutText}>Logout</Text>
+            </>
+          )}
         </TouchableOpacity>
       </ScrollView>
 

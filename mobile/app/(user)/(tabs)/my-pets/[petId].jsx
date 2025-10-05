@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ImageBackground,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from '@components/Header';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
 
 const SPECIES_OPTIONS = [
   { label: 'Select species', value: '' },
@@ -115,42 +117,17 @@ export default function PetDetailScreen() {
   const params = useLocalSearchParams();
   const { petId } = params;
 
-  // Mock pet data based on petId
-  const getPetData = () => {
-    const pets = {
-      '1': {
-        name: 'Max',
-        species: 'dog',
-        breed: 'golden-retriever',
-        birthday: '01/15/2022',
-        gender: 'male',
-        weight: '32',
-        color: 'Golden',
-      },
-      '2': {
-        name: 'Luna',
-        species: 'cat',
-        breed: 'persian',
-        birthday: '03/20/2023',
-        gender: 'female',
-        weight: '4.5',
-        color: 'White',
-      },
-      '3': {
-        name: 'Charlie',
-        species: 'dog',
-        breed: 'beagle',
-        birthday: '06/10/2021',
-        gender: 'male',
-        weight: '12',
-        color: 'Tricolor',
-      },
-    };
-    return pets[petId] || pets['1'];
-  };
-
-  const [petInfo, setPetInfo] = useState(getPetData());
+  const [petInfo, setPetInfo] = useState({
+    name: '',
+    species: '',
+    breed: '',
+    birthday: '',
+    gender: '',
+    weight: '',
+    color: '',
+  });
   const [petImage, setPetImage] = useState(null);
+  const [originalImage, setOriginalImage] = useState(null);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
   const [showBreedModal, setShowBreedModal] = useState(false);
   const [showGenderModal, setShowGenderModal] = useState(false);
@@ -158,6 +135,67 @@ export default function PetDetailScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch pet data on mount
+  useEffect(() => {
+    const fetchPetData = async () => {
+      try {
+        setIsLoading(true);
+        const response = await apiClient.get(`/pets/${petId}`);
+
+        if (response.status === 200) {
+          const pet = response.data;
+
+          // Convert birthday from YYYY-MM-DD to MM/DD/YYYY
+          let formattedBirthday = '';
+          if (pet.birthday) {
+            const [year, month, day] = pet.birthday.split('-');
+            formattedBirthday = `${month}/${day}/${year}`;
+          }
+
+          setPetInfo({
+            name: pet.name || '',
+            species: pet.species || '',
+            breed: pet.breed || '',
+            birthday: formattedBirthday,
+            gender: pet.gender || '',
+            weight: pet.weight ? pet.weight.toString() : '',
+            color: pet.color || '',
+          });
+
+          if (pet.avatar) {
+            setPetImage(pet.avatar);
+            setOriginalImage(pet.avatar);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching pet:', error);
+        if (error.response) {
+          const status = error.response.status;
+          if (status === 401) {
+            Alert.alert('Authentication Error', 'Please log in again.');
+            router.replace('/(auth)/login');
+          } else if (status === 404) {
+            Alert.alert('Error', 'Pet not found.', [
+              { text: 'OK', onPress: () => router.back() }
+            ]);
+          } else {
+            Alert.alert('Error', 'Failed to load pet information.');
+          }
+        } else if (error.request) {
+          Alert.alert('Network Error', 'Please check your connection and try again.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (petId) {
+      fetchPetData();
+    }
+  }, [petId]);
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -253,23 +291,168 @@ export default function PetDetailScreen() {
     setShowConfirmModal(true);
   };
 
-  const confirmSave = () => {
+  const confirmSave = async () => {
     setShowConfirmModal(false);
-    Alert.alert('Success', 'Pet information updated successfully!', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setIsSaving(true);
+
+    try {
+      // Convert birthday from MM/DD/YYYY to YYYY-MM-DD format
+      const [month, day, year] = petInfo.birthday.split('/');
+      const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // Prepare pet data for API
+      const petData = {
+        name: petInfo.name,
+        species: petInfo.species,
+        breed: petInfo.breed,
+        birthday: formattedBirthday,
+        gender: petInfo.gender,
+        weight: parseFloat(petInfo.weight),
+        color: petInfo.color || null,
+      };
+
+      const response = await apiClient.put(`/pets/${petId}`, petData);
+
+      if (response.status === 200) {
+        // Handle image update
+        const imageChanged = petImage !== originalImage;
+
+        if (imageChanged) {
+          if (petImage && petImage !== originalImage) {
+            // New image selected - upload it
+            await uploadPetImage();
+          } else if (!petImage && originalImage) {
+            // Image was removed
+            await deletePetImage();
+          }
+        }
+
+        Alert.alert('Success', 'Pet information updated successfully!', [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error updating pet:', error);
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+
+        if (status === 401) {
+          Alert.alert('Authentication Error', 'Please log in again.');
+          router.replace('/(auth)/login');
+        } else if (status === 404) {
+          Alert.alert('Error', 'Pet not found.');
+        } else if (status === 422) {
+          Alert.alert('Validation Error', data?.message || 'Please check your input and try again.');
+        } else {
+          Alert.alert('Error', data?.message || 'Failed to update pet. Please try again.');
+        }
+      } else if (error.request) {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const uploadPetImage = async () => {
+    try {
+      const formData = new FormData();
+
+      // Get file extension from URI
+      const uriParts = petImage.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+
+      formData.append('image', {
+        uri: petImage,
+        name: `pet_${petId}.${fileType}`,
+        type: `image/${fileType}`,
+      });
+
+      await apiClient.put(`/pets/${petId}/image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Warning', 'Pet updated but image upload failed.');
+    }
+  };
+
+  const deletePetImage = async () => {
+    try {
+      await apiClient.delete(`/pets/${petId}/image`);
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      Alert.alert('Warning', 'Pet updated but image deletion failed.');
+    }
   };
 
   const handleDelete = () => {
     setShowDeleteModal(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     setShowDeleteModal(false);
-    Alert.alert('Deleted', `${petInfo.name} has been removed from your pets list.`, [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setIsSaving(true);
+
+    try {
+      const response = await apiClient.delete(`/pets/${petId}`);
+
+      if (response.status === 200 || response.status === 204) {
+        Alert.alert('Deleted', `${petInfo.name} has been removed from your pets list.`, [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error deleting pet:', error);
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+
+        if (status === 401) {
+          Alert.alert('Authentication Error', 'Please log in again.');
+          router.replace('/(auth)/login');
+        } else if (status === 404) {
+          Alert.alert('Error', 'Pet not found.');
+        } else {
+          Alert.alert('Error', data?.message || 'Failed to delete pet. Please try again.');
+        }
+      } else if (error.request) {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading pet information...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -588,6 +771,18 @@ export default function PetDetailScreen() {
           maximumDate={new Date()}
         />
       )}
+
+      {/* Loading Overlay */}
+      {isSaving && (
+        <Modal transparent={true} visible={isSaving}>
+          <View style={styles.savingOverlay}>
+            <View style={styles.savingContainer}>
+              <ActivityIndicator size="large" color="#1C86FF" />
+              <Text style={styles.savingText}>Saving changes...</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -851,5 +1046,36 @@ const styles = StyleSheet.create({
   },
   deleteButtonModal: {
     backgroundColor: '#dc3545',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#666',
+    fontFamily: 'SFProReg',
+  },
+  savingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  savingContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(30),
+    alignItems: 'center',
+    minWidth: moderateScale(200),
+  },
+  savingText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#333',
+    fontFamily: 'SFProReg',
   },
 });

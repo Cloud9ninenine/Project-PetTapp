@@ -11,6 +11,7 @@ import {
   ImageBackground,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from '@components/Header';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
 
 const SPECIES_OPTIONS = [
   { label: 'Select species', value: '' },
@@ -123,6 +125,7 @@ export default function AddPetScreen() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const GENDER_OPTIONS = [
     { label: 'Select gender', value: '' },
@@ -224,11 +227,87 @@ export default function AddPetScreen() {
     setShowConfirmModal(true);
   };
 
-  const confirmSave = () => {
+  const confirmSave = async () => {
     setShowConfirmModal(false);
-    Alert.alert('Success', 'Pet added successfully!', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    setIsLoading(true);
+
+    try {
+      // Convert birthday from MM/DD/YYYY to YYYY-MM-DD format
+      const [month, day, year] = petInfo.birthday.split('/');
+      const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+      // Prepare pet data for API
+      const petData = {
+        name: petInfo.petName,
+        species: petInfo.species,
+        breed: petInfo.breed,
+        birthday: formattedBirthday,
+        gender: petInfo.gender,
+        weight: parseFloat(petInfo.weight),
+        color: petInfo.additionalInfo || null,
+      };
+
+      const response = await apiClient.post('/pets', petData);
+
+      if (response.status === 201 || response.status === 200) {
+        const createdPet = response.data;
+
+        // Upload image if selected
+        if (petImage && createdPet.id) {
+          await uploadPetImage(createdPet.id);
+        }
+
+        Alert.alert('Success', 'Pet added successfully!', [
+          { text: 'OK', onPress: () => router.back() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error adding pet:', error);
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+
+        if (status === 401) {
+          Alert.alert('Authentication Error', 'Please log in again.');
+          router.replace('/(auth)/login');
+        } else if (status === 422) {
+          Alert.alert('Validation Error', data?.message || 'Please check your input and try again.');
+        } else {
+          Alert.alert('Error', data?.message || 'Failed to add pet. Please try again.');
+        }
+      } else if (error.request) {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const uploadPetImage = async (petId) => {
+    try {
+      const formData = new FormData();
+
+      // Get file extension from URI
+      const uriParts = petImage.split('.');
+      const fileType = uriParts[uriParts.length - 1];
+
+      formData.append('image', {
+        uri: petImage,
+        name: `pet_${petId}.${fileType}`,
+        type: `image/${fileType}`,
+      });
+
+      await apiClient.put(`/pets/${petId}/image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      // Don't show alert for image upload failure, pet is already created
+    }
   };
 
   const handleReset = () => {
@@ -564,6 +643,18 @@ export default function AddPetScreen() {
           maximumDate={new Date()}
         />
       )}
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <Modal transparent={true} visible={isLoading}>
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#1C86FF" />
+              <Text style={styles.loadingText}>Adding pet...</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -823,5 +914,24 @@ const styles = StyleSheet.create({
   },
   resetButtonModal: {
     backgroundColor: '#FF9B79',
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(30),
+    alignItems: 'center',
+    minWidth: moderateScale(200),
+  },
+  loadingText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#333',
+    fontFamily: 'SFProReg',
   },
 });

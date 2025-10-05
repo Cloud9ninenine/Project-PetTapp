@@ -10,6 +10,7 @@ import {
   Modal,
   ImageBackground,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,12 +18,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
+import apiClient from "../../../config/api";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -116,11 +119,19 @@ export default function ProfileScreen() {
     setShowLogoutModal(true);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
     setShowLogoutModal(false);
-    Alert.alert('Logged Out', 'You have been logged out successfully.', [
-      { text: 'OK', onPress: () => router.replace('/(auth)/login') }
-    ]);
+    setIsLoggingOut(true);
+    try {
+      await apiClient.post('/auth/logout');
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still redirect to login even if API call fails
+      router.replace('/(auth)/login');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleAddPayment = () => {
@@ -303,8 +314,16 @@ export default function ProfileScreen() {
                   {isEditing ? 'Confirm' : 'Edit'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutButtonText}>Logout</Text>
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={handleLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator color="#1C86FF" />
+                ) : (
+                  <Text style={styles.logoutButtonText}>Logout</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
