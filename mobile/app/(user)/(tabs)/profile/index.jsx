@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,46 +22,97 @@ import apiClient from "../../../config/api";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Account Info
+  const [accountInfo, setAccountInfo] = useState({
+    firstName: '',
+    lastName: '',
+    middleName: '',
+    suffix: '',
+    email: '',
+    phoneNumber: '',
+  });
+
+  // Address Info
+  const [addressInfo, setAddressInfo] = useState({
+    homeAddress: '',
+  });
+
+  // Password Change
+  const [passwordInfo, setPasswordInfo] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  // Payment Options
+  const [paymentOptions, setPaymentOptions] = useState([]);
+  const [newPayment, setNewPayment] = useState({
+    type: '',
+    gcashNumber: '',
+    gcashName: '',
+  });
+
+  // Modals
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
-  const [profileImage, setProfileImage] = useState(null);
 
-  const [profileInfo, setProfileInfo] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    homeAddress: '123 Pet Street, Animal City, PC 12345',
-    phoneNumber: '+1 234 567 8900',
-  });
+  // Editing States
+  const [editingAccount, setEditingAccount] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
-  const [paymentOptions, setPaymentOptions] = useState([
-    {
-      id: '1',
-      name: 'Option 1',
-      cardNumber: '**** **** **** 1234',
-      cardHolder: 'John Doe',
-      expiryDate: '12/25',
-    },
-    {
-      id: '2',
-      name: 'Option 2',
-      cardNumber: '**** **** **** 5678',
-      cardHolder: 'John Doe',
-      expiryDate: '06/26',
-    },
-  ]);
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true);
+        const response = await apiClient.get('/users/profile');
 
-  const [newPayment, setNewPayment] = useState({
-    cardNumber: '',
-    cardHolder: '',
-    expiryDate: '',
-    cvv: '',
-  });
+        if (response.status === 200) {
+          const userData = response.data.data.user;
+          const profileData = response.data.data.profile;
+
+          setAccountInfo({
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            middleName: userData.middleName || '',
+            suffix: userData.suffix || '',
+            email: userData.email || '',
+            phoneNumber: profileData.contactNumber || '',
+          });
+
+          setAddressInfo({
+            homeAddress: userData.homeAddress || '',
+          });
+
+          if (profileData?.profilePicture) {
+            setProfileImage(profileData.profilePicture);
+          }
+
+          if (profileData?.paymentMethods && Array.isArray(profileData.paymentMethods)) {
+            setPaymentOptions(profileData.paymentMethods);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        Alert.alert('Error', 'Failed to load profile data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -71,17 +122,7 @@ export default function ProfileScreen() {
     </View>
   );
 
-  const updateProfileInfo = (field, value) => {
-    setProfileInfo(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateNewPayment = (field, value) => {
-    setNewPayment(prev => ({ ...prev, [field]: value }));
-  };
-
   const pickImage = async () => {
-    if (!isEditing) return;
-
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
@@ -98,21 +139,160 @@ export default function ProfileScreen() {
 
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri);
+      uploadProfilePicture(result.assets[0].uri);
     }
   };
 
-  const handleEditToggle = () => {
-    if (isEditing) {
-      setShowConfirmModal(true);
-    } else {
-      setIsEditing(true);
+  const uploadProfilePicture = async (imageUri) => {
+    try {
+      const formData = new FormData();
+      const filename = imageUri.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      formData.append('image', {
+        uri: imageUri,
+        name: filename,
+        type: type,
+      });
+
+      const uploadResponse = await apiClient.post('/files/users/profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (uploadResponse.data?.data?.url) {
+        const updateData = {
+          profile: {
+            profilePicture: uploadResponse.data.data.url,
+          },
+        };
+
+        await apiClient.put('/users/profile', updateData);
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      Alert.alert('Error', 'Failed to upload profile picture');
     }
   };
 
-  const confirmUpdate = () => {
-    setShowConfirmModal(false);
-    setIsEditing(false);
-    Alert.alert('Success', 'Profile updated successfully!');
+  const handleSaveAccount = async () => {
+    setSavingAccount(true);
+    try {
+      const updateData = {
+        user: {
+          firstName: accountInfo.firstName,
+          lastName: accountInfo.lastName,
+          middleName: accountInfo.middleName || null,
+          suffix: accountInfo.suffix || null,
+        },
+        profile: {
+          contactNumber: accountInfo.phoneNumber,
+        },
+      };
+
+      const response = await apiClient.put('/users/profile', updateData);
+
+      if (response.status === 200) {
+        setEditingAccount(false);
+        Alert.alert('Success', 'Account information updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating account:', error);
+      Alert.alert('Error', 'Failed to update account information');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    setSavingAddress(true);
+    try {
+      const updateData = {
+        user: {
+          homeAddress: addressInfo.homeAddress,
+        },
+      };
+
+      const response = await apiClient.put('/users/profile', updateData);
+
+      if (response.status === 200) {
+        setEditingAddress(false);
+        Alert.alert('Success', 'Address updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating address:', error);
+      Alert.alert('Error', 'Failed to update address');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordInfo.currentPassword || !passwordInfo.newPassword || !passwordInfo.confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (passwordInfo.newPassword !== passwordInfo.confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    if (passwordInfo.newPassword.length < 8) {
+      Alert.alert('Error', 'New password must be at least 8 characters long');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const response = await apiClient.patch('/users/change-password', {
+        currentPassword: passwordInfo.currentPassword,
+        newPassword: passwordInfo.newPassword,
+      });
+
+      if (response.status === 200) {
+        setPasswordInfo({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+        Alert.alert('Success', 'Password changed successfully!');
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      if (error.response?.status === 400) {
+        Alert.alert('Error', 'Current password is incorrect');
+      } else {
+        Alert.alert('Error', 'Failed to change password');
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const response = await apiClient.delete('/users/account');
+
+      if (response.status === 200) {
+        Alert.alert('Account Deleted', 'Your account has been deactivated successfully', [
+          {
+            text: 'OK',
+            onPress: () => router.replace('/(auth)/login'),
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Error', 'Failed to delete account');
+    } finally {
+      setDeletingAccount(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const handleLogout = () => {
@@ -127,7 +307,6 @@ export default function ProfileScreen() {
       router.replace('/(auth)/login');
     } catch (error) {
       console.error('Logout error:', error);
-      // Still redirect to login even if API call fails
       router.replace('/(auth)/login');
     } finally {
       setIsLoggingOut(false);
@@ -143,44 +322,80 @@ export default function ProfileScreen() {
     setShowViewPaymentModal(true);
   };
 
-  const handleDeletePayment = (paymentId) => {
-    Alert.alert(
-      'Delete Payment Option',
-      'Are you sure you want to delete this payment option?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setPaymentOptions(paymentOptions.filter(option => option.id !== paymentId));
-            setShowViewPaymentModal(false);
-            Alert.alert('Success', 'Payment option deleted successfully!');
-          },
+  const handleDeletePayment = async (paymentId) => {
+    const updatedPayments = paymentOptions.filter(option => option.id !== paymentId);
+
+    try {
+      const updateData = {
+        profile: {
+          paymentMethods: updatedPayments,
         },
-      ]
-    );
+      };
+
+      const response = await apiClient.put('/users/profile', updateData);
+
+      if (response.status === 200) {
+        setPaymentOptions(updatedPayments);
+        setShowViewPaymentModal(false);
+        Alert.alert('Success', 'Payment option deleted successfully!');
+      }
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      Alert.alert('Error', 'Failed to delete payment option');
+    }
   };
 
-  const savePayment = () => {
-    const { cardNumber, cardHolder, expiryDate, cvv } = newPayment;
-    if (!cardNumber || !cardHolder || !expiryDate || !cvv) {
-      Alert.alert('Error', 'Please fill in all payment fields');
+  const savePayment = async () => {
+    const { type, gcashNumber, gcashName } = newPayment;
+
+    if (!type) {
+      Alert.alert('Error', 'Please select a payment type');
       return;
     }
 
-    const newOption = {
-      id: String(paymentOptions.length + 1),
-      name: `Option ${paymentOptions.length + 1}`,
-      cardNumber: `**** **** **** ${cardNumber.slice(-4)}`,
-      cardHolder: cardHolder,
-      expiryDate: expiryDate,
-    };
+    let newOption;
 
-    setPaymentOptions([...paymentOptions, newOption]);
-    setNewPayment({ cardNumber: '', cardHolder: '', expiryDate: '', cvv: '' });
-    setShowPaymentModal(false);
-    Alert.alert('Success', 'Payment option added successfully!');
+    if (type === 'gcash') {
+      if (!gcashNumber || !gcashName) {
+        Alert.alert('Error', 'Please fill in GCash number and name');
+        return;
+      }
+      newOption = {
+        id: String(Date.now()),
+        type: 'gcash',
+        name: 'GCash',
+        gcashNumber: gcashNumber,
+        gcashName: gcashName,
+      };
+    } else if (type === 'cash') {
+      newOption = {
+        id: String(Date.now()),
+        type: 'cash',
+        name: 'Cash',
+      };
+    }
+
+    const updatedPayments = [...paymentOptions, newOption];
+
+    try {
+      const updateData = {
+        profile: {
+          paymentMethods: updatedPayments,
+        },
+      };
+
+      const response = await apiClient.put('/users/profile', updateData);
+
+      if (response.status === 200) {
+        setPaymentOptions(updatedPayments);
+        setNewPayment({ type: '', gcashNumber: '', gcashName: '' });
+        setShowPaymentModal(false);
+        Alert.alert('Success', 'Payment option added successfully!');
+      }
+    } catch (error) {
+      console.error('Error adding payment:', error);
+      Alert.alert('Error', 'Failed to add payment option');
+    }
   };
 
   return (
@@ -199,89 +414,122 @@ export default function ProfileScreen() {
         showBack={false}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Profile Photo */}
-          <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
-            ) : (
-              <View style={styles.placeholderIcon}>
-                <Ionicons name="person" size={50} color="#1C86FF" />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.content}>
+            {/* Profile Photo */}
+            <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.placeholderIcon}>
+                  <Ionicons name="person" size={50} color="#1C86FF" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* ACCOUNT SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="person-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Account</Text>
+                <TouchableOpacity
+                  onPress={() => editingAccount ? handleSaveAccount() : setEditingAccount(true)}
+                  disabled={savingAccount}
+                >
+                  {savingAccount ? (
+                    <ActivityIndicator size="small" color="#1C86FF" />
+                  ) : (
+                    <Ionicons
+                      name={editingAccount ? "checkmark" : "create-outline"}
+                      size={22}
+                      color="#1C86FF"
+                    />
+                  )}
+                </TouchableOpacity>
               </View>
-            )}
-          </TouchableOpacity>
 
-          {/* Form Section */}
-          <View style={styles.formSection}>
-            {/* First Name */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>First Name</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.disabledInput]}
-                value={profileInfo.firstName}
-                onChangeText={(value) => updateProfileInfo('firstName', value)}
-                placeholder="Enter first name"
-                editable={isEditing}
-              />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>First Name</Text>
+                <TextInput
+                  style={[styles.input, !editingAccount && styles.disabledInput]}
+                  value={accountInfo.firstName}
+                  onChangeText={(value) => setAccountInfo(prev => ({ ...prev, firstName: value }))}
+                  placeholder="Enter first name"
+                  editable={editingAccount}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Last Name</Text>
+                <TextInput
+                  style={[styles.input, !editingAccount && styles.disabledInput]}
+                  value={accountInfo.lastName}
+                  onChangeText={(value) => setAccountInfo(prev => ({ ...prev, lastName: value }))}
+                  placeholder="Enter last name"
+                  editable={editingAccount}
+                />
+              </View>
+
+              <View style={styles.rowInputGroup}>
+                <View style={styles.halfInput}>
+                  <Text style={styles.label}>Middle Name</Text>
+                  <TextInput
+                    style={[styles.input, !editingAccount && styles.disabledInput]}
+                    value={accountInfo.middleName}
+                    onChangeText={(value) => setAccountInfo(prev => ({ ...prev, middleName: value }))}
+                    placeholder="Optional"
+                    editable={editingAccount}
+                  />
+                </View>
+
+                <View style={styles.halfInput}>
+                  <Text style={styles.label}>Suffix</Text>
+                  <TextInput
+                    style={[styles.input, !editingAccount && styles.disabledInput]}
+                    value={accountInfo.suffix}
+                    onChangeText={(value) => setAccountInfo(prev => ({ ...prev, suffix: value }))}
+                    placeholder="Jr., Sr., III"
+                    editable={editingAccount}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email Address</Text>
+                <TextInput
+                  style={[styles.input, styles.disabledInput]}
+                  value={accountInfo.email}
+                  placeholder="Enter email address"
+                  keyboardType="email-address"
+                  editable={false}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone Number</Text>
+                <TextInput
+                  style={[styles.input, !editingAccount && styles.disabledInput]}
+                  value={accountInfo.phoneNumber}
+                  onChangeText={(value) => setAccountInfo(prev => ({ ...prev, phoneNumber: value }))}
+                  placeholder="Enter phone number"
+                  keyboardType="phone-pad"
+                  editable={editingAccount}
+                />
+              </View>
             </View>
 
-            {/* Last Name */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Last Name</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.disabledInput]}
-                value={profileInfo.lastName}
-                onChangeText={(value) => updateProfileInfo('lastName', value)}
-                placeholder="Enter last name"
-                editable={isEditing}
-              />
-            </View>
-
-            {/* Email Address */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.disabledInput]}
-                value={profileInfo.email}
-                onChangeText={(value) => updateProfileInfo('email', value)}
-                placeholder="Enter email address"
-                keyboardType="email-address"
-                editable={isEditing}
-              />
-            </View>
-
-            {/* Home Address */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Home Address</Text>
-              <TextInput
-                style={[styles.input, styles.textArea, !isEditing && styles.disabledInput]}
-                value={profileInfo.homeAddress}
-                onChangeText={(value) => updateProfileInfo('homeAddress', value)}
-                placeholder="Enter home address"
-                multiline
-                numberOfLines={2}
-                textAlignVertical="top"
-                editable={isEditing}
-              />
-            </View>
-
-            {/* Phone Number */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Phone Number</Text>
-              <TextInput
-                style={[styles.input, !isEditing && styles.disabledInput]}
-                value={profileInfo.phoneNumber}
-                onChangeText={(value) => updateProfileInfo('phoneNumber', value)}
-                placeholder="Enter phone number"
-                keyboardType="phone-pad"
-                editable={isEditing}
-              />
-            </View>
-
-            {/* Payment Options */}
-            <View style={styles.paymentSection}>
-              <Text style={styles.sectionTitle}>Payment Options</Text>
+            {/* PAYMENT OPTIONS SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="wallet-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Payment Options</Text>
+              </View>
 
               <View style={styles.paymentCardsContainer}>
                 {paymentOptions.map((option) => (
@@ -291,13 +539,16 @@ export default function ProfileScreen() {
                     onPress={() => handleViewPayment(option)}
                   >
                     <View style={styles.paymentCardContent}>
-                      <Ionicons name="card-outline" size={40} color="#1C86FF" />
+                      <Ionicons
+                        name={option.type === 'gcash' ? 'phone-portrait-outline' : 'cash-outline'}
+                        size={40}
+                        color="#1C86FF"
+                      />
                     </View>
                     <Text style={styles.paymentCardLabel}>{option.name}</Text>
                   </TouchableOpacity>
                 ))}
 
-                {/* Add Payment Card */}
                 <TouchableOpacity style={styles.addPaymentCard} onPress={handleAddPayment}>
                   <View style={styles.paymentCardContent}>
                     <Ionicons name="add" size={40} color="#1C86FF" />
@@ -307,76 +558,143 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleEditToggle}>
-                <Text style={styles.confirmButtonText}>
-                  {isEditing ? 'Confirm' : 'Edit'}
-                </Text>
-              </TouchableOpacity>
+            {/* ADDRESS SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="location-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Address</Text>
+                <TouchableOpacity
+                  onPress={() => editingAddress ? handleSaveAddress() : setEditingAddress(true)}
+                  disabled={savingAddress}
+                >
+                  {savingAddress ? (
+                    <ActivityIndicator size="small" color="#1C86FF" />
+                  ) : (
+                    <Ionicons
+                      name={editingAddress ? "checkmark" : "create-outline"}
+                      size={22}
+                      color="#1C86FF"
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Home Address</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea, !editingAddress && styles.disabledInput]}
+                  value={addressInfo.homeAddress}
+                  onChangeText={(value) => setAddressInfo(prev => ({ ...prev, homeAddress: value }))}
+                  placeholder="Enter home address"
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  editable={editingAddress}
+                />
+              </View>
+            </View>
+
+            {/* CHANGE PASSWORD SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="lock-closed-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Change Password</Text>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Current Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordInfo.currentPassword}
+                  onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, currentPassword: value }))}
+                  placeholder="Enter current password"
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordInfo.newPassword}
+                  onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, newPassword: value }))}
+                  placeholder="Enter new password"
+                  secureTextEntry
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordInfo.confirmPassword}
+                  onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, confirmPassword: value }))}
+                  placeholder="Confirm new password"
+                  secureTextEntry
+                />
+              </View>
+
               <TouchableOpacity
-                style={styles.logoutButton}
-                onPress={handleLogout}
-                disabled={isLoggingOut}
+                style={styles.changePasswordButton}
+                onPress={handleChangePassword}
+                disabled={changingPassword}
               >
-                {isLoggingOut ? (
-                  <ActivityIndicator color="#1C86FF" />
+                {changingPassword ? (
+                  <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.logoutButtonText}>Logout</Text>
+                  <Text style={styles.changePasswordButtonText}>Update Password</Text>
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </ScrollView>
 
-      {/* Confirmation Modal */}
-      <Modal
-        visible={showConfirmModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowConfirmModal(false)}
-      >
-        <View style={styles.confirmModalOverlay}>
-          <View style={styles.confirmModalContent}>
-            <Ionicons name="checkmark-circle" size={60} color="#1C86FF" style={styles.confirmIcon} />
-            <Text style={styles.confirmModalTitle}>Confirm Update</Text>
-            <Text style={styles.confirmModalText}>
-              Are you sure you want to save these changes to your profile?
-            </Text>
-            <View style={styles.confirmModalButtons}>
+            {/* SETTINGS SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="settings-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Settings</Text>
+              </View>
+
               <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setShowConfirmModal(false)}
+                style={styles.settingItem}
+                onPress={() => setShowDeleteModal(true)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmButtonModal}
-                onPress={confirmUpdate}
-              >
-                <Text style={styles.confirmButtonText}>Confirm</Text>
+                <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
+                <Text style={styles.settingText}>Delete Account</Text>
+                <Ionicons name="chevron-forward" size={22} color="#999" />
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
 
-      {/* Logout Confirmation Modal */}
+            {/* Logout Button */}
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={handleLogout}
+              disabled={isLoggingOut}
+            >
+              {isLoggingOut ? (
+                <ActivityIndicator color="#1C86FF" />
+              ) : (
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Logout Modal */}
       <Modal
         visible={showLogoutModal}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setShowLogoutModal(false)}
       >
-        <View style={styles.confirmModalOverlay}>
-          <View style={styles.confirmModalContent}>
-            <Ionicons name="log-out" size={60} color="#ff9b79" style={styles.confirmIcon} />
-            <Text style={styles.confirmModalTitle}>Logout</Text>
-            <Text style={styles.confirmModalText}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="log-out" size={60} color="#ff9b79" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Logout</Text>
+            <Text style={styles.modalText}>
               Are you sure you want to logout?
             </Text>
-            <View style={styles.confirmModalButtons}>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setShowLogoutModal(false)}
@@ -394,6 +712,43 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
+      {/* Delete Account Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Ionicons name="warning" size={60} color="#FF6B6B" style={styles.modalIcon} />
+            <Text style={[styles.modalTitle, { color: '#FF6B6B' }]}>Delete Account</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmButtonModal, { backgroundColor: '#FF6B6B' }]}
+                onPress={handleDeleteAccount}
+                disabled={deletingAccount}
+              >
+                {deletingAccount ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* View Payment Details Modal */}
       <Modal
         visible={showViewPaymentModal}
@@ -401,28 +756,37 @@ export default function ProfileScreen() {
         animationType="fade"
         onRequestClose={() => setShowViewPaymentModal(false)}
       >
-        <View style={styles.confirmModalOverlay}>
+        <View style={styles.modalOverlay}>
           <View style={styles.viewPaymentModalContent}>
             <View style={styles.viewPaymentHeader}>
-              <Ionicons name="card" size={60} color="#1C86FF" style={styles.confirmIcon} />
+              <Ionicons
+                name={selectedPayment?.type === 'gcash' ? 'phone-portrait-outline' : 'cash-outline'}
+                size={60}
+                color="#1C86FF"
+                style={styles.modalIcon}
+              />
               <Text style={styles.viewPaymentTitle}>{selectedPayment?.name}</Text>
             </View>
 
             <View style={styles.viewPaymentDetails}>
-              <View style={styles.paymentDetailRow}>
-                <Text style={styles.paymentDetailLabel}>Card Number</Text>
-                <Text style={styles.paymentDetailValue}>{selectedPayment?.cardNumber}</Text>
-              </View>
+              {selectedPayment?.type === 'gcash' ? (
+                <>
+                  <View style={styles.paymentDetailRow}>
+                    <Text style={styles.paymentDetailLabel}>GCash Number</Text>
+                    <Text style={styles.paymentDetailValue}>{selectedPayment?.gcashNumber}</Text>
+                  </View>
 
-              <View style={styles.paymentDetailRow}>
-                <Text style={styles.paymentDetailLabel}>Card Holder</Text>
-                <Text style={styles.paymentDetailValue}>{selectedPayment?.cardHolder}</Text>
-              </View>
-
-              <View style={styles.paymentDetailRow}>
-                <Text style={styles.paymentDetailLabel}>Expiry Date</Text>
-                <Text style={styles.paymentDetailValue}>{selectedPayment?.expiryDate}</Text>
-              </View>
+                  <View style={styles.paymentDetailRow}>
+                    <Text style={styles.paymentDetailLabel}>Account Name</Text>
+                    <Text style={styles.paymentDetailValue}>{selectedPayment?.gcashName}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.paymentDetailRow}>
+                  <Text style={styles.paymentDetailLabel}>Payment Type</Text>
+                  <Text style={styles.paymentDetailValue}>Cash on Delivery</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.viewPaymentButtonsRow}>
@@ -459,58 +823,90 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Card Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Card Number</Text>
-              <TextInput
-                style={styles.input}
-                value={newPayment.cardNumber}
-                onChangeText={(value) => updateNewPayment('cardNumber', value)}
-                placeholder="1234 5678 9012 3456"
-                keyboardType="number-pad"
-                maxLength={16}
-              />
-            </View>
+              <Text style={styles.label}>Payment Type</Text>
+              <View style={styles.paymentTypeContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.paymentTypeButton,
+                    newPayment.type === 'gcash' && styles.paymentTypeButtonActive
+                  ]}
+                  onPress={() => setNewPayment(prev => ({ ...prev, type: 'gcash' }))}
+                >
+                  <Ionicons
+                    name="phone-portrait-outline"
+                    size={24}
+                    color={newPayment.type === 'gcash' ? '#fff' : '#1C86FF'}
+                  />
+                  <Text style={[
+                    styles.paymentTypeText,
+                    newPayment.type === 'gcash' && styles.paymentTypeTextActive
+                  ]}>GCash</Text>
+                </TouchableOpacity>
 
-            {/* Card Holder */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Card Holder Name</Text>
-              <TextInput
-                style={styles.input}
-                value={newPayment.cardHolder}
-                onChangeText={(value) => updateNewPayment('cardHolder', value)}
-                placeholder="John Doe"
-              />
-            </View>
-
-            {/* Expiry and CVV */}
-            <View style={styles.rowInputGroup}>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Expiry Date</Text>
-                <TextInput
-                  style={styles.input}
-                  value={newPayment.expiryDate}
-                  onChangeText={(value) => updateNewPayment('expiryDate', value)}
-                  placeholder="MM/YY"
-                  maxLength={5}
-                />
-              </View>
-
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>CVV</Text>
-                <TextInput
-                  style={styles.input}
-                  value={newPayment.cvv}
-                  onChangeText={(value) => updateNewPayment('cvv', value)}
-                  placeholder="123"
-                  keyboardType="number-pad"
-                  maxLength={3}
-                  secureTextEntry
-                />
+                <TouchableOpacity
+                  style={[
+                    styles.paymentTypeButton,
+                    newPayment.type === 'cash' && styles.paymentTypeButtonActive
+                  ]}
+                  onPress={() => setNewPayment(prev => ({ ...prev, type: 'cash' }))}
+                >
+                  <Ionicons
+                    name="cash-outline"
+                    size={24}
+                    color={newPayment.type === 'cash' ? '#fff' : '#1C86FF'}
+                  />
+                  <Text style={[
+                    styles.paymentTypeText,
+                    newPayment.type === 'cash' && styles.paymentTypeTextActive
+                  ]}>Cash</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.addPaymentConfirmButton} onPress={savePayment}>
+            {newPayment.type === 'gcash' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>GCash Number</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newPayment.gcashNumber}
+                    onChangeText={(value) => setNewPayment(prev => ({ ...prev, gcashNumber: value }))}
+                    placeholder="09XX XXX XXXX"
+                    keyboardType="phone-pad"
+                    maxLength={11}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Account Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newPayment.gcashName}
+                    onChangeText={(value) => setNewPayment(prev => ({ ...prev, gcashName: value }))}
+                    placeholder="Juan Dela Cruz"
+                  />
+                </View>
+              </>
+            )}
+
+            {newPayment.type === 'cash' && (
+              <View style={styles.cashInfoContainer}>
+                <Ionicons name="information-circle" size={24} color="#1C86FF" />
+                <Text style={styles.cashInfoText}>
+                  Cash payment will be collected upon delivery or service completion
+                </Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.addPaymentConfirmButton,
+                !newPayment.type && styles.addPaymentConfirmButtonDisabled
+              ]}
+              onPress={savePayment}
+              disabled={!newPayment.type}
+            >
               <Text style={styles.confirmButtonText}>Add Payment</Text>
             </TouchableOpacity>
           </View>
@@ -540,9 +936,21 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: 'SFProReg',
+    color: '#666',
+  },
   content: {
-    paddingHorizontal: 30,
-    paddingTop: 30,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 40,
     alignItems: 'center',
   },
@@ -567,8 +975,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  formSection: {
+  section: {
     width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  sectionTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontFamily: 'SFProBold',
+    color: '#333',
+    marginLeft: 8,
   },
   inputGroup: {
     marginBottom: 12,
@@ -582,7 +1011,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'black',
     marginBottom: 6,
     fontFamily: 'SFProSB',
@@ -599,21 +1028,12 @@ const styles = StyleSheet.create({
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',
+    borderColor: '#E0E0E0',
     color: '#666',
   },
   textArea: {
-    minHeight: 60,
+    minHeight: 80,
     paddingTop: 12,
-  },
-  paymentSection: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'SFProBold',
-    color: 'black',
-    marginBottom: 16,
   },
   paymentCardsContainer: {
     flexDirection: 'row',
@@ -653,45 +1073,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonContainer: {
-    flexDirection: 'column',
-    gap: 12,
-    marginTop: 20,
-  },
-  confirmButton: {
-    flex: 1,
+  changePasswordButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
+    marginTop: 8,
   },
-  confirmButtonText: {
+  changePasswordButtonText: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 16,
+    fontFamily: 'SFProSB',
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  settingText: {
+    flex: 1,
+    fontSize: 16,
     fontFamily: 'SFProReg',
+    color: '#FF6B6B',
+    marginLeft: 12,
   },
   logoutButton: {
-    flex: 1,
+    width: '100%',
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
+    marginTop: 8,
   },
   logoutButtonText: {
     color: '#1C86FF',
-    fontSize: 20,
-    fontFamily: 'SFProReg',
+    fontSize: 18,
+    fontFamily: 'SFProSB',
   },
-  confirmModalOverlay: {
+  modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  confirmModalContent: {
+  modalContent: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 30,
@@ -699,17 +1130,17 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignItems: 'center',
   },
-  confirmIcon: {
+  modalIcon: {
     marginBottom: 20,
   },
-  confirmModalTitle: {
+  modalTitle: {
     fontSize: 22,
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
     marginBottom: 12,
   },
-  confirmModalText: {
+  modalText: {
     fontSize: 16,
     fontFamily: 'SFProReg',
     color: '#666',
@@ -717,7 +1148,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
-  confirmModalButtons: {
+  modalButtons: {
     flexDirection: 'row',
     gap: 12,
     width: '100%',
@@ -733,8 +1164,8 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#1C86FF',
-    fontSize: 20,
-    fontFamily: 'SFProReg',
+    fontSize: 16,
+    fontFamily: 'SFProSB',
   },
   confirmButtonModal: {
     flex: 1,
@@ -746,28 +1177,10 @@ const styles = StyleSheet.create({
   logoutButtonModal: {
     backgroundColor: '#ff9b79',
   },
-  paymentModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  paymentModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    maxHeight: '80%',
-  },
-  paymentModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  paymentModalTitle: {
-    fontSize: 20,
-    fontFamily: 'SFProBold',
-    color: '#1C86FF',
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'SFProSB',
   },
   viewPaymentModalContent: {
     backgroundColor: '#fff',
@@ -825,8 +1238,8 @@ const styles = StyleSheet.create({
   },
   deletePaymentButtonText: {
     color: '#FF6B6B',
-    fontSize: 20,
-    fontFamily: 'SFProReg',
+    fontSize: 16,
+    fontFamily: 'SFProSB',
   },
   closeModalButton: {
     flex: 1,
@@ -835,6 +1248,73 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
+  paymentModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  paymentModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  paymentModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  paymentModalTitle: {
+    fontSize: 20,
+    fontFamily: 'SFProBold',
+    color: '#1C86FF',
+  },
+  paymentTypeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  paymentTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    borderRadius: 10,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  paymentTypeButtonActive: {
+    backgroundColor: '#1C86FF',
+  },
+  paymentTypeText: {
+    fontSize: 16,
+    fontFamily: 'SFProSB',
+    color: '#1C86FF',
+  },
+  paymentTypeTextActive: {
+    color: '#fff',
+  },
+  cashInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 10,
+    marginTop: 8,
+    gap: 12,
+  },
+  cashInfoText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'SFProReg',
+    color: '#333',
+    lineHeight: 20,
+  },
   addPaymentConfirmButton: {
     width: '100%',
     backgroundColor: '#1C86FF',
@@ -842,5 +1322,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
+  },
+  addPaymentConfirmButtonDisabled: {
+    backgroundColor: '#ccc',
   },
 });

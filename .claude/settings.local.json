@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/user/Documents/GitHub/petTapp-be/**)",
+      "Bash(for file in home booking messages notification my-pets)",
+      "Bash(do echo -n \"$file: \")",
+      "Bash(done)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -22,10 +22,6 @@ import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/resp
 import apiClient from "../config/api";
 
 export default function SignUpScreen() {
-  const [username, setUsername] = useState("");
-  const [usernameAvailable, setUsernameAvailable] = useState(null);
-  const [checkingUsername, setCheckingUsername] = useState(false);
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -37,38 +33,14 @@ export default function SignUpScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [errors, setErrors] = useState({
-    username: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
 
-  // simulate existing usernames
-  const existingUsernames = useRef(["existinguser", "admin", "test"]);
-
-  // simulate API check
-  const checkUsernameAvailability = async (value) => {
-    if (!value) return null;
-    setCheckingUsername(true);
-    setUsernameAvailable(null);
-    await new Promise((res) => setTimeout(res, 700));
-    const exists = existingUsernames.current.includes(value.trim().toLowerCase());
-    setCheckingUsername(false);
-    setUsernameAvailable(!exists);
-    return !exists;
-  };
-
   const validateAll = async () => {
     let ok = true;
-    const newErr = { username: "", email: "", password: "", confirmPassword: "" };
-
-    if (!username.trim()) {
-      newErr.username = "Username is required";
-      ok = false;
-    } else if (username.trim().length < 3) {
-      newErr.username = "Username must be at least 3 characters";
-      ok = false;
-    }
+    const newErr = { email: "", password: "", confirmPassword: "" };
 
     if (!email.trim()) {
       newErr.email = "Email is required";
@@ -104,16 +76,6 @@ export default function SignUpScreen() {
     }
 
     setErrors(newErr);
-
-    if (ok) {
-      const available =
-        usernameAvailable === null ? await checkUsernameAvailability(username) : usernameAvailable;
-      if (!available) {
-        setErrors((prev) => ({ ...prev, username: "Username already exists" }));
-        return false;
-      }
-    }
-
     return ok;
   };
 
@@ -125,7 +87,6 @@ export default function SignUpScreen() {
 
     try {
       const response = await apiClient.post('/auth/register', {
-        username: username.trim(),
         email: email.trim(),
         password: password,
         role: role
@@ -152,12 +113,6 @@ export default function SignUpScreen() {
               email: data?.message || "Email already exists"
             }));
             Alert.alert("Registration Failed", "This email is already registered. Please use a different email.");
-          } else if (message.toLowerCase().includes("username")) {
-            setErrors((prev) => ({
-              ...prev,
-              username: data?.message || "Username already exists"
-            }));
-            Alert.alert("Registration Failed", "Username already exists. Please choose a different username.");
           } else {
             Alert.alert("Registration Failed", data?.message || "User already exists.");
           }
@@ -165,11 +120,8 @@ export default function SignUpScreen() {
         // 422 - Validation errors
         else if (status === 422) {
           const validationErrors = data?.errors || {};
-          const newErrors = { username: "", email: "", password: "", confirmPassword: "" };
+          const newErrors = { email: "", password: "", confirmPassword: "" };
 
-          if (validationErrors.username) {
-            newErrors.username = validationErrors.username;
-          }
           if (validationErrors.email) {
             newErrors.email = validationErrors.email;
           }
@@ -196,22 +148,11 @@ export default function SignUpScreen() {
     }
   };
 
-  const onUsernameBlur = () => {
-    if (!username.trim()) {
-      setUsernameAvailable(null);
-      return;
-    }
-    checkUsernameAvailability(username);
-  };
-
   const canSubmit =
-    username.trim().length >= 3 &&
     email.trim().length > 0 &&
     /\S+@\S+\.\S+/.test(email) &&
     password.length >= 6 &&
     confirmPassword === password &&
-    usernameAvailable === true &&
-    !checkingUsername &&
     !isLoading;
 
   return (
@@ -233,22 +174,6 @@ export default function SignUpScreen() {
 
           {/* Form */}
           <View style={styles.form}>
-            {/* Username */}
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              value={username}
-              onChangeText={(t) => {
-                setUsername(t);
-                setUsernameAvailable(null);
-                if (errors.username) setErrors((p) => ({ ...p, username: "" }));
-              }}
-              onBlur={onUsernameBlur}
-              placeholder="Enter your username"
-              style={styles.input}
-              autoCapitalize="none"
-            />
-            {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
-
             {/* Email */}
             <Text style={styles.label}>Email Address</Text>
             <TextInput
@@ -349,41 +274,6 @@ export default function SignUpScreen() {
             )}
           </TouchableOpacity>
 
-
-          {/* Social login */}
-          <View style={styles.socialLogin}>
-            <View style={styles.dividerRow}>
-              <View style={styles.divider} />
-              <Text style={styles.orContinueWith}>or continue with</Text>
-              <View style={styles.divider} />
-            </View>
-
-              <View style={styles.socialButtons}>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Google")}
-                >
-                  <Ionicons name="logo-google" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Facebook")}
-                >
-                  <Ionicons name="logo-facebook" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Apple")}
-                >
-                  <Ionicons name="logo-apple" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-              </View>
-          </View>
-
-          {/* Center error */}
-          {errors.username === "Username already exists" && (
-            <Text style={styles.centerError}>Username already exists</Text>
-          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -489,48 +379,7 @@ const styles = StyleSheet.create({
     fontFamily: "SFProBold",
   },
 
-  socialLogin: {
-    alignItems: "center",
-    width: "100%",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: hp(1.5),
-    width: "100%",
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "black",
-  },
-  orContinueWith: {
-    fontSize: scaleFontSize(13),
-    color: "#black",
-    marginHorizontal: wp(3),
-    fontFamily: "SFProMedium",
-  },
 
-  socialButtons: {
-    flexDirection: "row",
-    gap: wp(4),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  socialButton: {
-    width: moderateScale(50),
-    height: moderateScale(50),
-    backgroundColor: "#000",
-    borderRadius: moderateScale(10),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  socialIconPlaceholder: {
-    width: moderateScale(28),
-    height: moderateScale(28),
-    backgroundColor: "#fff",
-  },
 
   errorText: {
     fontSize: scaleFontSize(12),

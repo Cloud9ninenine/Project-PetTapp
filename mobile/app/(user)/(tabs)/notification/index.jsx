@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,22 @@ import {
   TouchableOpacity,
   ScrollView,
   FlatList,
+  Alert,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '@components/Header';
+import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "../../../config/api";
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
+  const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   // Mock notifications data
   const notifications = [
@@ -93,6 +98,39 @@ export default function NotificationsScreen() {
   const filteredNotifications = activeTab === 'all'
     ? notifications
     : notifications.filter(n => !n.read);
+
+  // Check profile completeness on mount
+  useEffect(() => {
+    const checkProfile = async () => {
+      try {
+        const meResponse = await apiClient.get('/auth/me');
+
+        if (meResponse.status === 200) {
+          const userData = meResponse.data.user;
+
+          // Check if profile is incomplete
+          const isIncomplete = (
+            !userData.lastName ||
+            !userData.firstName ||
+            !userData.homeAddress ||
+            !userData.phoneNumber
+          );
+
+          setIsProfileComplete(!isIncomplete);
+
+          if (isIncomplete) {
+            setShowProfileIncompleteModal(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+      }
+    };
+
+    checkProfile();
+  }, []);
+
+  
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -197,6 +235,13 @@ export default function NotificationsScreen() {
       ) : (
         renderEmptyState()
       )}
+
+      {/* Profile Incomplete Modal */}
+      <CompleteProfileModal
+        visible={showProfileIncompleteModal}
+        onClose={() => setShowProfileIncompleteModal(false)}
+        message="Please complete your profile information before viewing notifications. You need to provide your first name, last name, address, and contact number."
+      />
     </SafeAreaView>
   );
 }
@@ -371,4 +416,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: moderateScale(20),
   },
+  
 });

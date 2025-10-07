@@ -58,7 +58,7 @@ export default function LoginScreen() {
             console.log('User data from /auth/me:', meResponse.data);
 
             // Try to get role from different possible locations in the response
-            const role = meResponse.data.user.role 
+            const role = meResponse.data.user.role
 
             // Navigate based on role
             if (role === "business-owner") {
@@ -142,7 +142,7 @@ export default function LoginScreen() {
             {/* Form */}
             <View style={styles.form}>
               <Text style={styles.label}>
-                Username / Email
+                Email Address:
               </Text>
               <TextInput
                 style={styles.input}
@@ -154,7 +154,7 @@ export default function LoginScreen() {
               />
 
               <Text style={styles.label}>
-                Password
+                Password:
               </Text>
               <View style={styles.passwordContainer}>
                 <TextInput
@@ -204,36 +204,6 @@ export default function LoginScreen() {
               >
                 <Text style={styles.signupButtonText}>Sign Up</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Social Login */}
-            <View style={styles.socialLogin}>
-              <View style={styles.dividerRow}>
-                <View style={styles.divider} />
-                <Text style={styles.orContinueWith}>or continue with</Text>
-                <View style={styles.divider} />
-              </View>
-
-              <View style={styles.socialButtons}>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Google")}
-                >
-                  <Ionicons name="logo-google" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Facebook")}
-                >
-                  <Ionicons name="logo-facebook" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.socialButton}
-                  onPress={() => handleSocialLogin("Apple")}
-                >
-                  <Ionicons name="logo-apple" size={moderateScale(24)} color="#fff" />
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -366,40 +336,5 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     fontWeight: "600",
     fontFamily: "SFProReg",
-  },
-  socialLogin: {
-    alignItems: "center",
-    width: "100%",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: hp(2),
-    width: "100%",
-  },
-  divider: {
-    flex: 1,
-    height: 1.2,
-    backgroundColor: "black",
-  },
-  orContinueWith: {
-    fontSize: scaleFontSize(13),
-    color: "black",
-    fontFamily: "SFProMedium",
-    marginHorizontal: wp(3),
-  },
-  socialButtons: {
-    flexDirection: "row",
-    gap: wp(4),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  socialButton: {
-    width: moderateScale(50),
-    height: moderateScale(50),
-    backgroundColor: "#000",
-    borderRadius: moderateScale(10),
-    justifyContent: "center",
-    alignItems: "center",
   },
 });

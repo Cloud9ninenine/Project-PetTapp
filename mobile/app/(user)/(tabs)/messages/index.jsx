@@ -8,18 +8,23 @@ import {
   Image,
   TextInput,
   ImageBackground,
+  Alert,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Header from '@components/Header';
-import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import CompleteProfileModal from "@components/CompleteProfileModal";
+import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "../../../config/api";
 
 export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const params = useLocalSearchParams();
   const router = useRouter();
+  const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -73,6 +78,37 @@ export default function MessagesScreen() {
     }
   };
 
+  // Check profile completeness on mount
+  useEffect(() => {
+    const checkProfile = async () => {
+      try {
+        const meResponse = await apiClient.get('/auth/me');
+
+        if (meResponse.status === 200) {
+          const userData = meResponse.data.user;
+
+          // Check if profile is incomplete
+          const isIncomplete = (
+            !userData.lastName ||
+            !userData.firstName ||
+            !userData.homeAddress ||
+            !userData.phoneNumber
+          );
+
+          setIsProfileComplete(!isIncomplete);
+
+          if (isIncomplete) {
+            setShowProfileIncompleteModal(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+      }
+    };
+
+    checkProfile();
+  }, []);
+
   // Handle navigation from service details
   useEffect(() => {
     if (params.serviceName) {
@@ -101,6 +137,8 @@ export default function MessagesScreen() {
       }
     }
   }, [params.serviceName]);
+
+  
 
   const filteredChats = chats.filter(chat =>
     chat.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -182,6 +220,13 @@ export default function MessagesScreen() {
           </Text>
         </View>
       )}
+
+      {/* Profile Incomplete Modal */}
+      <CompleteProfileModal
+        visible={showProfileIncompleteModal}
+        onClose={() => setShowProfileIncompleteModal(false)}
+        message="Please complete your profile information before accessing messages. You need to provide your first name, last name, address, and contact number."
+      />
     </SafeAreaView>
   );
 }
@@ -329,4 +374,5 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
+  
 });

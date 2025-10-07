@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,23 @@ import {
   TouchableOpacity,
   ImageBackground,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import Header from "@components/Header";
+import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "../../../config/api";
 
 const Bookings = () => {
   const [searchText, setSearchText] = useState('');
   const router = useRouter();
+
+  const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   const [schedules] = useState([
     {
@@ -73,9 +79,41 @@ const Bookings = () => {
     }
   ]);
 
+  // Check profile completeness on mount
+  useEffect(() => {
+    const checkProfile = async () => {
+      try {
+        const meResponse = await apiClient.get('/auth/me');
+
+        if (meResponse.status === 200) {
+          const userData = meResponse.data.user;
+
+          // Check if profile is incomplete
+          const isIncomplete = (
+            !userData.lastName ||
+            !userData.firstName ||
+            !userData.phoneNumber
+          );
+
+          setIsProfileComplete(!isIncomplete);
+
+          if (isIncomplete) {
+            setShowProfileIncompleteModal(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking profile:', error);
+      }
+    };
+
+    checkProfile();
+  }, []);
+
   const filteredSchedules = schedules.filter(schedule =>
     schedule.title.toLowerCase().includes(searchText.toLowerCase())
   );
+
+  
 
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
@@ -157,6 +195,13 @@ const Bookings = () => {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+      />
+
+      {/* Profile Incomplete Modal */}
+      <CompleteProfileModal
+        visible={showProfileIncompleteModal}
+        onClose={() => setShowProfileIncompleteModal(false)}
+        message="Please complete your profile information before accessing bookings. You need to provide your first name, last name, address, and contact number."
       />
     </SafeAreaView>
   );
@@ -250,6 +295,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     fontWeight: '600',
   },
+  
 });
 
 export default Bookings;

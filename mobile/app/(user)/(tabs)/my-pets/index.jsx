@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Header from '@components/Header';
+import CompleteProfileModal from '@components/CompleteProfileModal';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 
@@ -23,6 +24,8 @@ export default function MyPetsScreen() {
   const router = useRouter();
   const [pets, setPets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -47,6 +50,37 @@ export default function MyPetsScreen() {
     return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : 'Less than 1 year';
   };
 
+  // TEMPORARILY DISABLED: Check profile completeness on mount
+  // useEffect(() => {
+  //   const checkProfile = async () => {
+  //     try {
+  //       const meResponse = await apiClient.get('/auth/me');
+
+  //       if (meResponse.status === 200) {
+  //         const userData = meResponse.data.user;
+
+  //         // Check if profile is incomplete
+  //         const isIncomplete = (
+  //           !userData.lastName ||
+  //           !userData.firstName ||
+  //           !userData.homeAddress ||
+  //           !userData.phoneNumber
+  //         );
+
+  //         setIsProfileComplete(!isIncomplete);
+
+  //         if (isIncomplete) {
+  //           setShowProfileIncompleteModal(true);
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error('Error checking profile:', error);
+  //     }
+  //   };
+
+  //   checkProfile();
+  // }, []);
+
   // Fetch pets from API
   useEffect(() => {
     const fetchPets = async () => {
@@ -56,8 +90,8 @@ export default function MyPetsScreen() {
 
         if (response.status === 200) {
           // Map API response to match UI structure
-          const petsData = response.data.map(pet => ({
-            id: pet.id.toString(),
+          const petsData = response.data.data.map(pet => ({
+            id: pet._id.toString(),
             name: pet.name,
             species: pet.species,
             breed: pet.breed,
@@ -93,6 +127,7 @@ export default function MyPetsScreen() {
 
     fetchPets();
   }, []);
+
 
   const renderPetCard = ({ item }) => (
     <TouchableOpacity
@@ -192,6 +227,14 @@ export default function MyPetsScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
+
+      {/* Profile Incomplete Modal */}
+      <CompleteProfileModal
+        visible={showProfileIncompleteModal}
+        onClose={() => setShowProfileIncompleteModal(false)}
+        title="Complete Your Profile"
+        message="Please complete your profile information before managing pets. You need to provide your first name, last name, address, and contact number."
+      />
     </SafeAreaView>
   );
 }
