@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
 import apiClient from "../../../config/api";
+import AddressManager from './address-manager';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -36,10 +37,8 @@ export default function ProfileScreen() {
     phoneNumber: '',
   });
 
-  // Address Info
-  const [addressInfo, setAddressInfo] = useState({
-    homeAddress: '',
-  });
+  // View state for address manager
+  const [showAddressManager, setShowAddressManager] = useState(false);
 
   // Password Change
   const [passwordInfo, setPasswordInfo] = useState({
@@ -65,9 +64,7 @@ export default function ProfileScreen() {
 
   // Editing States
   const [editingAccount, setEditingAccount] = useState(false);
-  const [editingAddress, setEditingAddress] = useState(false);
   const [savingAccount, setSavingAccount] = useState(false);
-  const [savingAddress, setSavingAddress] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
@@ -89,10 +86,6 @@ export default function ProfileScreen() {
             suffix: userData.suffix || '',
             email: userData.email || '',
             phoneNumber: profileData.contactNumber || '',
-          });
-
-          setAddressInfo({
-            homeAddress: userData.homeAddress || '',
           });
 
           if (profileData?.profilePicture) {
@@ -207,28 +200,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSaveAddress = async () => {
-    setSavingAddress(true);
-    try {
-      const updateData = {
-        user: {
-          homeAddress: addressInfo.homeAddress,
-        },
-      };
-
-      const response = await apiClient.put('/users/profile', updateData);
-
-      if (response.status === 200) {
-        setEditingAddress(false);
-        Alert.alert('Success', 'Address updated successfully!');
-      }
-    } catch (error) {
-      console.error('Error updating address:', error);
-      Alert.alert('Error', 'Failed to update address');
-    } finally {
-      setSavingAddress(false);
-    }
-  };
 
   const handleChangePassword = async () => {
     if (!passwordInfo.currentPassword || !passwordInfo.newPassword || !passwordInfo.confirmPassword) {
@@ -524,6 +495,23 @@ export default function ProfileScreen() {
               </View>
             </View>
 
+                        {/* ADDRESS SECTION */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="location-outline" size={24} color="#1C86FF" />
+                <Text style={styles.sectionTitle}>Addresses</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.manageAddressButton}
+                onPress={() => setShowAddressManager(true)}
+              >
+                <Ionicons name="map-outline" size={22} color="#1C86FF" />
+                <Text style={styles.manageAddressText}>Manage My Addresses</Text>
+                <Ionicons name="chevron-forward" size={22} color="#999" />
+              </TouchableOpacity>
+            </View>
+
             {/* PAYMENT OPTIONS SECTION */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -558,41 +546,7 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* ADDRESS SECTION */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="location-outline" size={24} color="#1C86FF" />
-                <Text style={styles.sectionTitle}>Address</Text>
-                <TouchableOpacity
-                  onPress={() => editingAddress ? handleSaveAddress() : setEditingAddress(true)}
-                  disabled={savingAddress}
-                >
-                  {savingAddress ? (
-                    <ActivityIndicator size="small" color="#1C86FF" />
-                  ) : (
-                    <Ionicons
-                      name={editingAddress ? "checkmark" : "create-outline"}
-                      size={22}
-                      color="#1C86FF"
-                    />
-                  )}
-                </TouchableOpacity>
-              </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Home Address</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea, !editingAddress && styles.disabledInput]}
-                  value={addressInfo.homeAddress}
-                  onChangeText={(value) => setAddressInfo(prev => ({ ...prev, homeAddress: value }))}
-                  placeholder="Enter home address"
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                  editable={editingAddress}
-                />
-              </View>
-            </View>
 
             {/* CHANGE PASSWORD SECTION */}
             <View style={styles.section}>
@@ -911,6 +865,27 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Address Manager Modal */}
+      <Modal
+        visible={showAddressManager}
+        animationType="slide"
+        onRequestClose={() => setShowAddressManager(false)}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.addressManagerHeader}>
+            <TouchableOpacity
+              onPress={() => setShowAddressManager(false)}
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={24} color="#1C86FF" />
+            </TouchableOpacity>
+            <Text style={styles.addressManagerTitle}>My Addresses</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <AddressManager />
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1325,5 +1300,40 @@ const styles = StyleSheet.create({
   },
   addPaymentConfirmButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  manageAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  manageAddressText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'SFProSB',
+    color: '#1C86FF',
+    marginLeft: 12,
+  },
+  addressManagerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  backButton: {
+    padding: 4,
+  },
+  addressManagerTitle: {
+    fontSize: 20,
+    fontFamily: 'SFProBold',
+    color: '#1C86FF',
   },
 });

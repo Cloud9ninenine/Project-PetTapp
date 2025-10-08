@@ -116,7 +116,14 @@ export default function AddPetScreen() {
     gender: '',
     weight: '',
     additionalInfo: '',
+    specialInstructions: '',
   });
+
+  const [medicalHistory, setMedicalHistory] = useState([]);
+  const [vaccinations, setVaccinations] = useState([]);
+  const [currentDateField, setCurrentDateField] = useState(null); // Tracks which date field is being edited
+  const [currentPage, setCurrentPage] = useState(1); // Page 1: Basic Info, Page 2: Medical/Vaccinations
+
   const [petImage, setPetImage] = useState(null);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
   const [showBreedModal, setShowBreedModal] = useState(false);
@@ -207,15 +214,83 @@ export default function AddPetScreen() {
       setShowDatePicker(false);
     }
 
-    if (date) {
-      setSelectedDate(date);
+    if (date && currentDateField) {
       const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
-      updatePetInfo('birthday', formattedDate);
+
+      if (currentDateField.type === 'birthday') {
+        setSelectedDate(date);
+        updatePetInfo('birthday', formattedDate);
+      } else if (currentDateField.type === 'medical') {
+        updateMedicalHistoryField(currentDateField.id, currentDateField.field, formattedDate);
+      } else if (currentDateField.type === 'vaccination') {
+        updateVaccinationField(currentDateField.id, currentDateField.field, formattedDate);
+      }
+
+      setCurrentDateField(null);
     }
   };
 
-  const showDatePickerModal = () => {
+  const showDatePickerModal = (type, id = null, field = null) => {
+    setCurrentDateField({ type, id, field });
     setShowDatePicker(true);
+  };
+
+  // Medical History Management
+  const addMedicalHistory = () => {
+    const newEntry = {
+      id: Date.now().toString(),
+      condition: '',
+      diagnosedDate: '',
+      treatment: '',
+      notes: ''
+    };
+    setMedicalHistory([...medicalHistory, newEntry]);
+  };
+
+  const deleteMedicalHistory = (id) => {
+    setMedicalHistory(medicalHistory.filter(entry => entry.id !== id));
+  };
+
+  const updateMedicalHistoryField = (id, field, value) => {
+    setMedicalHistory(medicalHistory.map(entry =>
+      entry.id === id ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  // Vaccination Management
+  const addVaccination = () => {
+    const newEntry = {
+      id: Date.now().toString(),
+      vaccineName: '',
+      administeredDate: '',
+      nextDueDate: '',
+      veterinarian: ''
+    };
+    setVaccinations([...vaccinations, newEntry]);
+  };
+
+  const deleteVaccination = (id) => {
+    setVaccinations(vaccinations.filter(entry => entry.id !== id));
+  };
+
+  const updateVaccinationField = (id, field, value) => {
+    setVaccinations(vaccinations.map(entry =>
+      entry.id === id ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  // Page Navigation
+  const goToNextPage = () => {
+    const { petName, birthday, species, breed, gender, weight } = petInfo;
+    if (!petName || !birthday || !species || !breed || !gender || !weight) {
+      Alert.alert('Error', 'Please fill in all required fields before proceeding');
+      return;
+    }
+    setCurrentPage(2);
+  };
+
+  const goToPreviousPage = () => {
+    setCurrentPage(1);
   };
 
   const handleSave = () => {
@@ -236,15 +311,27 @@ export default function AddPetScreen() {
       const [month, day, year] = petInfo.birthday.split('/');
       const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 
+      // Calculate age from birthday
+      const birthDate = new Date(formattedBirthday);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
       // Prepare pet data for API
       const petData = {
         name: petInfo.petName,
         species: petInfo.species,
         breed: petInfo.breed,
-        birthday: formattedBirthday,
+        age: age,
         gender: petInfo.gender,
         weight: parseFloat(petInfo.weight),
         color: petInfo.additionalInfo || null,
+        specialInstructions: petInfo.specialInstructions || null, // ADD THIS
+        medicalHistory: medicalHistory.length > 0 ? medicalHistory : null, // ADD THIS
+        vaccinations: vaccinations.length > 0 ? vaccinations : null, // ADD THIS
       };
 
       const response = await apiClient.post('/pets', petData);
@@ -323,8 +410,12 @@ export default function AddPetScreen() {
       gender: '',
       weight: '',
       additionalInfo: '',
+      specialInstructions: '', // ADD THIS
     });
     setPetImage(null);
+    setMedicalHistory([]); // ADD THIS
+    setVaccinations([]); // ADD THIS
+    setCurrentPage(1);
     setShowResetModal(false);
   };
 
@@ -344,125 +435,301 @@ export default function AddPetScreen() {
         showBack={true}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
-          {/* Pet Photo Upload */}
+  <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: wp(4) }}>
+    <View style={styles.content}>
+      {currentPage === 1 ? (
+        // PAGE 1: Profile Image + Basic Information
+        <>
+          {/* SECTION 1: Profile Image */}
           <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
-            {petImage ? (
-              <Image source={{ uri: petImage }} style={styles.petImage} />
-            ) : (
-              <Ionicons name="add" size={moderateScale(36)} color="#1C86FF" />
-            )}
-          </TouchableOpacity>
+        {petImage ? (
+          <Image source={{ uri: petImage }} style={styles.petImage} />
+        ) : (
+          <Ionicons name="add" size={moderateScale(36)} color="#1C86FF" />
+        )}
+      </TouchableOpacity>
 
-          {/* Form Section */}
-          <View style={styles.formSection}>
-            {/* Pet Name */}
+      {/* SECTION 2: Basic Information */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
+          <Text style={styles.sectionHeader}>Basic Information</Text>
+        </View>
+
+        {/* Pet Name */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Pet Name *</Text>
+          <TextInput
+            style={styles.input}
+            value={petInfo.petName}
+            onChangeText={(value) => updatePetInfo('petName', value)}
+            placeholder="Enter pet name"
+          />
+        </View>
+
+        {/* Species */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Species *</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowSpeciesModal(true)}
+          >
+            <Text style={[styles.dropdownText, !petInfo.species && styles.placeholderText]}>
+              {getSpeciesLabel()}
+            </Text>
+            <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Breed */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Breed *</Text>
+          <TouchableOpacity
+            style={[styles.dropdownButton, !petInfo.species && styles.disabledDropdown]}
+            onPress={() => petInfo.species && setShowBreedModal(true)}
+            disabled={!petInfo.species}
+          >
+            <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
+              {getBreedLabel()}
+            </Text>
+            <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Birthday */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Birthday *</Text>
+          <TouchableOpacity onPress={() => showDatePickerModal('birthday')}>
+            <View style={styles.dateInputContainer}>
+              <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
+                {petInfo.birthday || 'MM/DD/YYYY'}
+              </Text>
+              <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sex and Weight */}
+        <View style={styles.rowInputGroup}>
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Sex *</Text>
+            <TouchableOpacity
+              style={styles.dropdownButton}
+              onPress={() => setShowGenderModal(true)}
+            >
+              <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
+                {getGenderLabel()}
+              </Text>
+              <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.halfInput}>
+            <Text style={styles.label}>Weight (kg) *</Text>
+            <TextInput
+              style={styles.input}
+              value={petInfo.weight}
+              onChangeText={(value) => updatePetInfo('weight', value)}
+              placeholder="Weight"
+              keyboardType="decimal-pad"
+            />
+          </View>
+        </View>
+
+        {/* Additional Info */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Additional Info</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={petInfo.additionalInfo}
+            onChangeText={(value) => updatePetInfo('additionalInfo', value)}
+            placeholder="Color, markings, etc."
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+        </View>
+      </View>
+
+          {/* Navigation Button for Page 1 */}
+          <TouchableOpacity style={styles.confirmButton} onPress={goToNextPage}>
+            <Text style={styles.confirmButtonText}>Next</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        // PAGE 2: Medical History + Vaccinations + Special Instructions
+        <>
+          {/* SECTION 3: Medical History */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="medical" size={moderateScale(24)} color="#1C86FF" />
+          <Text style={styles.sectionHeader}>Medical History</Text>
+        </View>
+
+        {medicalHistory.map((entry, index) => (
+          <View key={entry.id} style={styles.entryCard}>
+            <View style={styles.entryHeader}>
+              <Text style={styles.entryTitle}>Record #{index + 1}</Text>
+              <TouchableOpacity onPress={() => deleteMedicalHistory(entry.id)}>
+                <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Pet Name</Text>
+              <Text style={styles.label}>Condition</Text>
               <TextInput
                 style={styles.input}
-                value={petInfo.petName}
-                onChangeText={(value) => updatePetInfo('petName', value)}
-                placeholder="Enter pet name"
+                value={entry.condition}
+                onChangeText={(value) => updateMedicalHistoryField(entry.id, 'condition', value)}
+                placeholder="Enter condition"
               />
             </View>
 
-            {/* Birthday */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Birthday</Text>
-              <TouchableOpacity onPress={showDatePickerModal}>
+              <Text style={styles.label}>Diagnosed Date</Text>
+              <TouchableOpacity onPress={() => showDatePickerModal('medical', entry.id, 'diagnosedDate')}>
                 <View style={styles.dateInputContainer}>
-                  <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
-                    {petInfo.birthday || 'MM/DD/YYYY'}
+                  <Text style={[styles.dateInput, !entry.diagnosedDate && styles.placeholderTextInput]}>
+                    {entry.diagnosedDate || 'MM/DD/YYYY'}
                   </Text>
                   <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
                 </View>
               </TouchableOpacity>
             </View>
 
-            {/* Species */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Species</Text>
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowSpeciesModal(true)}
-              >
-                <Text style={[styles.dropdownText, !petInfo.species && styles.placeholderText]}>
-                  {getSpeciesLabel()}
-                </Text>
-                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Breed */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Breed</Text>
-              <TouchableOpacity
-                style={[styles.dropdownButton, !petInfo.species && styles.disabledDropdown]}
-                onPress={() => petInfo.species && setShowBreedModal(true)}
-                disabled={!petInfo.species}
-              >
-                <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
-                  {getBreedLabel()}
-                </Text>
-                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Sex and Weight - Side by Side */}
-            <View style={styles.rowInputGroup}>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Sex</Text>
-                <TouchableOpacity
-                  style={styles.dropdownButton}
-                  onPress={() => setShowGenderModal(true)}
-                >
-                  <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
-                    {getGenderLabel()}
-                  </Text>
-                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Weight (kg)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={petInfo.weight}
-                  onChangeText={(value) => updatePetInfo('weight', value)}
-                  placeholder="Weight"
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            </View>
-
-            {/* Additional Info */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Additional Info</Text>
+              <Text style={styles.label}>Treatment</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                value={petInfo.additionalInfo}
-                onChangeText={(value) => updatePetInfo('additionalInfo', value)}
-                placeholder="Enter additional information (color, markings, etc.)"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
+                style={styles.input}
+                value={entry.treatment}
+                onChangeText={(value) => updateMedicalHistoryField(entry.id, 'treatment', value)}
+                placeholder="Enter treatment"
               />
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>Add</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                <Text style={styles.resetButtonText}>Reset</Text>
-              </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Notes</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={entry.notes}
+                onChangeText={(value) => updateMedicalHistoryField(entry.id, 'notes', value)}
+                placeholder="Additional notes"
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+              />
             </View>
           </View>
+        ))}
+
+        <TouchableOpacity style={styles.addButton} onPress={addMedicalHistory}>
+          <Ionicons name="add-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+          <Text style={styles.addButtonText}>Add Medical Record</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* SECTION 4: Vaccinations */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="shield-checkmark" size={moderateScale(24)} color="#1C86FF" />
+          <Text style={styles.sectionHeader}>Vaccinations</Text>
         </View>
-      </ScrollView>
+
+        {vaccinations.map((entry, index) => (
+          <View key={entry.id} style={styles.entryCard}>
+            <View style={styles.entryHeader}>
+              <Text style={styles.entryTitle}>Vaccination #{index + 1}</Text>
+              <TouchableOpacity onPress={() => deleteVaccination(entry.id)}>
+                <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Vaccine Name</Text>
+              <TextInput
+                style={styles.input}
+                value={entry.vaccineName}
+                onChangeText={(value) => updateVaccinationField(entry.id, 'vaccineName', value)}
+                placeholder="Enter vaccine name"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Administered Date</Text>
+              <TouchableOpacity onPress={() => showDatePickerModal('vaccination', entry.id, 'administeredDate')}>
+                <View style={styles.dateInputContainer}>
+                  <Text style={[styles.dateInput, !entry.administeredDate && styles.placeholderTextInput]}>
+                    {entry.administeredDate || 'MM/DD/YYYY'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Next Due Date</Text>
+              <TouchableOpacity onPress={() => showDatePickerModal('vaccination', entry.id, 'nextDueDate')}>
+                <View style={styles.dateInputContainer}>
+                  <Text style={[styles.dateInput, !entry.nextDueDate && styles.placeholderTextInput]}>
+                    {entry.nextDueDate || 'MM/DD/YYYY'}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Veterinarian</Text>
+              <TextInput
+                style={styles.input}
+                value={entry.veterinarian}
+                onChangeText={(value) => updateVaccinationField(entry.id, 'veterinarian', value)}
+                placeholder="Enter veterinarian name"
+              />
+            </View>
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.addButton} onPress={addVaccination}>
+          <Ionicons name="add-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+          <Text style={styles.addButtonText}>Add Vaccination</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* SECTION 5: Special Instructions */}
+      <View style={styles.sectionContainer}>
+        <View style={styles.sectionHeaderRow}>
+          <Ionicons name="document-text" size={moderateScale(24)} color="#1C86FF" />
+          <Text style={styles.sectionHeader}>Special Instructions</Text>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Instructions for Service Providers</Text>
+          <TextInput
+            style={[styles.input, styles.textAreaLarge]}
+            value={petInfo.specialInstructions}
+            onChangeText={(value) => updatePetInfo('specialInstructions', value)}
+            placeholder="Feeding schedules, behavioral notes, special care requirements, etc."
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+          />
+        </View>
+      </View>
+
+          {/* Navigation Buttons for Page 2 */}
+          <View style={styles.buttonContainerRow}>
+            <TouchableOpacity style={styles.previousButton} onPress={goToPreviousPage}>
+              <Text style={styles.resetButtonText}>Previous</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addPetButton} onPress={handleSave}>
+              <Text style={styles.confirmButtonText}>Add Pet</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </View>
+  </ScrollView>
 
       {/* Species Modal */}
       <Modal
@@ -678,13 +945,17 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#f9f9f9',
+    paddingHorizontal: 0,
   },
   content: {
-    paddingHorizontal: wp(4),
-    paddingTop: moderateScale(30),
-    paddingBottom: moderateScale(40),
+
+    paddingTop: moderateScale(25),
+    paddingBottom: moderateScale(60),
+    backgroundColor: 'rgba(255,255,255,0.0)',
     alignItems: 'center',
   },
+
   addCircle: {
     width: moderateScale(100),
     height: moderateScale(100),
@@ -784,6 +1055,8 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: moderateScale(12),
     marginTop: moderateScale(10),
+    width: wp(92),
+    alignItems: 'center',
   },
   resetButton: {
     flex: 1,
@@ -801,17 +1074,53 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   confirmButton: {
+    width: wp(92), // ✅ makes it span horizontally instead of vertically
+    backgroundColor: '#1C86FF',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+    marginTop: moderateScale(20),
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: scaleFontSize(15),
+    letterSpacing: 0.5,
+  },
+  buttonContainerRow: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    marginTop: moderateScale(20),
+    width: wp(92),
+  },
+  previousButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
+    alignItems: 'center',
+  },
+  addPetButton: {
     flex: 1,
     backgroundColor: '#1C86FF',
     paddingVertical: moderateScale(14),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  confirmButtonText: {
-    color: '#fff',
-    fontSize: scaleFontSize(16),
-    fontFamily: 'SFProReg',
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -933,5 +1242,74 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     color: '#333',
     fontFamily: 'SFProReg',
+  },
+
+  // 🔹 Then adjust your sectionContainer:
+  sectionContainer: {
+    marginBottom: moderateScale(20),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    width: '100%',
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(16),
+    gap: moderateScale(8),
+  },
+  sectionHeader: {
+    fontSize: scaleFontSize(20),
+    color: '#1C86FF',
+    fontFamily: 'SFProBold',
+  },
+  entryCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+    paddingBottom: moderateScale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  entryTitle: {
+    fontSize: scaleFontSize(16),
+    fontFamily: 'SFProSB',
+    color: '#333',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    borderStyle: 'dashed',
+    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(12),
+    gap: moderateScale(8),
+  },
+  addButtonText: {
+    color: '#1C86FF',
+    fontSize: scaleFontSize(16),
+    fontFamily: 'SFProSB',
+  },
+  textAreaLarge: {
+    minHeight: moderateScale(120),
+    paddingTop: moderateScale(12),
   },
 });

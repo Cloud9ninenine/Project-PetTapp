@@ -4,7 +4,11 @@
       "Read(//c/Users/user/Documents/GitHub/petTapp-be/**)",
       "Bash(for file in home booking messages notification my-pets)",
       "Bash(do echo -n \"$file: \")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(git diff:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
