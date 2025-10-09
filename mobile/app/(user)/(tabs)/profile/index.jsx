@@ -104,10 +104,13 @@ export default function ProfileScreen() {
           let files = Array.isArray(filesData) ? filesData : filesData.files;
 
           if (Array.isArray(files)) {
-            const profilePic = files.find(file => file.fileType === 'profile');
+            // Check for both 'category' and 'fileType' for compatibility
+            const profilePic = files.find(file =>
+              file.category === 'profile' || file.fileType === 'profile'
+            );
             if (profilePic) {
               setProfileImage(profilePic.url);
-              setProfileImageFileId(profilePic._id);
+              setProfileImageFileId(profilePic._id || profilePic.id);
             }
           }
         }

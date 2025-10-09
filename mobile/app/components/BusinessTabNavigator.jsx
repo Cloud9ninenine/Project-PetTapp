@@ -11,10 +11,10 @@ const businessTabs = [
     icon: require("@assets/images/service_icon/home icon.png"),
   },
   {
-    name: "messages",
-    route: "/(bsn)/(tabs)/messages",
-    label: "Messages",
-    icon: require("@assets/images/service_icon/message icon.png"),
+    name: "revenue",
+    route: "/(bsn)/(tabs)/revenue",
+    label: "Revenue",
+    icon: require("@assets/images/service_icon/list icon.png"),
   },
   {
     name: "my-services",

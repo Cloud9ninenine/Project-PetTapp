@@ -70,7 +70,7 @@ export default function BusinessProfileScreen() {
       title: 'Revenue',
       icon: 'cash',
       color: '#2196F3',
-      route: '/(bsn)/(tabs)/profile/revenue',
+      route: '/(bsn)/(tabs)/revenue',
     },
     {
       id: '4',

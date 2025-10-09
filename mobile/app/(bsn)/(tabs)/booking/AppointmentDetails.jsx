@@ -85,21 +85,6 @@ const AppointmentDetail = () => {
     Alert.alert("Copied", "Booking ID copied to clipboard");
   };
 
-  const handleChat = () => {
-    router.push({
-      pathname: '/(bsn)/(tabs)/messages/chat',
-      params: {
-        customerId: appointmentDetail.id,
-        customerName: appointmentDetail.customerName,
-        petName: appointmentDetail.petName,
-        service: appointmentDetail.service,
-        date: params.date,
-        time: params.time,
-        startConversation: 'true',
-      }
-    });
-  };
-
   const handleAccept = () => {
     Alert.alert("Accept Appointment", "Confirm this appointment?", [
       { text: "Cancel", style: "cancel" },
@@ -161,14 +146,10 @@ const AppointmentDetail = () => {
 
     if (status === "completed") {
       return (
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
-            <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.sideBySideButtonText}>Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={() => Alert.alert("View Review", "Customer review")}>
-            <Ionicons name="star-outline" size={moderateScale(20)} color="#ff9b79" />
-            <Text style={[styles.sideBySideButtonOutlineText, { color: "#ff9b79" }]}>Review</Text>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={() => Alert.alert("View Review", "Customer review")}>
+            <Ionicons name="star-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>View Review</Text>
           </TouchableOpacity>
         </View>
       );
@@ -176,34 +157,21 @@ const AppointmentDetail = () => {
 
     if (status === "scheduled") {
       return (
-        <>
-          <View style={styles.actionButtonsRow}>
-            <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
-              <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-              <Text style={styles.sideBySideButtonText}>Chat</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleReschedule}>
-              <Ionicons name="calendar-outline" size={moderateScale(20)} color="#1C86FF" />
-              <Text style={styles.sideBySideButtonOutlineText}>Reschedule</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleReschedule}>
+            <Ionicons name="calendar-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Reschedule</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
             <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
             <Text style={styles.completeButtonText}>Mark as Complete</Text>
           </TouchableOpacity>
-        </>
+        </View>
       );
     }
 
-    // Cancelled = only Chat
-    return (
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity style={styles.fullButton} onPress={handleChat}>
-          <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-          <Text style={styles.fullButtonText}>Chat with Customer</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    // Cancelled = no buttons
+    return null;
   };
 
   return (

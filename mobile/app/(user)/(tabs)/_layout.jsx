@@ -14,8 +14,7 @@ export default function RootLayout() {
     "/home/service-scheduled",
     "/home/schedule-booking",
     "/booking/review-service",
-    "/notification",
-    "/messages/"
+    "/notification"
   ];
 
   const shouldHideFooter = hideFooterOn.some((path) =>

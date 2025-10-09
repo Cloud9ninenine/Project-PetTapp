@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from 'expo-location';
 import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
@@ -28,6 +29,9 @@ export default function HomeScreen() {
   // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [nearbyServices, setNearbyServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  const [location, setLocation] = useState(null);
 
   const { isProfileComplete } = useProfileCompletion();
   const router = useRouter();
@@ -204,72 +208,79 @@ export default function HomeScreen() {
       title: "Veterinary",
       icon: require("@assets/images/service_icon/10.png"),
       color: "#FF9B79",
-      route: "home/veterinary-services",
+      category: "veterinary",
     },
     {
       id: 2,
       title: "Grooming",
       icon: require("@assets/images/service_icon/11.png"),
       color: "#FF9B79",
-      route: "home/grooming-services",
+      category: "grooming",
     },
     {
       id: 3,
       title: "Boarding",
       icon: require("@assets/images/service_icon/12.png"),
       color: "#FF9B79",
-      route: "home/boarding-services",
+      category: "boarding",
     },
     {
       id: 4,
       title: "Delivery",
       icon: require("@assets/images/service_icon/13.png"),
       color: "#FF9B79",
-      route: "home/delivery-services",
+      category: "other",
     },
   ];
 
-  const nearbyServices = [
-    {
-      id: 1,
-      name: "PetCity Daycare",
-      image: require("@assets/images/serviceimages/16.png"),
-      rating: 4.8,
-      type: "Pet Boarding",
-      address: "123 Pet Street, Quezon City",
-      distance: "1.2 km",
-      coordinates: {
-        latitude: 14.6507,
-        longitude: 121.0494,
-      },
-    },
-    {
-      id: 2,
-      name: "Prinz Aviary",
-      image: require("@assets/images/serviceimages/14.png"),
-      rating: 4.9,
-      type: "Pet Store",
-      address: "456 Bird Avenue, Makati City",
-      distance: "2.5 km",
-      coordinates: {
-        latitude: 14.5547,
-        longitude: 121.0244,
-      },
-    },
-    {
-      id: 3,
-      name: "Petkeeper Co.",
-      image: require("@assets/images/serviceimages/15.png"),
-      rating: 4.7,
-      type: "Veterinary Clinic",
-      address: "789 Animal Road, Pasig City",
-      distance: "3.0 km",
-      coordinates: {
-        latitude: 14.5764,
-        longitude: 121.0851,
-      },
-    },
-  ];
+  // Fetch user location
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const currentLocation = await Location.getCurrentPositionAsync({});
+          setLocation({
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude,
+          });
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+      }
+    })();
+  }, []);
+
+  // Fetch nearby services from API
+  useEffect(() => {
+    const fetchNearbyServices = async () => {
+      try {
+        setLoadingServices(true);
+        const params = {
+          limit: 6, // Fetch 6 services
+        };
+
+        // Add location if available
+        if (location) {
+          params.latitude = location.latitude;
+          params.longitude = location.longitude;
+          params.radius = 10; // 10km radius
+        }
+
+        const response = await apiClient.get('/services', { params });
+
+        if (response.data.success) {
+          setNearbyServices(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching nearby services:', error);
+      } finally {
+        setLoadingServices(false);
+      }
+    };
+
+    fetchNearbyServices();
+  }, [location]);
 
   const handleServicePress = (service) => {
     // Check if profile is complete before allowing access
@@ -277,7 +288,13 @@ export default function HomeScreen() {
       setShowProfileIncompleteModal(true);
       return;
     }
-    if (service.route) router.push(service.route);
+    // Navigate to services page with category filter
+    router.push({
+      pathname: '/(user)/(tabs)/services',
+      params: {
+        category: service.category,
+      },
+    });
   };
 
   const handleNearbyServicePress = (service) => {
@@ -289,14 +306,14 @@ export default function HomeScreen() {
     router.push({
       pathname: 'home/nearby-service-map',
       params: {
-        id: service.id,
+        id: service._id,
         name: service.name,
-        type: service.type,
-        rating: service.rating,
-        address: service.address,
-        distance: service.distance,
-        latitude: service.coordinates.latitude,
-        longitude: service.coordinates.longitude,
+        type: service.category || service.type,
+        rating: service.rating || 0,
+        address: service.location?.address || service.address || 'Address not available',
+        distance: service.distance || 'N/A',
+        latitude: service.location?.coordinates?.[1] || 0,
+        longitude: service.location?.coordinates?.[0] || 0,
       },
     });
   };
@@ -404,27 +421,44 @@ export default function HomeScreen() {
             <Text style={styles.sectionTitle}>Nearby Services</Text>
 
             {/* Nearby Services Grid */}
-            <View style={styles.nearbyGrid}>
-              {nearbyServices.map((service) => (
-                <TouchableOpacity
-                  key={service.id}
-                  style={styles.nearbyCardWrapper}
-                  onPress={() => handleNearbyServicePress(service)}
-                >
-                  <View style={styles.nearbyCard}>
-                    <View style={styles.nearbyImageContainer}>
-                      <Image source={service.image} style={styles.nearbyImage} />
+            {loadingServices ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading nearby services...</Text>
+              </View>
+            ) : nearbyServices.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="location-outline" size={moderateScale(48)} color="#ccc" />
+                <Text style={styles.emptyText}>No nearby services found</Text>
+                <Text style={styles.emptySubtext}>Try adjusting your location or check back later</Text>
+              </View>
+            ) : (
+              <View style={styles.nearbyGrid}>
+                {nearbyServices.slice(0, 3).map((service) => (
+                  <TouchableOpacity
+                    key={service._id}
+                    style={styles.nearbyCardWrapper}
+                    onPress={() => handleNearbyServicePress(service)}
+                  >
+                    <View style={styles.nearbyCard}>
+                      <View style={styles.nearbyImageContainer}>
+                        <Image
+                          source={service.imageUrl ? { uri: service.imageUrl } : require("@assets/images/serviceimages/18.png")}
+                          style={styles.nearbyImage}
+                        />
+                      </View>
                     </View>
-                  </View>
-                  <View style={styles.nearbyCardInfo}>
-                    <Text style={styles.nearbyName}>{service.name}</Text>
-                    <View style={styles.nearbyStarsContainer}>
-                      {renderStars(service.rating)}
+                    <View style={styles.nearbyCardInfo}>
+                      <Text style={styles.nearbyName} numberOfLines={2}>{service.name}</Text>
+                      {service.rating && (
+                        <View style={styles.nearbyStarsContainer}>
+                          {renderStars(service.rating)}
+                        </View>
+                      )}
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
       </ImageBackground>
@@ -587,5 +621,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: moderateScale(2),
   },
-  
+  loadingContainer: {
+    width: "100%",
+    paddingVertical: moderateScale(40),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    fontSize: scaleFontSize(14),
+    color: "#1C86FF",
+    fontWeight: "600",
+  },
+  emptyContainer: {
+    width: "100%",
+    paddingVertical: moderateScale(40),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: scaleFontSize(16),
+    color: "#666",
+    fontWeight: "600",
+    marginTop: moderateScale(12),
+  },
+  emptySubtext: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+    marginTop: moderateScale(4),
+    textAlign: "center",
+  },
 });

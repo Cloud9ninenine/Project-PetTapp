@@ -75,16 +75,6 @@ const ScheduleDetail = () => {
     Alert.alert("Copied", "Booking ID copied to clipboard");
   };
 
-  const handleChat = () => {
-    router.push({
-      pathname: `/(user)/(tabs)/messages/${scheduleDetail.id}`,
-      params: {
-        serviceName: scheduleDetail.clinic,
-        fromService: 'true',
-      }
-    });
-  };
-
   const handleCancel = () => {
     Alert.alert("Cancel Booking", "Are you sure?", [
       { text: "No", style: "cancel" },
@@ -108,14 +98,10 @@ const ScheduleDetail = () => {
 
     if (status === "completed") {
       return (
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
-            <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.sideBySideButtonText}>Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleRate}>
-            <Ionicons name="star-outline" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={[styles.sideBySideButtonOutlineText, { color: "#1C86FF" }]}>Rate</Text>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleRate}>
+            <Ionicons name="star-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Rate</Text>
           </TouchableOpacity>
         </View>
       );
@@ -123,28 +109,17 @@ const ScheduleDetail = () => {
 
     if (status === "scheduled") {
       return (
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity style={styles.sideBySideButton} onPress={handleChat}>
-            <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.sideBySideButtonText}>Chat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleCancel}>
-            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={[styles.sideBySideButtonOutlineText, { color: "#1C86FF" }]}>Cancel</Text>
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleCancel}>
+            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // Cancelled = only Chat
-    return (
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity style={styles.fullButton} onPress={handleChat}>
-          <Ionicons name="chatbubble-outline" size={moderateScale(20)} color="#fff" />
-          <Text style={styles.fullButtonText}>Chat</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    // Cancelled = no buttons
+    return null;
   };
 
   return (
