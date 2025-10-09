@@ -19,13 +19,14 @@ import Header from '@components/Header';
 import CompleteProfileModal from '@components/CompleteProfileModal';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import { useProfileCompletion } from '../../../hooks/useProfileCompletion';
 
 export default function MyPetsScreen() {
   const router = useRouter();
   const [pets, setPets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
-  const [isProfileComplete, setIsProfileComplete] = useState(true);
+  const { isProfileComplete } = useProfileCompletion();
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -50,36 +51,12 @@ export default function MyPetsScreen() {
     return years > 0 ? `${years} year${years !== 1 ? 's' : ''}` : 'Less than 1 year';
   };
 
-  // TEMPORARILY DISABLED: Check profile completeness on mount
-  // useEffect(() => {
-  //   const checkProfile = async () => {
-  //     try {
-  //       const meResponse = await apiClient.get('/auth/me');
-
-  //       if (meResponse.status === 200) {
-  //         const userData = meResponse.data.user;
-
-  //         // Check if profile is incomplete
-  //         const isIncomplete = (
-  //           !userData.lastName ||
-  //           !userData.firstName ||
-  //           !userData.homeAddress ||
-  //           !userData.phoneNumber
-  //         );
-
-  //         setIsProfileComplete(!isIncomplete);
-
-  //         if (isIncomplete) {
-  //           setShowProfileIncompleteModal(true);
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('Error checking profile:', error);
-  //     }
-  //   };
-
-  //   checkProfile();
-  // }, []);
+  // Show modal if profile is incomplete
+  useEffect(() => {
+    if (!isProfileComplete) {
+      setShowProfileIncompleteModal(true);
+    }
+  }, [isProfileComplete]);
 
   // Fetch pets from API
   useEffect(() => {

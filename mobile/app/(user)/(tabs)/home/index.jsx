@@ -21,14 +21,15 @@ import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import apiClient from "../../../config/api";
+import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
-  const [isProfileComplete, setIsProfileComplete] = useState(true);
 
+  const { isProfileComplete } = useProfileCompletion();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const SLIDE_WIDTH = Math.round(width - moderateScale(32));
@@ -143,36 +144,12 @@ export default function HomeScreen() {
     }
   };
 
-  // Check profile completeness on mount
+  // Show modal if profile is incomplete
   useEffect(() => {
-    const checkProfile = async () => {
-      try {
-        const meResponse = await apiClient.get('/auth/me');
-
-        if (meResponse.status === 200) {
-          const userData = meResponse.data.user;
-
-          // Check if profile is incomplete
-          const isIncomplete = (
-            !userData.lastName ||
-            !userData.firstName ||
-            !userData.homeAddress ||
-            !userData.phoneNumber
-          );
-
-          setIsProfileComplete(!isIncomplete);
-
-          if (isIncomplete) {
-            setShowProfileIncompleteModal(true);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking profile:', error);
-      }
-    };
-
-    checkProfile();
-  }, []);
+    if (!isProfileComplete) {
+      setShowProfileIncompleteModal(true);
+    }
+  }, [isProfileComplete]);
 
   // set initial position and start autoplay
   useEffect(() => {

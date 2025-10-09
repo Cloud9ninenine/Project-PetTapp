@@ -24,8 +24,10 @@ import AddressManager from './address-manager';
 export default function ProfileScreen() {
   const router = useRouter();
   const [profileImage, setProfileImage] = useState(null);
+  const [profileImageFileId, setProfileImageFileId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isDeletingImage, setIsDeletingImage] = useState(false);
 
   // Account Info
   const [accountInfo, setAccountInfo] = useState({
@@ -88,12 +90,25 @@ export default function ProfileScreen() {
             phoneNumber: profileData.contactNumber || '',
           });
 
-          if (profileData?.profilePicture) {
-            setProfileImage(profileData.profilePicture);
-          }
-
           if (profileData?.paymentMethods && Array.isArray(profileData.paymentMethods)) {
             setPaymentOptions(profileData.paymentMethods);
+          }
+        }
+
+        // Fetch user files to get profile picture
+        const filesResponse = await apiClient.get('/api/files/users');
+        if (filesResponse.status === 200 && filesResponse.data?.data) {
+          const filesData = filesResponse.data.data;
+
+          // Handle if data is an object with a files property or directly an array
+          let files = Array.isArray(filesData) ? filesData : filesData.files;
+
+          if (Array.isArray(files)) {
+            const profilePic = files.find(file => file.fileType === 'profile');
+            if (profilePic) {
+              setProfileImage(profilePic.url);
+              setProfileImageFileId(profilePic._id);
+            }
           }
         }
       } catch (error) {
@@ -149,26 +164,58 @@ export default function ProfileScreen() {
         type: type,
       });
 
-      const uploadResponse = await apiClient.post('/files/users/profile', formData, {
+      const uploadResponse = await apiClient.post('/api/files/users/profile', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      if (uploadResponse.data?.data?.url) {
-        const updateData = {
-          profile: {
-            profilePicture: uploadResponse.data.data.url,
-          },
-        };
-
-        await apiClient.put('/users/profile', updateData);
+      if (uploadResponse.data?.data) {
+        const uploadedFile = uploadResponse.data.data;
+        setProfileImage(uploadedFile.url);
+        setProfileImageFileId(uploadedFile._id);
         Alert.alert('Success', 'Profile picture updated successfully!');
       }
     } catch (error) {
       console.error('Error uploading profile picture:', error);
       Alert.alert('Error', 'Failed to upload profile picture');
     }
+  };
+
+  const deleteProfilePicture = async () => {
+    if (!profileImageFileId) {
+      Alert.alert('Error', 'No profile picture to delete');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Profile Picture',
+      'Are you sure you want to delete your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeletingImage(true);
+            try {
+              const response = await apiClient.delete(`/api/files/users/files/${profileImageFileId}`);
+
+              if (response.status === 200) {
+                setProfileImage(null);
+                setProfileImageFileId(null);
+                Alert.alert('Success', 'Profile picture deleted successfully!');
+              }
+            } catch (error) {
+              console.error('Error deleting profile picture:', error);
+              Alert.alert('Error', 'Failed to delete profile picture');
+            } finally {
+              setIsDeletingImage(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleSaveAccount = async () => {
@@ -394,15 +441,30 @@ export default function ProfileScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.content}>
             {/* Profile Photo */}
-            <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.profileImage} />
-              ) : (
-                <View style={styles.placeholderIcon}>
-                  <Ionicons name="person" size={50} color="#1C86FF" />
-                </View>
+            <View style={styles.profilePhotoContainer}>
+              <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
+                {profileImage ? (
+                  <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                ) : (
+                  <View style={styles.placeholderIcon}>
+                    <Ionicons name="person" size={50} color="#1C86FF" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              {profileImage && (
+                <TouchableOpacity
+                  style={styles.deleteImageButton}
+                  onPress={deleteProfilePicture}
+                  disabled={isDeletingImage}
+                >
+                  {isDeletingImage ? (
+                    <ActivityIndicator size="small" color="#FF6B6B" />
+                  ) : (
+                    <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
+                  )}
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
 
             {/* ACCOUNT SECTION */}
             <View style={styles.section}>
@@ -929,6 +991,10 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     alignItems: 'center',
   },
+  profilePhotoContainer: {
+    position: 'relative',
+    marginBottom: 30,
+  },
   addCircle: {
     width: 120,
     height: 120,
@@ -937,9 +1003,26 @@ const styles = StyleSheet.create({
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
     overflow: 'hidden',
     backgroundColor: '#E3F2FD',
+  },
+  deleteImageButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   profileImage: {
     width: '100%',

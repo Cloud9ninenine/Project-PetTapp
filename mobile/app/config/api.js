@@ -23,6 +23,15 @@ apiClient.interceptors.request.use(
     } catch (error) {
       console.error('Error retrieving token:', error);
     }
+
+    // Log the request for debugging
+    console.log('=== API REQUEST ===');
+    console.log('Method:', config.method);
+    console.log('URL:', config.baseURL + config.url);
+    console.log('Headers:', config.headers);
+    console.log('Data:', config.data);
+    console.log('==================');
+
     return config;
   },
   (error) => {

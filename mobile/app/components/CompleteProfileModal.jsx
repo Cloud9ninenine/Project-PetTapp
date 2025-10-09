@@ -23,7 +23,7 @@ export default function CompleteProfileModal({
   visible,
   onClose,
   title = "Complete Your Profile",
-  message = "Please complete your profile information before continuing. You need to provide your first name, last name, address, and contact number.",
+  message = "Please complete your profile information before continuing. You need to provide your first name, last name, contact number, and a complete address (street and city).",
   buttonText = "Go to Profile",
 }) {
   const router = useRouter();

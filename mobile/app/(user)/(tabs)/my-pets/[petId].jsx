@@ -107,7 +107,7 @@ const BREED_OPTIONS_BY_SPECIES = {
 };
 
 const GENDER_OPTIONS = [
-  { label: 'Select gender', value: '' },
+  { label: 'Gender', value: '' },
   { label: 'Male', value: 'male' },
   { label: 'Female', value: 'female' },
 ];

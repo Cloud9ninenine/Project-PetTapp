@@ -135,7 +135,7 @@ export default function AddPetScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const GENDER_OPTIONS = [
-    { label: 'Select gender', value: '' },
+    { label: 'Gender', value: '' },
     { label: 'Male', value: 'male' },
     { label: 'Female', value: 'female' },
   ];
@@ -307,6 +307,15 @@ export default function AddPetScreen() {
     setIsLoading(true);
 
     try {
+      console.log('=== PET INFO STATE ===');
+      console.log('petInfo:', petInfo);
+      console.log('petName:', petInfo.petName);
+      console.log('species:', petInfo.species);
+      console.log('breed:', petInfo.breed);
+      console.log('gender:', petInfo.gender);
+      console.log('weight:', petInfo.weight);
+      console.log('birthday:', petInfo.birthday);
+
       // Convert birthday from MM/DD/YYYY to YYYY-MM-DD format
       const [month, day, year] = petInfo.birthday.split('/');
       const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
@@ -320,7 +329,9 @@ export default function AddPetScreen() {
         age--;
       }
 
-      // Prepare pet data for API
+      console.log('Calculated age:', age);
+
+      // Prepare pet data for API - only include non-null fields
       const petData = {
         name: petInfo.petName,
         species: petInfo.species,
@@ -328,20 +339,53 @@ export default function AddPetScreen() {
         age: age,
         gender: petInfo.gender,
         weight: parseFloat(petInfo.weight),
-        color: petInfo.additionalInfo || null,
-        specialInstructions: petInfo.specialInstructions || null, // ADD THIS
-        medicalHistory: medicalHistory.length > 0 ? medicalHistory : null, // ADD THIS
-        vaccinations: vaccinations.length > 0 ? vaccinations : null, // ADD THIS
       };
 
-      const response = await apiClient.post('/pets', petData);
+      // Add optional fields only if they have values
+      if (petInfo.additionalInfo && petInfo.additionalInfo.trim()) {
+        petData.color = petInfo.additionalInfo;
+      }
+
+      if (petInfo.specialInstructions && petInfo.specialInstructions.trim()) {
+        petData.specialInstructions = petInfo.specialInstructions;
+      }
+
+      if (medicalHistory.length > 0) {
+        petData.medicalHistory = medicalHistory;
+      }
+
+      if (vaccinations.length > 0) {
+        // Transform vaccinations to match API structure
+        petData.vaccinations = vaccinations.map(v => ({
+          vaccine: v.vaccineName,
+          administeredDate: v.administeredDate,
+          nextDueDate: v.nextDueDate,
+          veterinarian: v.veterinarian,
+        }));
+      }
+
+      console.log('=== SUBMITTING PET DATA ===');
+      console.log(JSON.stringify(petData, null, 2));
+
+      // Try explicit JSON stringification as a workaround
+      const response = await apiClient.post('/pets', petData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('API Response:', response.data);
 
       if (response.status === 201 || response.status === 200) {
-        const createdPet = response.data;
+        // Handle different possible response structures
+        const createdPet = response.data.data || response.data;
+        const petId = createdPet._id || createdPet.id;
+
+        console.log('Created pet ID:', petId);
 
         // Upload image if selected
-        if (petImage && createdPet.id) {
-          await uploadPetImage(createdPet.id);
+        if (petImage && petId) {
+          await uploadPetImage(petId);
         }
 
         Alert.alert('Success', 'Pet added successfully!', [
@@ -350,6 +394,9 @@ export default function AddPetScreen() {
       }
     } catch (error) {
       console.error('Error adding pet:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+
       if (error.response) {
         const status = error.response.status;
         const data = error.response.data;
@@ -358,7 +405,9 @@ export default function AddPetScreen() {
           Alert.alert('Authentication Error', 'Please log in again.');
           router.replace('/(auth)/login');
         } else if (status === 422) {
-          Alert.alert('Validation Error', data?.message || 'Please check your input and try again.');
+          const errorMsg = data?.message || data?.error || 'Please check your input and try again.';
+          console.error('Validation error details:', data);
+          Alert.alert('Validation Error', errorMsg);
         } else {
           Alert.alert('Error', data?.message || 'Failed to add pet. Please try again.');
         }
@@ -435,8 +484,12 @@ export default function AddPetScreen() {
         showBack={true}
       />
 
-  <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: wp(4) }}>
-    <View style={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <View style={styles.content}>
       {currentPage === 1 ? (
         // PAGE 1: Profile Image + Basic Information
         <>
@@ -720,7 +773,7 @@ export default function AddPetScreen() {
           {/* Navigation Buttons for Page 2 */}
           <View style={styles.buttonContainerRow}>
             <TouchableOpacity style={styles.previousButton} onPress={goToPreviousPage}>
-              <Text style={styles.resetButtonText}>Previous</Text>
+              <Text style={styles.resetButtonText}>Back</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.addPetButton} onPress={handleSave}>
               <Text style={styles.confirmButtonText}>Add Pet</Text>
@@ -728,8 +781,8 @@ export default function AddPetScreen() {
           </View>
         </>
       )}
-    </View>
-  </ScrollView>
+        </View>
+      </ScrollView>
 
       {/* Species Modal */}
       <Modal
@@ -945,14 +998,13 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
-    paddingHorizontal: 0,
+  },
+  scrollContent: {
+    paddingHorizontal: wp(4),
+    paddingBottom: moderateScale(30),
   },
   content: {
-
-    paddingTop: moderateScale(25),
-    paddingBottom: moderateScale(60),
-    backgroundColor: 'rgba(255,255,255,0.0)',
+    paddingTop: moderateScale(20),
     alignItems: 'center',
   },
 
@@ -964,7 +1016,7 @@ const styles = StyleSheet.create({
     borderColor: '#1C86FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: moderateScale(30),
+    marginBottom: moderateScale(20),
     overflow: 'hidden',
     backgroundColor: '#fff',
   },
@@ -1070,14 +1122,13 @@ const styles = StyleSheet.create({
   resetButtonText: {
     color: '#1C86FF',
     fontSize: scaleFontSize(16),
-    fontFamily: 'SFProReg',
-    fontWeight: '600',
+    fontFamily: 'SFProSB',
   },
   confirmButton: {
-    width: wp(92), // ✅ makes it span horizontally instead of vertically
+    width: wp(92),
     backgroundColor: '#1C86FF',
     paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1085,18 +1136,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 3,
     elevation: 3,
-    marginTop: moderateScale(20),
+    marginTop: moderateScale(10),
   },
   confirmButtonText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: scaleFontSize(15),
-    letterSpacing: 0.5,
+    fontSize: scaleFontSize(16),
+    fontFamily: 'SFProSB',
   },
   buttonContainerRow: {
     flexDirection: 'row',
     gap: moderateScale(12),
-    marginTop: moderateScale(20),
+    marginTop: moderateScale(10),
     width: wp(92),
   },
   previousButton: {
@@ -1107,6 +1157,7 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(14),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addPetButton: {
     flex: 1,
@@ -1114,6 +1165,7 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(14),
     borderRadius: moderateScale(10),
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -1211,8 +1263,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: '#1C86FF',
     fontSize: scaleFontSize(16),
-    fontFamily: 'SFProReg',
-    fontWeight: '600',
+    fontFamily: 'SFProSB',
   },
   confirmButtonModal: {
     flex: 1,
@@ -1246,7 +1297,7 @@ const styles = StyleSheet.create({
 
   // 🔹 Then adjust your sectionContainer:
   sectionContainer: {
-    marginBottom: moderateScale(20),
+    marginBottom: moderateScale(16),
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
