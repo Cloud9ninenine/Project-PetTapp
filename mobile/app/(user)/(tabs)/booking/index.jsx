@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   ImageBackground,
   useWindowDimensions,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,58 +29,59 @@ const Bookings = () => {
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
   const { isProfileComplete } = useProfileCompletion();
 
-  const [schedules] = useState([
-    {
-      id: '109-177-748',
-      title: 'Veterinary Appointment',
-      businessName: 'PetCo Animal Clinic',
-      businessType: 'Veterinary Service',
-      date: '10-08-2025',
-      time: '1:00 PM',
-      icon: 'medical-outline',
-      status: 'Scheduled'
-    },
-    {
-      id: '356-455-349',
-      title: 'Pet Grooming',
-      businessName: 'Paws & Claws Grooming',
-      businessType: 'Pet Grooming',
-      date: '10-02-2025',
-      time: '8:00 AM',
-      icon: 'cut-outline',
-      status: 'Cancelled'
-    },
-    {
-      id: '497-370-547',
-      title: 'Pet Boarding',
-      businessName: 'Happy Tails Pet Hotel',
-      businessType: 'Pet Boarding',
-      date: '09-30-2025',
-      time: '6:00 PM',
-      icon: 'home-outline',
-      status: 'Completed'
-    },
-    {
-      id: '266-139-886',
-      title: 'Vaccination',
-      businessName: 'Animed Veterinary Clinic',
-      businessType: 'Veterinary Service',
-      date: '10-03-2025',
-      time: '8:00 AM',
-      icon: 'medical-outline',
-      status: 'Scheduled'
-    },
-    {
-      id: '976-630-165',
-      title: 'Pet Training',
-      businessName: 'Bark & Train Academy',
-      businessType: 'Pet Training',
-      date: '10-06-2025',
-      time: '10:00 AM',
-      icon: 'school-outline',
-      status: 'Completed'
+  // API state
+  const [bookings, setBookings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 0,
+  });
+  const [selectedStatus, setSelectedStatus] = useState('all'); // all, pending, confirmed, in-progress, completed, cancelled, no-show
+
+  // Fetch bookings from API
+  const fetchBookings = useCallback(async (page = 1, status = selectedStatus, isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      const params = {
+        page,
+        limit: pagination.limit,
+      };
+
+      // Add status filter if not 'all'
+      if (status && status !== 'all') {
+        params.status = status;
+      }
+
+      const response = await apiClient.get('/bookings', { params });
+
+      if (response.data.success) {
+        setBookings(response.data.data || []);
+        if (response.data.pagination) {
+          setPagination(response.data.pagination);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load bookings';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  ]);
+  }, [selectedStatus, pagination.limit]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
   // Show modal if profile is incomplete
   useEffect(() => {
@@ -87,45 +90,145 @@ const Bookings = () => {
     }
   }, [isProfileComplete]);
 
-  const filteredSchedules = schedules.filter(schedule =>
-    schedule.title.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Filter bookings by search text
+  const filteredBookings = bookings.filter(booking => {
+    if (!searchText) return true;
 
-  
+    const searchLower = searchText.toLowerCase();
+    const serviceName = booking.serviceId?.name?.toLowerCase() || '';
+    const businessName = booking.businessId?.businessName?.toLowerCase() || '';
+    const petName = booking.petId?.name?.toLowerCase() || '';
+
+    return serviceName.includes(searchLower) ||
+           businessName.includes(searchLower) ||
+           petName.includes(searchLower);
+  });
+
+  // Handle refresh
+  const handleRefresh = () => {
+    fetchBookings(1, selectedStatus, true);
+  };
+
+  // Handle status filter change
+  const handleStatusChange = (status) => {
+    setSelectedStatus(status);
+    fetchBookings(1, status);
+  };
+
+  // Format date from ISO to readable format
+  const formatDate = (isoDate) => {
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
+  // Format time from ISO to readable format
+  const formatTime = (isoDate) => {
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
+  // Get icon based on service category or default
+  const getServiceIcon = (serviceId) => {
+    const category = serviceId?.category?.toLowerCase();
+    switch (category) {
+      case 'veterinary':
+        return 'medical-outline';
+      case 'grooming':
+        return 'cut-outline';
+      case 'boarding':
+      case 'daycare':
+        return 'home-outline';
+      case 'training':
+        return 'school-outline';
+      case 'emergency':
+        return 'alert-circle-outline';
+      default:
+        return 'paw-outline';
+    }
+  };
 
   const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'scheduled':
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return '#FF9B79'; // orange
+      case 'confirmed':
         return '#28a745'; // green
-      case 'cancelled':
-        return '#dc3545'; // red
+      case 'in-progress':
+        return '#1C86FF'; // blue
       case 'completed':
         return '#007bff'; // blue
+      case 'cancelled':
+        return '#dc3545'; // red
+      case 'no-show':
+        return '#6c757d'; // gray
       default:
         return '#6c757d';
     }
   };
 
+  // Get display status text
+  const getStatusDisplay = (status) => {
+    if (!status) return 'Unknown';
+    return status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ');
+  };
+
   const renderScheduleItem = ({ item }) => (
     <TouchableOpacity
       style={styles.scheduleItem}
-      onPress={() => router.push({ pathname: "../booking/ScheduleDetail", params: { ...item } })}
+      onPress={() => router.push({
+        pathname: "../booking/ScheduleDetail",
+        params: {
+          bookingId: item._id,
+          serviceName: item.serviceId?.name || 'Service',
+          businessName: item.businessId?.businessName || 'Business',
+          date: formatDate(item.appointmentDateTime),
+          time: formatTime(item.appointmentDateTime),
+          status: item.status,
+          petName: item.petId?.name || 'Pet',
+          paymentMethod: item.paymentMethod,
+          totalAmount: item.totalAmount?.amount,
+          currency: item.totalAmount?.currency,
+          notes: item.notes,
+          specialRequests: item.specialRequests,
+        }
+      })}
     >
       {/* Icon inside circle */}
       <View style={styles.circlePlaceholder}>
-        <Ionicons name={item.icon} size={hp(4)} color="#1C86FF" />
+        <Ionicons name={getServiceIcon(item.serviceId)} size={hp(4)} color="#1C86FF" />
       </View>
 
       {/* Details */}
       <View style={styles.scheduleDetails}>
-        <Text style={styles.scheduleTitle}>{item.title}</Text>
-        <Text style={styles.businessName}>{item.businessName}</Text>
-        <Text style={styles.scheduleDateTime}>{item.date} | {item.time}</Text>
+        <Text style={styles.scheduleTitle}>{item.serviceId?.name || 'Service'}</Text>
+        <Text style={styles.businessName}>{item.businessId?.businessName || 'Business'}</Text>
+        <Text style={styles.petName}>
+          <Ionicons name="paw" size={moderateScale(12)} color="#666" /> {item.petId?.name || 'Pet'}
+        </Text>
+        <Text style={styles.scheduleDateTime}>
+          {formatDate(item.appointmentDateTime)} | {formatTime(item.appointmentDateTime)}
+        </Text>
       </View>
 
       {/* Status */}
       <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-        {item.status}
+        {getStatusDisplay(item.status)}
       </Text>
     </TouchableOpacity>
   );
@@ -133,7 +236,60 @@ const Bookings = () => {
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        My Schedules
+        My Bookings
+      </Text>
+    </View>
+  );
+
+  // Status filter chips
+  const statusFilters = [
+    { value: 'all', label: 'All' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'in-progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ];
+
+  const renderStatusFilter = () => (
+    <View style={styles.filterContainer}>
+      <FlatList
+        horizontal
+        data={statusFilters}
+        keyExtractor={(item) => item.value}
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              selectedStatus === item.value && styles.filterChipActive
+            ]}
+            onPress={() => handleStatusChange(item.value)}
+          >
+            <Text style={[
+              styles.filterChipText,
+              selectedStatus === item.value && styles.filterChipTextActive
+            ]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.filterList}
+      />
+    </View>
+  );
+
+  // Empty state
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="calendar-outline" size={moderateScale(64)} color="#ccc" />
+      <Text style={styles.emptyTitle}>No bookings found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchText
+          ? 'Try adjusting your search terms'
+          : selectedStatus !== 'all'
+          ? `You don't have any ${selectedStatus} bookings`
+          : 'Start booking services for your pets'}
       </Text>
     </View>
   );
@@ -159,21 +315,41 @@ const Bookings = () => {
         <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search"
+          placeholder="Search by service, business, or pet"
           placeholderTextColor="#C7C7CC"
           value={searchText}
           onChangeText={setSearchText}
         />
       </View>
 
-      {/* List */}
-      <FlatList
-        data={filteredSchedules}
-        renderItem={renderScheduleItem}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-      />
+      {/* Status Filter */}
+      {renderStatusFilter()}
+
+      {/* Loading State */}
+      {isLoading && !isRefreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading bookings...</Text>
+        </View>
+      ) : (
+        /* List */
+        <FlatList
+          data={filteredBookings}
+          renderItem={renderScheduleItem}
+          keyExtractor={(item) => item._id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              colors={['#1C86FF']}
+              tintColor="#1C86FF"
+            />
+          }
+        />
+      )}
 
       {/* Profile Incomplete Modal */}
       <CompleteProfileModal
@@ -263,6 +439,11 @@ const styles = StyleSheet.create({
   businessName: {
     fontSize: scaleFontSize(13),
     color: '#1C86FF',
+    marginBottom: moderateScale(2),
+  },
+  petName: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
     marginBottom: moderateScale(4),
   },
   scheduleDateTime: {
@@ -273,7 +454,64 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     fontWeight: '600',
   },
-  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
+  filterContainer: {
+    marginHorizontal: wp(4),
+    marginBottom: moderateScale(10),
+  },
+  filterList: {
+    paddingVertical: moderateScale(5),
+  },
+  filterChip: {
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    marginRight: moderateScale(8),
+  },
+  filterChipActive: {
+    backgroundColor: '#1C86FF',
+  },
+  filterChipText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(60),
+    paddingHorizontal: wp(10),
+  },
+  emptyTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
+  },
+  emptySubtitle: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: moderateScale(20),
+  },
 });
 
 export default Bookings;

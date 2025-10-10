@@ -37,7 +37,7 @@ export default function ServiceDetailsScreen() {
       try {
         setIsLoading(true);
         const serviceId = params.id;
-        
+
         if (!serviceId) {
           Alert.alert('Error', 'Service ID not provided');
           router.back();
@@ -45,7 +45,7 @@ export default function ServiceDetailsScreen() {
         }
 
         const response = await apiClient.get(`/services/${serviceId}`);
-        
+
         if (response.status === 200 && response.data.success) {
           const service = response.data.data;
           console.log('Service data received:', {
@@ -54,20 +54,29 @@ export default function ServiceDetailsScreen() {
             businessIdType: typeof service.businessId
           });
           setServiceData(service);
-          
-          // Fetch business data if available
-          if (service.businessId) {
+
+          // Business data is already populated in the service response
+          // Check if businessId is populated (object) or just an ID (string)
+          if (service.businessId && typeof service.businessId === 'object') {
+            // Business data is already populated from the API
+            const businessInfo = service.businessId;
+            setBusinessData({
+              _id: businessInfo._id,
+              name: businessInfo.businessName,
+              address: businessInfo.address?.street || businessInfo.address?.fullAddress || 'No address available',
+              contactNumber: businessInfo.contactInfo?.phone || businessInfo.contactInfo?.phoneNumber || 'No contact available',
+              businessType: businessInfo.businessType,
+              ratings: businessInfo.ratings,
+              businessHours: businessInfo.businessHours,
+              isActive: businessInfo.isActive,
+              isVerified: businessInfo.isVerified
+            });
+          } else if (service.businessId && typeof service.businessId === 'string') {
+            // If only ID is returned, fetch full business data
             try {
-              // Handle case where businessId might be an object or string
-              const businessId = typeof service.businessId === 'object' 
-                ? service.businessId._id || service.businessId.id 
-                : service.businessId;
-              
-              if (businessId) {
-                const businessResponse = await apiClient.get(`/businesses/${businessId}`);
-                if (businessResponse.status === 200 && businessResponse.data.success) {
-                  setBusinessData(businessResponse.data.data);
-                }
+              const businessResponse = await apiClient.get(`/businesses/${service.businessId}`);
+              if (businessResponse.status === 200 && businessResponse.data.success) {
+                setBusinessData(businessResponse.data.data);
               }
             } catch (businessError) {
               console.warn('Could not fetch business data:', businessError);
@@ -116,12 +125,12 @@ export default function ServiceDetailsScreen() {
 
   // Get service image - use API imageUrl or fallback to category-based images
   const getServiceImage = () => {
-    // If service has an imageUrl from API, use it
-    if (serviceData?.imageUrl) {
+    // Priority 1: Use imageUrl from API response if available
+    if (serviceData?.imageUrl && typeof serviceData.imageUrl === 'string') {
       return { uri: serviceData.imageUrl };
     }
 
-    // Fallback to category-based images
+    // Priority 2: Fallback to category-based images
     const category = serviceData?.category || params.serviceType;
     const serviceName = serviceData?.name || params.name;
 
@@ -287,12 +296,21 @@ export default function ServiceDetailsScreen() {
   // Create booking data for confirmation modal
   const getBookingData = () => {
     if (!serviceData) return null;
-    
+
+    // Extract businessId - handle both populated (object) and unpopulated (string) cases
+    let businessIdValue = null;
+    if (typeof serviceData.businessId === 'object' && serviceData.businessId?._id) {
+      businessIdValue = serviceData.businessId._id;
+    } else if (typeof serviceData.businessId === 'string') {
+      businessIdValue = serviceData.businessId;
+    }
+
     return {
-    service: {
+      service: {
         id: serviceData._id,
-      name: serviceData.name,
-      type: serviceData.category,
+        businessId: businessIdValue,
+        name: serviceData.name,
+        type: serviceData.category,
         price: formatPrice(serviceData.price),
         duration: formatDuration(serviceData.duration),
       },
@@ -304,27 +322,27 @@ export default function ServiceDetailsScreen() {
       } : null,
       availability: serviceData.availability,
       requirements: serviceData.requirements,
-    pet: {
-      name: 'Your Pet',
-      type: 'Pet',
-    },
-    transportation: {
-      label: 'To be selected',
-    },
-    payment: {
-      name: 'To be selected',
-    },
-    date: new Date().toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }),
-    time: new Date().toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    }),
+      pet: {
+        name: 'Your Pet',
+        type: 'Pet',
+      },
+      transportation: {
+        label: 'To be selected',
+      },
+      payment: {
+        name: 'To be selected',
+      },
+      date: new Date().toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }),
+      time: new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }),
     };
   };
 
@@ -332,25 +350,37 @@ export default function ServiceDetailsScreen() {
     setShowBookingModal(true);
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = (bookingResult) => {
     setShowBookingModal(false);
-    // Navigate to service-scheduled page
+    // Navigate to service-scheduled page with booking result
     router.push({
       pathname: 'home/service-scheduled',
       params: {
-        serviceName: serviceData.name,
-        date: new Date().toLocaleDateString('en-US', {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
-        time: new Date().toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }),
-        petName: 'Your Pet', // Default since no pet selection in service-details
+        // Service information
+        serviceName: bookingResult.service?.name || serviceData.name,
+        serviceCategory: bookingResult.service?.type || serviceData.category,
+
+        // Booking information
+        bookingId: bookingResult.booking?._id,
+        status: bookingResult.booking?.status,
+
+        // Pet information
+        petName: bookingResult.pet?.name || 'Your Pet',
+        petSpecies: bookingResult.pet?.species,
+        petBreed: bookingResult.pet?.breed,
+
+        // Date and time
+        date: bookingResult.date,
+        time: bookingResult.time,
+
+        // Payment and additional info
+        paymentMethod: bookingResult.paymentMethod,
+        totalAmount: bookingResult.booking?.totalAmount?.amount,
+        currency: bookingResult.booking?.totalAmount?.currency,
+
+        // Optional fields
+        notes: bookingResult.notes || '',
+        specialRequests: bookingResult.specialRequests || '',
       },
     });
   };
@@ -575,18 +605,6 @@ export default function ServiceDetailsScreen() {
         <TouchableOpacity style={styles.bookButton} onPress={handleBooking}>
           <Text style={styles.bookButtonText}>Book</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.chatButton}
-          onPress={() => router.push({
-            pathname: `/(user)/(tabs)/messages/${serviceData._id}`,
-            params: {
-              serviceName: serviceData.name,
-              fromService: 'true',
-            }
-          })}
-        >
-          <Text style={styles.chatButtonText}>Chat</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Booking Confirmation Modal */}
@@ -770,19 +788,6 @@ const styles = StyleSheet.create({
   },
   bookButtonText: {
     color: '#fff',
-    fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
-  },
-  chatButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#1C86FF',
-    paddingHorizontal: moderateScale(20),
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(8),
-  },
-  chatButtonText: {
-    color: '#1C86FF',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
   },

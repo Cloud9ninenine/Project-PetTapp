@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,14 @@ import {
   Platform,
   ScrollView,
   TextInput,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -27,33 +30,54 @@ export default function BookingConfirmationModal({
 }) {
   const [slideAnim] = useState(new Animated.Value(screenHeight));
 
-  // Mock pets data
-  const pets = [
-    { id: '1', name: 'Max', type: 'Dog', breed: 'Golden Retriever' },
-    { id: '2', name: 'Luna', type: 'Cat', breed: 'Persian' },
-    { id: '3', name: 'Charlie', type: 'Dog', breed: 'Beagle' },
-  ];
+  // Fetch pets from API
+  const [pets, setPets] = useState([]);
+  const [loadingPets, setLoadingPets] = useState(true);
 
-  // Mock payment options
-  const [paymentOptions, setPaymentOptions] = useState([
-    { id: '1', name: 'Visa', cardNumber: '**** **** **** 1234', type: 'visa' },
-    { id: '2', name: 'Mastercard', cardNumber: '**** **** **** 5678', type: 'mastercard' },
-  ]);
-
-  const transportationOptions = [
-    { id: '1', label: 'Own Transportation', icon: 'car-outline' },
-    { id: '2', label: 'PetTapp Rider', icon: 'bicycle-outline' },
-    { id: '3', label: 'Walk-in', icon: 'walk-outline' },
-  ];
-
+  // Required fields
   const [selectedPet, setSelectedPet] = useState('');
-  const [selectedTransportation, setSelectedTransportation] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState(null);
-  const [pickupAddress, setPickupAddress] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
+
+  // Optional fields
+  const [notes, setNotes] = useState('');
+  const [specialRequests, setSpecialRequests] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Payment methods from API enum
+  const paymentMethods = [
+    { value: 'cash', label: 'Cash', icon: 'cash-outline' },
+    { value: 'gcash', label: 'GCash', icon: 'phone-portrait-outline' },
+    { value: 'paymaya', label: 'PayMaya', icon: 'phone-portrait-outline' },
+    { value: 'credit-card', label: 'Credit Card', icon: 'card-outline' },
+    { value: 'debit-card', label: 'Debit Card', icon: 'card-outline' },
+  ];
+
+  // Fetch pets from API
+  useEffect(() => {
+    const fetchPets = async () => {
+      try {
+        setLoadingPets(true);
+        const response = await apiClient.get('/pets');
+        if (response.data.success) {
+          setPets(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching pets:', error);
+        Alert.alert('Error', 'Failed to load your pets. Please try again.');
+      } finally {
+        setLoadingPets(false);
+      }
+    };
+
+    if (visible) {
+      fetchPets();
+    }
+  }, [visible]);
 
   React.useEffect(() => {
     if (visible) {
@@ -72,7 +96,12 @@ export default function BookingConfirmationModal({
     }
   }, [visible]);
 
-  const getServiceImage = () => {
+  const getServiceImageSource = () => {
+    // If service has an imageUrl (from API), use it
+    if (bookingData?.service?.imageUrl) {
+      return { uri: bookingData.service.imageUrl };
+    }
+    // Otherwise, try to get from hardcoded images based on name
     const serviceName = bookingData?.service?.name;
     if (serviceName === 'Animed Veterinary Clinic') {
       return require('@assets/images/serviceimages/17.png');
@@ -136,28 +165,77 @@ export default function BookingConfirmationModal({
     }
   };
 
-  const handleConfirm = () => {
-    if (!selectedPet || !selectedTransportation || !selectedPayment) {
-      alert('Please fill all required fields');
+  const handleConfirm = async () => {
+    // Validate required fields
+    if (!selectedPet) {
+      Alert.alert('Required Field', 'Please select a pet');
       return;
     }
 
-    if (selectedTransportation === '2' && !pickupAddress) {
-      alert('Please enter pickup address for PetTapp Rider');
+    if (!paymentMethod) {
+      Alert.alert('Required Field', 'Please select a payment method');
       return;
     }
 
-    const data = {
-      service: bookingData?.service,
-      pet: pets.find(p => p.id === selectedPet),
-      transportation: transportationOptions.find(t => t.id === selectedTransportation),
-      payment: paymentOptions.find(p => p.id === selectedPayment),
-      pickupAddress: selectedTransportation === '2' ? pickupAddress : null,
-      date: formatDate(selectedDate),
-      time: formatTime(selectedTime),
-    };
+    // Validate field lengths
+    if (notes.length > 500) {
+      Alert.alert('Validation Error', 'Notes must be 500 characters or less');
+      return;
+    }
 
-    onConfirm(data);
+    if (specialRequests.length > 300) {
+      Alert.alert('Validation Error', 'Special requests must be 300 characters or less');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Combine date and time into ISO datetime string
+      const appointmentDate = new Date(selectedDate);
+      appointmentDate.setHours(selectedTime.getHours());
+      appointmentDate.setMinutes(selectedTime.getMinutes());
+      appointmentDate.setSeconds(0);
+      appointmentDate.setMilliseconds(0);
+
+      // Prepare booking payload matching API requirements
+      const bookingPayload = {
+        serviceId: bookingData?.service?.id,
+        petId: selectedPet,
+        appointmentDateTime: appointmentDate.toISOString(),
+        ...(paymentMethod && { paymentMethod }),
+        ...(notes.trim() && { notes: notes.trim() }),
+        ...(specialRequests.trim() && { specialRequests: specialRequests.trim() }),
+      };
+
+      console.log('Creating booking with payload:', bookingPayload);
+
+      const response = await apiClient.post('/bookings', bookingPayload);
+
+      if (response.data.success) {
+        const selectedPetData = pets.find(p => p._id === selectedPet);
+        const bookingResult = {
+          booking: response.data.data,
+          service: bookingData?.service,
+          pet: selectedPetData,
+          date: formatDate(appointmentDate),
+          time: formatTime(appointmentDate),
+          paymentMethod,
+          notes,
+          specialRequests,
+        };
+
+        onConfirm(bookingResult);
+      } else {
+        Alert.alert('Booking Failed', response.data.message || 'Failed to create booking');
+      }
+    } catch (error) {
+      console.error('Error creating booking:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred';
+      Alert.alert('Booking Error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!visible) return null;
@@ -193,129 +271,68 @@ export default function BookingConfirmationModal({
             </Text>
 
             <View style={styles.serviceCard}>
-              <Image source={getServiceImage()} style={styles.serviceImage} />
+              <Image source={getServiceImageSource()} style={styles.serviceImage} />
               <View style={styles.serviceInfo}>
                 <Text style={styles.serviceName}>{bookingData?.service?.name}</Text>
-                <Text style={styles.serviceCategory}>{bookingData?.service?.type}</Text>
+                <Text style={styles.serviceCategory}>
+                  {bookingData?.service?.category || bookingData?.service?.type}
+                </Text>
                 <View style={styles.starsContainer}>
-                  {renderStars()}
+                  {renderStars(bookingData?.service?.rating)}
                 </View>
+                {bookingData?.service?.price && (
+                  <Text style={styles.servicePriceText}>
+                    ₱{typeof bookingData.service.price === 'object'
+                      ? bookingData.service.price.amount
+                      : bookingData.service.price}
+                  </Text>
+                )}
               </View>
             </View>
 
             <View style={styles.divider} />
 
-            {/* Pet Selection */}
+            {/* Pet Selection - REQUIRED */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Select Pet *</Text>
-              <View style={styles.pickerContainer}>
-                <Ionicons name="paw" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
-                <Picker
-                  selectedValue={selectedPet}
-                  onValueChange={(itemValue) => setSelectedPet(itemValue)}
-                  style={styles.picker}
-                  dropdownIconColor="#fff"
-                >
-                  <Picker.Item label="Choose your pet" value="" />
-                  {pets.map((pet) => (
-                    <Picker.Item
-                      key={pet.id}
-                      label={`${pet.name} (${pet.type} - ${pet.breed})`}
-                      value={pet.id}
-                    />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            {/* Transportation */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Transportation *</Text>
-              <View style={styles.transportationRow}>
-                {transportationOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={[
-                      styles.transportationCard,
-                      selectedTransportation === option.id && styles.transportationCardSelected
-                    ]}
-                    onPress={() => setSelectedTransportation(option.id)}
+              {loadingPets ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#1C86FF" />
+                  <Text style={styles.loadingText}>Loading your pets...</Text>
+                </View>
+              ) : pets.length > 0 ? (
+                <View style={styles.pickerContainer}>
+                  <Ionicons name="paw" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
+                  <Picker
+                    selectedValue={selectedPet}
+                    onValueChange={(itemValue) => setSelectedPet(itemValue)}
+                    style={styles.picker}
+                    dropdownIconColor="#fff"
                   >
-                    <Ionicons
-                      name={option.icon}
-                      size={moderateScale(24)}
-                      color={selectedTransportation === option.id ? '#fff' : '#1C86FF'}
-                    />
-                    <Text style={[
-                      styles.transportationLabel,
-                      selectedTransportation === option.id && styles.transportationLabelSelected
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Pickup Address (conditional) */}
-              {selectedTransportation === '2' && (
-                <View style={styles.addressInputContainer}>
-                  <Ionicons name="location-outline" size={moderateScale(20)} color="#1C86FF" />
-                  <TextInput
-                    style={styles.addressInput}
-                    placeholder="Enter pickup address *"
-                    placeholderTextColor="#999"
-                    value={pickupAddress}
-                    onChangeText={setPickupAddress}
-                    multiline
-                  />
+                    <Picker.Item label="Choose your pet" value="" />
+                    {pets.map((pet) => (
+                      <Picker.Item
+                        key={pet._id}
+                        label={`${pet.name} (${pet.species} - ${pet.breed || 'Mixed'})`}
+                        value={pet._id}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              ) : (
+                <View style={styles.noPetsContainer}>
+                  <Ionicons name="paw-outline" size={moderateScale(32)} color="#999" />
+                  <Text style={styles.noPetsText}>No pets found. Please add a pet first.</Text>
                 </View>
               )}
             </View>
 
-            {/* Payment Method */}
+            {/* Date - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Payment Method *</Text>
-              {paymentOptions.map((card) => (
-                <TouchableOpacity
-                  key={card.id}
-                  style={[
-                    styles.paymentCard,
-                    selectedPayment === card.id && styles.paymentCardSelected
-                  ]}
-                  onPress={() => setSelectedPayment(card.id)}
-                >
-                  <Ionicons
-                    name="card"
-                    size={moderateScale(28)}
-                    color={selectedPayment === card.id ? '#fff' : '#1C86FF'}
-                  />
-                  <View style={styles.cardDetails}>
-                    <Text style={[
-                      styles.paymentCardName,
-                      selectedPayment === card.id && styles.paymentCardNameSelected
-                    ]}>
-                      {card.name}
-                    </Text>
-                    <Text style={[
-                      styles.paymentCardNumber,
-                      selectedPayment === card.id && styles.paymentCardNumberSelected
-                    ]}>
-                      {card.cardNumber}
-                    </Text>
-                  </View>
-                  {selectedPayment === card.id && (
-                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Date */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Date</Text>
+              <Text style={styles.inputLabel}>Date *</Text>
               <TouchableOpacity style={styles.inputField} onPress={() => setShowDatePicker(true)}>
                 <Text style={styles.inputText}>
-                  {bookingData?.date || formatDate(selectedDate)}
+                  {formatDate(selectedDate)}
                 </Text>
                 <View style={styles.calendarIcon}>
                   <Text style={styles.calendarIconText}>📅</Text>
@@ -323,12 +340,12 @@ export default function BookingConfirmationModal({
               </TouchableOpacity>
             </View>
 
-            {/* Time */}
+            {/* Time - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Time</Text>
+              <Text style={styles.inputLabel}>Time *</Text>
               <TouchableOpacity style={styles.inputField} onPress={() => setShowTimePicker(true)}>
                 <Text style={styles.inputText}>
-                  {bookingData?.time || formatTime(selectedTime)}
+                  {formatTime(selectedTime)}
                 </Text>
                 <View style={styles.dropdownIcon}>
                   <Text style={styles.dropdownIconText}>⌄</Text>
@@ -336,21 +353,81 @@ export default function BookingConfirmationModal({
               </TouchableOpacity>
             </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={styles.bookButton}
-                onPress={handleConfirm}
-              >
-                <Text style={styles.bookButtonText}>Book</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.chatButton}
-                onPress={onClose}
-              >
-                <Text style={styles.chatButtonText}>Chat</Text>
-              </TouchableOpacity>
+            {/* Payment Method - REQUIRED */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Payment Method *</Text>
+              <View style={styles.pickerContainer}>
+                <Ionicons name="wallet-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
+                <Picker
+                  selectedValue={paymentMethod}
+                  onValueChange={(itemValue) => setPaymentMethod(itemValue)}
+                  style={styles.picker}
+                  dropdownIconColor="#fff"
+                >
+                  <Picker.Item label="Choose payment method" value="" />
+                  {paymentMethods.map((method) => (
+                    <Picker.Item
+                      key={method.value}
+                      label={method.label}
+                      value={method.value}
+                    />
+                  ))}
+                </Picker>
+              </View>
             </View>
+
+            {/* Notes - OPTIONAL (max 500 chars) */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                Notes (Optional) {notes.length > 0 && `- ${notes.length}/500`}
+              </Text>
+              <View style={styles.textAreaContainer}>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="e.g., Please call when you arrive"
+                  placeholderTextColor="#999"
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                  maxLength={500}
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* Special Requests - OPTIONAL (max 300 chars) */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                Special Requests (Optional) {specialRequests.length > 0 && `- ${specialRequests.length}/300`}
+              </Text>
+              <View style={styles.textAreaContainer}>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="e.g., Pet is nervous around loud noises"
+                  placeholderTextColor="#999"
+                  value={specialRequests}
+                  onChangeText={setSpecialRequests}
+                  multiline
+                  maxLength={300}
+                  numberOfLines={2}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* Book Button */}
+            <TouchableOpacity
+              style={[styles.bookButton, isSubmitting && styles.bookButtonDisabled]}
+              onPress={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.bookButtonText}>Confirm Booking</Text>
+              )}
+            </TouchableOpacity>
           </ScrollView>
         </Animated.View>
       </View>
@@ -459,6 +536,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: moderateScale(1),
   },
+  servicePriceText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginTop: moderateScale(4),
+  },
   inputContainer: {
     marginBottom: moderateScale(12),
   },
@@ -506,35 +589,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: moderateScale(12),
-    marginTop: moderateScale(15),
-  },
   bookButton: {
-    flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(15),
-    borderRadius: moderateScale(25),
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
+    marginTop: moderateScale(20),
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  bookButtonDisabled: {
+    backgroundColor: '#B3D9FF',
   },
   bookButtonText: {
     color: '#fff',
-    fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
-  },
-  chatButton: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#1C86FF',
-    paddingVertical: moderateScale(13),
-    borderRadius: moderateScale(25),
-    alignItems: 'center',
-  },
-  chatButtonText: {
-    color: '#1C86FF',
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(18),
     fontWeight: 'bold',
   },
   // Picker styles
@@ -550,89 +622,47 @@ const styles = StyleSheet.create({
     color: '#fff',
     height: moderateScale(50),
   },
-  // Transportation styles
-  transportationRow: {
+  loadingContainer: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(20),
     flexDirection: 'row',
-    gap: moderateScale(8),
-    marginBottom: moderateScale(8),
-  },
-  transportationCard: {
-    flex: 1,
     alignItems: 'center',
-    paddingVertical: moderateScale(12),
-    paddingHorizontal: moderateScale(6),
-    borderRadius: moderateScale(8),
-    backgroundColor: '#E3F2FD',
-    borderWidth: 2,
-    borderColor: '#B3D9FF',
+    justifyContent: 'center',
   },
-  transportationCardSelected: {
-    backgroundColor: '#1C86FF',
-    borderColor: '#1C86FF',
-    borderWidth: 2,
-  },
-  transportationLabel: {
-    fontSize: scaleFontSize(10),
+  loadingText: {
+    fontSize: scaleFontSize(14),
     color: '#1C86FF',
-    marginTop: moderateScale(6),
-    textAlign: 'center',
     fontWeight: '600',
+    marginLeft: moderateScale(10),
   },
-  transportationLabelSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  addressInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: moderateScale(8),
-    padding: moderateScale(12),
+  noPetsContainer: {
+    backgroundColor: '#F5F5F5',
     borderRadius: moderateScale(8),
-    backgroundColor: '#E3F2FD',
+    padding: moderateScale(20),
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#B3D9FF',
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
   },
-  addressInput: {
-    flex: 1,
-    marginLeft: moderateScale(8),
+  noPetsText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginTop: moderateScale(12),
+    textAlign: 'center',
+  },
+  // Text area styles
+  textAreaContainer: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textArea: {
+    padding: moderateScale(12),
     fontSize: scaleFontSize(14),
     color: '#333',
-    minHeight: moderateScale(45),
-    textAlignVertical: 'top',
-  },
-  // Payment card styles
-  paymentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: moderateScale(10),
-    borderRadius: moderateScale(8),
-    backgroundColor: '#E3F2FD',
-    borderWidth: 2,
-    borderColor: '#B3D9FF',
-    marginBottom: moderateScale(8),
-  },
-  paymentCardSelected: {
-    backgroundColor: '#1C86FF',
-    borderColor: '#1C86FF',
-  },
-  cardDetails: {
-    flex: 1,
-    marginLeft: moderateScale(12),
-  },
-  paymentCardName: {
-    fontSize: scaleFontSize(14),
-    fontWeight: '600',
-    color: '#1C86FF',
-  },
-  paymentCardNameSelected: {
-    color: '#fff',
-  },
-  paymentCardNumber: {
-    fontSize: scaleFontSize(12),
-    color: '#666',
-    marginTop: moderateScale(2),
-  },
-  paymentCardNumberSelected: {
-    color: 'rgba(255, 255, 255, 0.9)',
+    minHeight: moderateScale(60),
+    maxHeight: moderateScale(100),
   },
 });

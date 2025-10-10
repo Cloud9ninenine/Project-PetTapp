@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  TextInput,
+  Modal,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -13,114 +16,293 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "../../../config/api";
 
 const ScheduleDetail = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  // State for API data
+  const [booking, setBooking] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // State for cancellation modal
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Fetch booking details from API
+  useEffect(() => {
+    fetchBookingDetail();
+  }, [params.bookingId]);
+
+  const fetchBookingDetail = async () => {
+    try {
+      setIsLoading(true);
+      const bookingId = params.bookingId;
+
+      if (!bookingId) {
+        Alert.alert('Error', 'Booking ID not provided');
+        router.back();
+        return;
+      }
+
+      const response = await apiClient.get(`/bookings/${bookingId}`);
+
+      if (response.data.success) {
+        setBooking(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching booking:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to load booking details';
+      Alert.alert('Error', errorMessage);
+
+      if (error.response?.status === 404) {
+        router.back();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        Schedule Summary
+        Booking Details
       </Text>
     </View>
   );
 
-  const formatDateTime = (dateStr, timeStr) => {
-    if (!dateStr || !timeStr) return "Not specified";
-    // Parse the date string (format: 10-08-2025)
-    const [month, day, year] = dateStr.split('-');
-    const dateObj = new Date(year, month - 1, day);
-
-    const formattedDate = dateObj.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-
-    return `${formattedDate} • ${timeStr}`;
-  };
-
-  // Use dynamic data from params
-  const scheduleDetail = {
-    id: params.id || "100001",
-    title: params.title || "Service Booking",
-    clinic: params.businessName || "Pet Service",
-    service: params.businessType || params.title || "Service",
-    status: params.status || "scheduled",
-    bookingId: params.id || "100001",
-    icon: params.icon || "calendar-outline",
-    bookingTime: formatDateTime(params.date, params.time),
-    paymentTime: "Sep 25, 2025 • 3:43 PM",
-    completedTime: "Sep 26, 2025 • 4:36 PM",
-  };
-
-  const getStatusConfig = (status) => {
-    const statusLower = status.toLowerCase();
-    switch (statusLower) {
-      case "scheduled":
-        return { label: "Scheduled", backgroundColor: "#4CAF50" };
-      case "cancelled":
-        return { label: "Cancelled", backgroundColor: "#FF6B6B" };
-      case "completed":
-        return { label: "Completed", backgroundColor: "#2196F3" };
-      default:
-        return { label: status, backgroundColor: "#9E9E9E" };
+  // Format ISO date to readable format
+  const formatDate = (isoDate) => {
+    if (!isoDate) return "Not specified";
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        weekday: 'short'
+      });
+    } catch (error) {
+      return "Invalid date";
     }
   };
 
-  const statusConfig = getStatusConfig(scheduleDetail.status);
+  // Format ISO time to readable format
+  const formatTime = (isoDate) => {
+    if (!isoDate) return "Not specified";
+    try {
+      const date = new Date(isoDate);
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (error) {
+      return "Invalid time";
+    }
+  };
+
+  // Format datetime with both date and time
+  const formatDateTime = (isoDate) => {
+    if (!isoDate) return "Not specified";
+    return `${formatDate(isoDate)} • ${formatTime(isoDate)}`;
+  };
+
+  // Format payment method for display
+  const formatPaymentMethod = (method) => {
+    if (!method) return 'Not specified';
+    const methodMap = {
+      'cash': 'Cash',
+      'gcash': 'GCash',
+      'paymaya': 'PayMaya',
+      'credit-card': 'Credit Card',
+      'debit-card': 'Debit Card',
+    };
+    return methodMap[method] || method;
+  };
+
+  // Format price for display
+  const formatPrice = (totalAmount) => {
+    if (!totalAmount || !totalAmount.amount) return 'Not specified';
+    const amount = parseFloat(totalAmount.amount);
+    const currency = totalAmount.currency || 'PHP';
+    return `₱${amount.toLocaleString()}`;
+  };
+
+  // Get service icon based on category
+  const getServiceIcon = (serviceId) => {
+    const category = serviceId?.category?.toLowerCase();
+    switch (category) {
+      case 'veterinary':
+        return 'medical-outline';
+      case 'grooming':
+        return 'cut-outline';
+      case 'boarding':
+      case 'daycare':
+        return 'home-outline';
+      case 'training':
+        return 'school-outline';
+      case 'emergency':
+        return 'alert-circle-outline';
+      default:
+        return 'paw-outline';
+    }
+  };
+
+  const getStatusConfig = (status) => {
+    if (!status) return { label: "Unknown", backgroundColor: "#9E9E9E" };
+
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case "pending":
+        return { label: "Pending", backgroundColor: "#FF9B79" };
+      case "confirmed":
+        return { label: "Confirmed", backgroundColor: "#4CAF50" };
+      case "in-progress":
+        return { label: "In Progress", backgroundColor: "#1C86FF" };
+      case "completed":
+        return { label: "Completed", backgroundColor: "#2196F3" };
+      case "cancelled":
+        return { label: "Cancelled", backgroundColor: "#FF6B6B" };
+      case "no-show":
+        return { label: "No Show", backgroundColor: "#9E9E9E" };
+      default:
+        return { label: status.charAt(0).toUpperCase() + status.slice(1), backgroundColor: "#9E9E9E" };
+    }
+  };
 
   const copyBookingId = () => {
     Alert.alert("Copied", "Booking ID copied to clipboard");
   };
 
-  const handleCancel = () => {
-    Alert.alert("Cancel Booking", "Are you sure?", [
-      { text: "No", style: "cancel" },
-      { text: "Yes", style: "destructive", onPress: () => console.log("Booking cancelled") },
-    ]);
+  const handleCancelPress = () => {
+    setShowCancelModal(true);
+  };
+
+  const handleCancelBooking = async () => {
+    if (!cancellationReason.trim()) {
+      Alert.alert('Required', 'Please provide a cancellation reason');
+      return;
+    }
+
+    if (cancellationReason.length > 200) {
+      Alert.alert('Validation Error', 'Cancellation reason must be 200 characters or less');
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+
+      const response = await apiClient.patch(`/bookings/${booking._id}/status`, {
+        status: 'cancelled',
+        cancellationReason: cancellationReason.trim(),
+      });
+
+      if (response.data.success) {
+        Alert.alert('Success', 'Booking cancelled successfully');
+        setShowCancelModal(false);
+        setCancellationReason('');
+        // Refresh booking data
+        fetchBookingDetail();
+      }
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to cancel booking';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handleRate = () => {
+    if (!booking) return;
+
     router.push({
       pathname: '../booking/review-service',
       params: {
-        clinic: scheduleDetail.clinic,
-        service: scheduleDetail.service,
-        bookingId: scheduleDetail.bookingId,
+        bookingId: booking._id,
+        businessName: booking.businessId?.businessName || 'Business',
+        serviceName: booking.serviceId?.name || 'Service',
       },
     });
   };
 
   const renderActionButtons = () => {
-    const status = scheduleDetail.status.toLowerCase();
+    if (!booking) return null;
 
-    if (status === "completed") {
+    const status = booking.status?.toLowerCase();
+
+    // Show rate button for completed bookings without rating
+    if (status === "completed" && !booking.rating) {
       return (
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity style={styles.fullButton} onPress={handleRate}>
             <Ionicons name="star-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.fullButtonText}>Rate</Text>
+            <Text style={styles.fullButtonText}>Rate Service</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (status === "scheduled") {
+    // Show cancel button for pending/confirmed bookings
+    if (status === "pending" || status === "confirmed") {
       return (
         <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.fullButton} onPress={handleCancel}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleCancelPress}>
             <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.fullButtonText}>Cancel</Text>
+            <Text style={styles.fullButtonText}>Cancel Booking</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // Cancelled = no buttons
+    // No buttons for other statuses
     return null;
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading booking details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state - no booking data
+  if (!booking) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={moderateScale(60)} color="#FF6B6B" />
+          <Text style={styles.errorText}>Booking not found</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const statusConfig = getStatusConfig(booking.status);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -137,13 +319,13 @@ const ScheduleDetail = () => {
           <Text style={styles.statusBarText}>{statusConfig.label}</Text>
         </View>
 
-        {/* Clinic Info */}
+        {/* Business/Service Info */}
         <View style={styles.clinicSection}>
           <View style={styles.clinicLogo}>
-            <Ionicons name={scheduleDetail.icon} size={hp(4.5)} color="#1C86FF" />
+            <Ionicons name={getServiceIcon(booking.serviceId)} size={hp(4.5)} color="#1C86FF" />
           </View>
-          <Text style={styles.clinicName}>{scheduleDetail.clinic}</Text>
-          <Text style={styles.serviceName}>{scheduleDetail.service}</Text>
+          <Text style={styles.clinicName}>{booking.businessId?.businessName || 'Business Name'}</Text>
+          <Text style={styles.serviceName}>{booking.serviceId?.name || 'Service'}</Text>
         </View>
 
         {/* Booking Details */}
@@ -151,7 +333,7 @@ const ScheduleDetail = () => {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Booking ID</Text>
             <View style={styles.bookingIdContainer}>
-              <Text style={styles.detailValue}>{scheduleDetail.bookingId}</Text>
+              <Text style={styles.detailValue}>{booking._id.slice(-8).toUpperCase()}</Text>
               <TouchableOpacity style={styles.copyButton} onPress={copyBookingId}>
                 <Text style={styles.copyButtonText}>Copy</Text>
               </TouchableOpacity>
@@ -159,24 +341,135 @@ const ScheduleDetail = () => {
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Booking Time</Text>
-            <Text style={styles.detailValue}>{scheduleDetail.bookingTime}</Text>
+            <Text style={styles.detailLabel}>Appointment</Text>
+            <Text style={styles.detailValue}>{formatDateTime(booking.appointmentDateTime)}</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Payment Time</Text>
-            <Text style={styles.detailValue}>{scheduleDetail.paymentTime}</Text>
+            <Text style={styles.detailLabel}>Duration</Text>
+            <Text style={styles.detailValue}>{booking.duration} minutes</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Completed Time</Text>
-            <Text style={styles.detailValue}>{scheduleDetail.completedTime}</Text>
+            <Text style={styles.detailLabel}>Pet</Text>
+            <Text style={styles.detailValue}>{booking.petId?.name || 'Pet'}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Total Amount</Text>
+            <Text style={styles.detailValuePrice}>{formatPrice(booking.totalAmount)}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Payment Method</Text>
+            <Text style={styles.detailValue}>{formatPaymentMethod(booking.paymentMethod)}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Payment Status</Text>
+            <Text style={[styles.detailValue, {
+              color: booking.paymentStatus === 'paid' ? '#4CAF50' : '#FF9B79'
+            }]}>
+              {booking.paymentStatus?.charAt(0).toUpperCase() + booking.paymentStatus?.slice(1) || 'Pending'}
+            </Text>
+          </View>
+
+          {booking.notes && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Notes</Text>
+              <Text style={styles.detailValueNote}>{booking.notes}</Text>
+            </View>
+          )}
+
+          {booking.specialRequests && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Special Requests</Text>
+              <Text style={styles.detailValueNote}>{booking.specialRequests}</Text>
+            </View>
+          )}
+
+          {booking.cancellationReason && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Cancellation Reason</Text>
+              <Text style={styles.detailValueNote}>{booking.cancellationReason}</Text>
+            </View>
+          )}
+
+          {booking.rating && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Your Rating</Text>
+              <View>
+                <Text style={styles.detailValue}>⭐ {booking.rating.score}/5</Text>
+                {booking.rating.review && (
+                  <Text style={styles.detailValueNote}>{booking.rating.review}</Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Booked On</Text>
+            <Text style={styles.detailValue}>{formatDateTime(booking.createdAt)}</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
         {renderActionButtons()}
       </ScrollView>
+
+      {/* Cancellation Modal */}
+      <Modal
+        visible={showCancelModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Cancel Booking</Text>
+            <Text style={styles.modalSubtitle}>Please provide a reason for cancellation</Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Reason for cancellation (max 200 characters)"
+              placeholderTextColor="#999"
+              value={cancellationReason}
+              onChangeText={setCancellationReason}
+              multiline
+              maxLength={200}
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <Text style={styles.characterCount}>{cancellationReason.length}/200</Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonCancel}
+                onPress={() => {
+                  setShowCancelModal(false);
+                  setCancellationReason('');
+                }}
+                disabled={isCancelling}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButtonConfirm, isCancelling && styles.modalButtonDisabled]}
+                onPress={handleCancelBooking}
+                disabled={isCancelling}
+              >
+                {isCancelling ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonConfirmText}>Confirm</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -232,9 +525,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
   },
-  detailLabel: { fontSize: scaleFontSize(15), fontWeight: "500", color: "#333" },
-  detailValue: { fontSize: scaleFontSize(15), color: "#555" },
-  bookingIdContainer: { flexDirection: "row", alignItems: "center" },
+  detailLabel: { fontSize: scaleFontSize(14), fontWeight: "500", color: "#666", flex: 1 },
+  detailValue: { fontSize: scaleFontSize(14), color: "#333", fontWeight: "600", flex: 2, textAlign: "right" },
+  detailValuePrice: { fontSize: scaleFontSize(16), color: "#4CAF50", fontWeight: "bold", flex: 2, textAlign: "right" },
+  detailValueNote: { fontSize: scaleFontSize(13), color: "#555", fontStyle: "italic", flex: 2, textAlign: "right" },
+  bookingIdContainer: { flexDirection: "row", alignItems: "center", flex: 2, justifyContent: "flex-end" },
   copyButton: {
     marginLeft: moderateScale(10),
     paddingHorizontal: moderateScale(10),
@@ -245,6 +540,41 @@ const styles = StyleSheet.create({
   },
   copyButtonText: { color: "#2196F3", fontSize: scaleFontSize(12), fontWeight: "600" },
   actionButtonsContainer: { gap: moderateScale(12) },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: "#666",
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: wp(8),
+  },
+  errorText: {
+    fontSize: scaleFontSize(18),
+    color: "#333",
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(24),
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "#1C86FF",
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: scaleFontSize(16),
+    fontWeight: "bold",
+  },
   actionButtonsRow: {
     flexDirection: "row",
     gap: moderateScale(12),
@@ -283,6 +613,84 @@ const styles = StyleSheet.create({
     borderColor: "#1C86FF",
   },
   sideBySideButtonOutlineText: { color: "#1C86FF", fontSize: scaleFontSize(16), fontWeight: "600" },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(16),
+    padding: moderateScale(24),
+    width: wp(85),
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: moderateScale(8),
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: scaleFontSize(14),
+    color: "#666",
+    marginBottom: moderateScale(20),
+    textAlign: "center",
+  },
+  modalInput: {
+    backgroundColor: "#F5F5F5",
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    padding: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: "#333",
+    minHeight: moderateScale(100),
+    maxHeight: moderateScale(150),
+  },
+  characterCount: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+    textAlign: "right",
+    marginTop: moderateScale(4),
+    marginBottom: moderateScale(20),
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: moderateScale(12),
+  },
+  modalButtonCancel: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: "#1C86FF",
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+    alignItems: "center",
+  },
+  modalButtonCancelText: {
+    color: "#1C86FF",
+    fontSize: scaleFontSize(16),
+    fontWeight: "600",
+  },
+  modalButtonConfirm: {
+    flex: 1,
+    backgroundColor: "#FF6B6B",
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+    alignItems: "center",
+  },
+  modalButtonConfirmText: {
+    color: "#fff",
+    fontSize: scaleFontSize(16),
+    fontWeight: "600",
+  },
+  modalButtonDisabled: {
+    backgroundColor: "#FFB3B3",
+  },
 });
 
 export default ScheduleDetail;

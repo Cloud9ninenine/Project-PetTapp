@@ -12,6 +12,8 @@ import {
   Easing,
   PanResponder,
   Alert,
+  ActivityIndicator,
+  FlatList,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,45 +35,60 @@ export default function HomeScreen() {
   const [loadingServices, setLoadingServices] = useState(true);
   const [location, setLocation] = useState(null);
 
+  // Search states
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Carousel states
+  const [carouselImages, setCarouselImages] = useState([]);
+  const [loadingCarousel, setLoadingCarousel] = useState(true);
+
   const { isProfileComplete } = useProfileCompletion();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const SLIDE_WIDTH = Math.round(width - moderateScale(32));
   const translateX = useRef(new Animated.Value(0)).current;
 
-  // real carousel images
-  const carouselImages = [
+  // Default carousel fallback images
+  const defaultCarouselImages = [
     {
-      id: 1,
+      id: 'default-1',
       image: require("@assets/images/serviceimages/Vet Care.png"),
       title: "Wellness Check-up",
       subtitle: "PetCo Clinic",
+      isDefault: true,
     },
     {
-      id: 2,
+      id: 'default-2',
       image: require("@assets/images/serviceimages/21.png"),
       title: "Professional Grooming",
       subtitle: "Pet Spa",
+      isDefault: true,
     },
     {
-      id: 3,
+      id: 'default-3',
       image: require("@assets/images/serviceimages/22.png"),
       title: "Pet Boarding",
       subtitle: "Pet Hotel",
+      isDefault: true,
     },
     {
-      id: 4,
+      id: 'default-4',
       image: require("@assets/images/serviceimages/23.png"),
       title: "Pet Training",
       subtitle: "Training Center",
+      isDefault: true,
     },
   ];
 
   // build extended array: [last, ...images, first] for looping
+  const imagesToUse = carouselImages.length > 0 ? carouselImages : defaultCarouselImages;
   const extendedImages = [
-    carouselImages[carouselImages.length - 1],
-    ...carouselImages,
-    carouselImages[0],
+    imagesToUse[imagesToUse.length - 1],
+    ...imagesToUse,
+    imagesToUse[0],
   ];
 
   // internal index points into extendedImages (start at 1 => first real slide)
@@ -251,6 +268,154 @@ export default function HomeScreen() {
     })();
   }, []);
 
+  // Fetch carousel images from different service categories and nearby services
+  useEffect(() => {
+    const fetchCarouselServices = async () => {
+      try {
+        setLoadingCarousel(true);
+        const categories = ['veterinary', 'grooming', 'boarding', 'training', 'daycare', 'emergency', 'consultation'];
+        const carouselData = [];
+        const usedServiceIds = new Set();
+
+        // Fetch one service from each category
+        for (const category of categories) {
+          try {
+            const response = await apiClient.get('/services', {
+              params: {
+                category,
+                limit: 1,
+              },
+            });
+
+            if (response.data.success && response.data.data.length > 0) {
+              const service = response.data.data[0];
+              // Avoid duplicates
+              if (!usedServiceIds.has(service._id)) {
+                carouselData.push({
+                  id: service._id,
+                  serviceId: service._id,
+                  image: service.imageUrl ? { uri: service.imageUrl } : null,
+                  title: service.name,
+                  subtitle: service.businessId?.businessName || 'Pet Service',
+                  category: service.category,
+                  isDefault: false,
+                });
+                usedServiceIds.add(service._id);
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching ${category} service:`, error);
+          }
+        }
+
+        // Optionally add nearby services if location is available
+        if (location && carouselData.length < 6) {
+          try {
+            const nearbyResponse = await apiClient.get('/services', {
+              params: {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                radius: 10,
+                limit: 3,
+              },
+            });
+
+            if (nearbyResponse.data.success && nearbyResponse.data.data.length > 0) {
+              nearbyResponse.data.data.forEach((service) => {
+                // Add nearby services if not already in carousel and haven't reached max
+                if (!usedServiceIds.has(service._id) && carouselData.length < 8) {
+                  carouselData.push({
+                    id: service._id,
+                    serviceId: service._id,
+                    image: service.imageUrl ? { uri: service.imageUrl } : null,
+                    title: service.name,
+                    subtitle: service.businessId?.businessName || 'Pet Service',
+                    category: service.category,
+                    isDefault: false,
+                  });
+                  usedServiceIds.add(service._id);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching nearby services for carousel:', error);
+          }
+        }
+
+        // If we have at least 2 services from API, use them. Otherwise use defaults
+        if (carouselData.length >= 2) {
+          setCarouselImages(carouselData);
+        } else {
+          setCarouselImages(defaultCarouselImages);
+        }
+      } catch (error) {
+        console.error('Error fetching carousel services:', error);
+        setCarouselImages(defaultCarouselImages);
+      } finally {
+        setLoadingCarousel(false);
+      }
+    };
+
+    fetchCarouselServices();
+  }, [location]);
+
+  // Search services function
+  const searchServices = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setShowSearchResults(true);
+
+      const response = await apiClient.get('/services', {
+        params: {
+          search: query.trim(),
+          limit: 20, // Show more results for search
+        },
+      });
+
+      if (response.data.success) {
+        setSearchResults(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error searching services:', error);
+      Alert.alert('Search Error', 'Failed to search services. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If search query is empty, hide results
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    // Set new timeout for debounced search (500ms delay)
+    searchTimeoutRef.current = setTimeout(() => {
+      searchServices(searchQuery);
+    }, 500);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
   // Fetch nearby services from API
   useEffect(() => {
     const fetchNearbyServices = async () => {
@@ -304,21 +469,88 @@ export default function HomeScreen() {
       return;
     }
     router.push({
-      pathname: 'home/nearby-service-map',
+      pathname: 'home/service-details',
       params: {
         id: service._id,
         name: service.name,
-        type: service.category || service.type,
-        rating: service.rating || 0,
-        address: service.location?.address || service.address || 'Address not available',
-        distance: service.distance || 'N/A',
-        latitude: service.location?.coordinates?.[1] || 0,
-        longitude: service.location?.coordinates?.[0] || 0,
+        serviceType: service.category,
       },
     });
   };
 
-  
+  const handleCarouselItemPress = (item) => {
+    // Don't navigate if it's a default carousel item or profile is incomplete
+    if (item.isDefault) return;
+
+    if (!isProfileComplete) {
+      setShowProfileIncompleteModal(true);
+      return;
+    }
+
+    // Navigate to service details
+    router.push({
+      pathname: 'home/service-details',
+      params: {
+        id: item.serviceId,
+        name: item.title,
+        serviceType: item.category,
+      },
+    });
+  };
+
+  const handleSearchResultPress = (service) => {
+    // Check if profile is complete before allowing access
+    if (!isProfileComplete) {
+      setShowProfileIncompleteModal(true);
+      return;
+    }
+
+    // Clear search and hide results
+    setSearchQuery('');
+    setShowSearchResults(false);
+
+    // Navigate to service details
+    router.push({
+      pathname: 'home/service-details',
+      params: {
+        id: service._id,
+        name: service.name,
+        serviceType: service.category,
+      },
+    });
+  };
+
+  // Get service icon for search results
+  const getServiceCategoryIcon = (category) => {
+    switch (category?.toLowerCase()) {
+      case 'veterinary':
+        return 'medical-outline';
+      case 'grooming':
+        return 'cut-outline';
+      case 'boarding':
+      case 'daycare':
+        return 'home-outline';
+      case 'training':
+        return 'school-outline';
+      case 'emergency':
+        return 'alert-circle-outline';
+      case 'consultation':
+        return 'chatbubble-outline';
+      default:
+        return 'paw-outline';
+    }
+  };
+
+  // Format price for display
+  const formatPrice = (price) => {
+    if (!price) return 'Price not available';
+    if (typeof price === 'object' && price.amount) {
+      return `₱${parseFloat(price.amount).toLocaleString()}`;
+    }
+    return `₱${parseFloat(price).toLocaleString()}`;
+  };
+
+
 
   const renderStars = (rating) => {
     const stars = [];
@@ -348,6 +580,87 @@ export default function HomeScreen() {
         setSearchQuery={setSearchQuery}
         onNotifPress={() => router.push("/(user)/(tabs)/notification")}
       />
+
+      {/* Search Results Overlay */}
+      {showSearchResults && (
+        <>
+          {/* Overlay backdrop */}
+          <TouchableOpacity
+            style={styles.searchOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setShowSearchResults(false);
+              setSearchQuery('');
+            }}
+          />
+
+          {/* Search Results Container */}
+          <View style={styles.searchResultsContainer}>
+            {isSearching ? (
+              <View style={styles.searchLoadingContainer}>
+                <ActivityIndicator size="large" color="#1C86FF" />
+                <Text style={styles.searchLoadingText}>Searching...</Text>
+              </View>
+            ) : searchResults.length === 0 ? (
+              <View style={styles.searchEmptyContainer}>
+                <Ionicons name="search-outline" size={moderateScale(48)} color="#ccc" />
+                <Text style={styles.searchEmptyText}>No services found</Text>
+                <Text style={styles.searchEmptySubtext}>
+                  Try searching with different keywords
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item._id}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.searchResultItem}
+                    onPress={() => handleSearchResultPress(item)}
+                  >
+                    <View style={styles.searchResultIcon}>
+                      <Ionicons
+                        name={getServiceCategoryIcon(item.category)}
+                        size={moderateScale(24)}
+                        color="#1C86FF"
+                      />
+                    </View>
+                    <View style={styles.searchResultDetails}>
+                      <Text style={styles.searchResultName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.searchResultBusiness} numberOfLines={1}>
+                        {item.businessId?.businessName || 'Business'}
+                      </Text>
+                      <View style={styles.searchResultMeta}>
+                        <Text style={styles.searchResultCategory}>
+                          {item.category?.charAt(0).toUpperCase() + item.category?.slice(1)}
+                        </Text>
+                        {item.pricing && (
+                          <>
+                            <Text style={styles.searchResultDot}> • </Text>
+                            <Text style={styles.searchResultPrice}>
+                              {formatPrice(item.pricing)}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward-outline"
+                      size={moderateScale(20)}
+                      color="#999"
+                    />
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.searchResultsList}
+              />
+            )}
+          </View>
+        </>
+      )}
+
       <ImageBackground
         source={require("@assets/images/PetTapp pattern.png")}
         style={styles.backgroundimg}
@@ -366,19 +679,25 @@ export default function HomeScreen() {
                 }}
               >
                 {extendedImages.map((item, idx) => (
-                  <View
+                  <TouchableOpacity
                     key={`slide-${idx}-${item.id}`}
                     style={[
                       styles.carouselSlide,
                       { width: SLIDE_WIDTH }
                     ]}
+                    onPress={() => handleCarouselItemPress(item)}
+                    activeOpacity={item.isDefault ? 1 : 0.9}
                   >
-                    <Image source={item.image} style={styles.featuredImage} resizeMode="cover" />
+                    <Image
+                      source={item.image || require("@assets/images/serviceimages/Vet Care.png")}
+                      style={styles.featuredImage}
+                      resizeMode="cover"
+                    />
                     <View style={styles.carouselTextContainer}>
                       <Text style={styles.featuredTitle}>{item.title}</Text>
                       <Text style={styles.featuredSubtitle}>{item.subtitle}</Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </Animated.View>
 
@@ -649,5 +968,110 @@ const styles = StyleSheet.create({
     color: "#999",
     marginTop: moderateScale(4),
     textAlign: "center",
+  },
+  // Search Results Overlay Styles
+  searchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 998,
+  },
+  searchResultsContainer: {
+    position: 'absolute',
+    top: hp(12), // Below SearchHeader
+    left: wp(4),
+    right: wp(4),
+    maxHeight: hp(60),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 999,
+    overflow: 'hidden',
+  },
+  searchLoadingContainer: {
+    paddingVertical: moderateScale(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchLoadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
+  searchEmptyContainer: {
+    paddingVertical: moderateScale(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchEmptyText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+    marginTop: moderateScale(12),
+  },
+  searchEmptySubtext: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    marginTop: moderateScale(4),
+    textAlign: 'center',
+  },
+  searchResultsList: {
+    paddingVertical: moderateScale(8),
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  searchResultIcon: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: moderateScale(12),
+  },
+  searchResultDetails: {
+    flex: 1,
+    marginRight: moderateScale(8),
+  },
+  searchResultName: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(2),
+  },
+  searchResultBusiness: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    marginBottom: moderateScale(4),
+  },
+  searchResultMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchResultCategory: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+  },
+  searchResultDot: {
+    fontSize: scaleFontSize(12),
+    color: '#999',
+  },
+  searchResultPrice: {
+    fontSize: scaleFontSize(12),
+    color: '#4CAF50',
+    fontWeight: '600',
   },
 });

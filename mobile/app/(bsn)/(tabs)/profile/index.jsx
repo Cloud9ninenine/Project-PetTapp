@@ -74,10 +74,10 @@ export default function BusinessProfileScreen() {
     },
     {
       id: '4',
-      title: 'Payment Settings',
+      title: 'Payment Gateways',
       icon: 'card',
       color: '#FF9B79',
-      route: '/(bsn)/(tabs)/profile/payment-settings',
+      route: '/(bsn)/(tabs)/profile/payment-gateways',
     },
     {
       id: '5',
