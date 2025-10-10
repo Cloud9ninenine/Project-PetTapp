@@ -55,7 +55,7 @@ export default function HomeScreen() {
   const defaultCarouselImages = [
     {
       id: 'default-1',
-      image: require("@assets/images/serviceimages/vetcare.png"),
+      image: require("@assets/images/serviceimages/19.png"),
       title: "Wellness Check-up",
       subtitle: "PetCo Clinic",
       isDefault: true,
@@ -689,7 +689,7 @@ export default function HomeScreen() {
                     activeOpacity={item.isDefault ? 1 : 0.9}
                   >
                     <Image
-                      source={item.image || require("@assets/images/serviceimages/vetcare.png")}
+                      source={item.image || require("@assets/images/serviceimages/19.png")}
                       style={styles.featuredImage}
                       resizeMode="cover"
                     />
