@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   ImageBackground,
   useWindowDimensions,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
 import Header from '@components/Header';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
 
 
 export default function ServiceDetailsScreen() {
@@ -24,14 +27,106 @@ export default function ServiceDetailsScreen() {
   const [activeTab, setActiveTab] = useState('details');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [serviceData, setServiceData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [businessData, setBusinessData] = useState(null);
 
-  // Get image based on service type and name
+  // Fetch service data from API
+  useEffect(() => {
+    const fetchServiceData = async () => {
+      try {
+        setIsLoading(true);
+        const serviceId = params.id;
+        
+        if (!serviceId) {
+          Alert.alert('Error', 'Service ID not provided');
+          router.back();
+          return;
+        }
+
+        const response = await apiClient.get(`/services/${serviceId}`);
+        
+        if (response.status === 200 && response.data.success) {
+          const service = response.data.data;
+          console.log('Service data received:', {
+            id: service._id,
+            businessId: service.businessId,
+            businessIdType: typeof service.businessId
+          });
+          setServiceData(service);
+          
+          // Fetch business data if available
+          if (service.businessId) {
+            try {
+              // Handle case where businessId might be an object or string
+              const businessId = typeof service.businessId === 'object' 
+                ? service.businessId._id || service.businessId.id 
+                : service.businessId;
+              
+              if (businessId) {
+                const businessResponse = await apiClient.get(`/businesses/${businessId}`);
+                if (businessResponse.status === 200 && businessResponse.data.success) {
+                  setBusinessData(businessResponse.data.data);
+                }
+              }
+            } catch (businessError) {
+              console.warn('Could not fetch business data:', businessError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching service:', error);
+        console.error('Error details:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          serviceId: params.id
+        });
+        
+        if (error.response) {
+          const status = error.response.status;
+          const errorMessage = error.response.data?.message || 'Unknown error occurred';
+          
+          if (status === 401) {
+            Alert.alert('Authentication Error', 'Please log in again.');
+            router.replace('/(auth)/login');
+          } else if (status === 404) {
+            Alert.alert('Error', 'Service not found.', [
+              { text: 'OK', onPress: () => router.back() }
+            ]);
+          } else if (status === 400) {
+            Alert.alert('Error', `Invalid request: ${errorMessage}`, [
+              { text: 'OK', onPress: () => router.back() }
+            ]);
+          } else {
+            Alert.alert('Error', `Failed to load service information: ${errorMessage}`);
+          }
+        } else if (error.request) {
+          Alert.alert('Network Error', 'Please check your connection and try again.');
+        } else {
+          Alert.alert('Error', `Something went wrong: ${error.message}`);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServiceData();
+  }, [params.id]);
+
+  // Get service image - use API imageUrl or fallback to category-based images
   const getServiceImage = () => {
-    const serviceType = params.serviceType;
-    const serviceName = params.name;
+    // If service has an imageUrl from API, use it
+    if (serviceData?.imageUrl) {
+      return { uri: serviceData.imageUrl };
+    }
+
+    // Fallback to category-based images
+    const category = serviceData?.category || params.serviceType;
+    const serviceName = serviceData?.name || params.name;
 
     // Veterinary services
-    if (serviceType === 'veterinary' || !serviceType) {
+    if (category === 'veterinary') {
       if (serviceName === 'Animed Veterinary Clinic') {
         return require('@assets/images/serviceimages/17.png');
       } else if (serviceName === 'Vetfusion Animal Clinic') {
@@ -42,59 +137,132 @@ export default function ServiceDetailsScreen() {
     }
 
     // Grooming services
-    if (serviceType === 'grooming') {
+    if (category === 'grooming') {
       return require('@assets/images/serviceimages/21.png');
     }
 
     // Boarding services
-    if (serviceType === 'boarding') {
+    if (category === 'boarding' || category === 'daycare') {
       if (serviceName === 'PetCity Daycare') {
         return require('@assets/images/serviceimages/16.png');
       }
       return require('@assets/images/serviceimages/22.png');
     }
 
-    // Delivery services
-    if (serviceType === 'delivery') {
-      return require('@assets/images/serviceimages/23.png');
+    // Training services
+    if (category === 'training') {
+      return require('@assets/images/serviceimages/17.png');
+    }
+
+    // Emergency services
+    if (category === 'emergency') {
+      return require('@assets/images/serviceimages/19.png');
+    }
+
+    // Consultation services
+    if (category === 'consultation') {
+      return require('@assets/images/serviceimages/18.png');
     }
 
     // Default fallback
     return require('@assets/images/serviceimages/18.png');
   };
 
-  // Mock data - in a real app, you'd fetch this based on the service ID
-  const serviceData = {
-    id: params.id || 1,
-    name: params.name || 'PetCo Clinic',
-    category: params.category || 'Veterinary Service',
-    price: params.price || '₱XXX,XXX',
-    rating: parseFloat(params.rating) || 4.9,
-    image: getServiceImage(),
-    description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-    fullDescription: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
-    reviews: [
-      {
-        id: 1,
-        user: 'John Doe',
-        rating: 5,
-        comment: 'Excellent service! My pet was well taken care of.',
-        date: '2 days ago'
-      },
-      {
-        id: 2,
-        user: 'Jane Smith',
-        rating: 4,
-        comment: 'Good experience overall. Professional staff.',
-        date: '1 week ago'
+  // Format price for display
+  const formatPrice = (priceObj) => {
+    try {
+      if (!priceObj) return 'Price not available';
+      
+      if (typeof priceObj === 'string') {
+        return priceObj;
       }
-    ]
+      
+      if (typeof priceObj === 'number') {
+        return `₱${priceObj.toLocaleString()}`;
+      }
+      
+      if (typeof priceObj === 'object') {
+        const { amount, currency = 'PHP' } = priceObj;
+        const numericAmount = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+        return `₱${numericAmount.toLocaleString()}`;
+      }
+      
+      return 'Price not available';
+    } catch (error) {
+      console.warn('Error formatting price:', error);
+      return 'Price not available';
+    }
+  };
+
+  // Format duration for display
+  const formatDuration = (duration) => {
+    try {
+      if (!duration) return 'Duration not specified';
+      
+      if (typeof duration === 'string') {
+        return duration;
+      }
+      
+      const numericDuration = typeof duration === 'number' ? duration : parseFloat(duration) || 0;
+      
+      if (numericDuration < 60) {
+        return `${Math.round(numericDuration)} minutes`;
+      }
+      
+      const hours = Math.floor(numericDuration / 60);
+      const minutes = Math.round(numericDuration % 60);
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    } catch (error) {
+      console.warn('Error formatting duration:', error);
+      return 'Duration not specified';
+    }
+  };
+
+  // Format availability for display
+  const formatAvailability = (availability) => {
+    if (!availability) return 'Availability not specified';
+    
+    try {
+      if (typeof availability === 'string') {
+        return availability;
+      }
+      
+      if (typeof availability === 'object') {
+        // Handle different availability object structures
+        if (availability.days && availability.timeSlots) {
+          const days = Array.isArray(availability.days) 
+            ? availability.days.map(day => 
+                typeof day === 'string' ? day.charAt(0).toUpperCase() + day.slice(1) : String(day)
+              ).join(', ')
+            : String(availability.days);
+          
+          const timeSlots = Array.isArray(availability.timeSlots)
+            ? availability.timeSlots.map(slot => {
+                if (typeof slot === 'object' && slot.start && slot.end) {
+                  return `${slot.start} - ${slot.end}`;
+                }
+                return String(slot);
+              }).join(', ')
+            : String(availability.timeSlots);
+          
+          return `${days}\n${timeSlots}`;
+        }
+        
+        // If it's an object but not the expected structure, stringify it safely
+        return JSON.stringify(availability, null, 2);
+      }
+      
+      return String(availability);
+    } catch (error) {
+      console.warn('Error formatting availability:', error);
+      return 'Availability information unavailable';
+    }
   };
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        {serviceData.name}
+        {serviceData?.name || 'Loading...'}
       </Text>
     </View>
   );
@@ -116,12 +284,26 @@ export default function ServiceDetailsScreen() {
     return stars;
   };
 
-  // Create mock booking data for confirmation modal
-  const mockBookingData = {
+  // Create booking data for confirmation modal
+  const getBookingData = () => {
+    if (!serviceData) return null;
+    
+    return {
     service: {
+        id: serviceData._id,
       name: serviceData.name,
       type: serviceData.category,
-    },
+        price: formatPrice(serviceData.price),
+        duration: formatDuration(serviceData.duration),
+      },
+      business: businessData ? {
+        id: businessData._id || businessData.id,
+        name: businessData.name,
+        address: businessData.address,
+        contactNumber: businessData.contactNumber,
+      } : null,
+      availability: serviceData.availability,
+      requirements: serviceData.requirements,
     pet: {
       name: 'Your Pet',
       type: 'Pet',
@@ -143,6 +325,7 @@ export default function ServiceDetailsScreen() {
       minute: '2-digit',
       hour12: true
     }),
+    };
   };
 
   const handleBooking = () => {
@@ -177,53 +360,161 @@ export default function ServiceDetailsScreen() {
   };
 
   const renderTabContent = () => {
+    if (!serviceData) {
+      return (
+        <View style={styles.tabContent}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading service details...</Text>
+        </View>
+      );
+    }
+
     if (activeTab === 'details') {
       return (
         <View style={styles.tabContent}>
-          {/* Petshop Info */}
-          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {renderStars(serviceData.rating)}
-            </View>
-            <Text style={styles.ratingText}>({serviceData.rating})</Text>
-          </View>
+          {/* Service Category */}
+          <Text style={styles.serviceCategory}>
+            {serviceData.category?.charAt(0).toUpperCase() + serviceData.category?.slice(1)} Service
+          </Text>
 
           {/* Service Details */}
           <Text style={styles.sectionTitle}>Service Details</Text>
-          <Text style={styles.description}>{serviceData.fullDescription}</Text>
+          <Text style={styles.description}>{String(serviceData.description || 'No description available')}</Text>
+
+          {/* Service Information */}
+          <View style={styles.infoSection}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Duration</Text>
+              <Text style={styles.infoValue}>{formatDuration(serviceData.duration)}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Price</Text>
+              <Text style={styles.infoValue}>{formatPrice(serviceData.price)}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Availability</Text>
+              <Text style={styles.infoValue}>{formatAvailability(serviceData.availability)}</Text>
+            </View>
+          </View>
+
+          {/* Business Information */}
+          {businessData && (
+            <>
+              <Text style={styles.sectionTitle}>Business Information</Text>
+              <View style={styles.businessInfo}>
+                <Text style={styles.businessName}>{String(businessData.name || 'Business Name')}</Text>
+                {businessData.address && (
+                  <Text style={styles.businessAddress}>{String(businessData.address)}</Text>
+                )}
+                {businessData.contactNumber && (
+                  <Text style={styles.businessContact}>{String(businessData.contactNumber)}</Text>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Requirements */}
+          {serviceData.requirements && (
+            <>
+              <Text style={styles.sectionTitle}>Requirements</Text>
+              <View style={styles.requirementsSection}>
+                {serviceData.requirements.petTypes && Array.isArray(serviceData.requirements.petTypes) && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementLabel}>Pet Types</Text>
+                    <Text style={styles.requirementValue}>
+                      {serviceData.requirements.petTypes.map(type => {
+                        const stringType = String(type);
+                        return stringType.charAt(0).toUpperCase() + stringType.slice(1);
+                      }).join(', ')}
+                    </Text>
+                  </View>
+                )}
+                {serviceData.requirements.healthRequirements && Array.isArray(serviceData.requirements.healthRequirements) && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementLabel}>Health Requirements</Text>
+                    <Text style={styles.requirementValue}>
+                      {serviceData.requirements.healthRequirements.map(req => String(req)).join(', ')}
+                    </Text>
+                  </View>
+                )}
+                {serviceData.requirements.specialNotes && (
+                  <View style={styles.requirementItem}>
+                    <Text style={styles.requirementLabel}>Special Notes</Text>
+                    <Text style={styles.requirementValue}>{String(serviceData.requirements.specialNotes)}</Text>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </View>
       );
     } else {
       return (
         <View style={styles.tabContent}>
-          {/* Petshop Info */}
-          <Text style={styles.serviceCategory}>{serviceData.category}</Text>
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {renderStars(serviceData.rating)}
-            </View>
-            <Text style={styles.ratingText}>({serviceData.rating})</Text>
-          </View>
+          <Text style={styles.serviceCategory}>
+            {serviceData.category?.charAt(0).toUpperCase() + serviceData.category?.slice(1)} Service
+          </Text>
 
-          {/* Reviews */}
+          {/* Reviews Section - Placeholder for future implementation */}
           <Text style={styles.sectionTitle}>Reviews</Text>
-          {serviceData.reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewUser}>{review.user}</Text>
-                <Text style={styles.reviewDate}>{review.date}</Text>
-              </View>
-              <View style={styles.reviewRating}>
-                {renderStars(review.rating)}
-              </View>
-              <Text style={styles.reviewComment}>{review.comment}</Text>
+          <View style={styles.noReviewsContainer}>
+            <Ionicons name="star-outline" size={moderateScale(40)} color="#ccc" />
+            <Text style={styles.noReviewsText}>No reviews yet</Text>
+            <Text style={styles.noReviewsSubtext}>Be the first to review this service</Text>
             </View>
-          ))}
         </View>
       );
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading service details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!serviceData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={moderateScale(60)} color="#FF6B6B" />
+          <Text style={styles.errorText}>Service not found</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
+            <Text style={styles.retryButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -247,10 +538,11 @@ export default function ServiceDetailsScreen() {
             />
           </TouchableOpacity>
         }
+        showBack={true}
       />
       <ScrollView style={styles.scrollView}>
         {/* Service Image */}
-        <Image source={serviceData.image} style={styles.serviceImage} />
+        <Image source={getServiceImage()} style={styles.serviceImage} />
         {/* Tab Navigation */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
@@ -278,7 +570,7 @@ export default function ServiceDetailsScreen() {
       {/* Bottom Action Buttons */}
       <View style={styles.bottomActions}>
         <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>{serviceData.price}</Text>
+          <Text style={styles.priceText}>{formatPrice(serviceData.price)}</Text>
         </View>
         <TouchableOpacity style={styles.bookButton} onPress={handleBooking}>
           <Text style={styles.bookButtonText}>Book</Text>
@@ -286,7 +578,7 @@ export default function ServiceDetailsScreen() {
         <TouchableOpacity
           style={styles.chatButton}
           onPress={() => router.push({
-            pathname: `/(user)/(tabs)/messages/${serviceData.id}`,
+            pathname: `/(user)/(tabs)/messages/${serviceData._id}`,
             params: {
               serviceName: serviceData.name,
               fromService: 'true',
@@ -302,7 +594,7 @@ export default function ServiceDetailsScreen() {
         visible={showBookingModal}
         onClose={handleCancelBooking}
         onConfirm={handleConfirmBooking}
-        bookingData={mockBookingData}
+        bookingData={getBookingData()}
       />
     </SafeAreaView>
   );
@@ -493,5 +785,124 @@ const styles = StyleSheet.create({
     color: '#1C86FF',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(60),
+  },
+  loadingText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(8),
+  },
+  errorText: {
+    fontSize: scaleFontSize(18),
+    color: '#333',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(24),
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#1C86FF',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+  },
+  infoSection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(16),
+    marginTop: moderateScale(16),
+  },
+  infoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  infoLabel: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: moderateScale(16),
+  },
+  businessInfo: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(16),
+    marginTop: moderateScale(16),
+  },
+  businessName: {
+    fontSize: scaleFontSize(16),
+    color: '#333',
+    fontWeight: 'bold',
+    marginBottom: moderateScale(8),
+  },
+  businessAddress: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginBottom: moderateScale(4),
+  },
+  businessContact: {
+    fontSize: scaleFontSize(14),
+    color: '#1C86FF',
+    fontWeight: '500',
+  },
+  requirementsSection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(16),
+    marginTop: moderateScale(16),
+  },
+  requirementItem: {
+    marginBottom: moderateScale(12),
+  },
+  requirementLabel: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontWeight: '500',
+    marginBottom: moderateScale(4),
+  },
+  requirementValue: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    lineHeight: moderateScale(20),
+  },
+  noReviewsContainer: {
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  noReviewsText: {
+    fontSize: scaleFontSize(18),
+    color: '#666',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
+  },
+  noReviewsSubtext: {
+    fontSize: scaleFontSize(14),
+    color: '#999',
+    textAlign: 'center',
   },
 });

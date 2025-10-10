@@ -5,19 +5,27 @@ import {
   StyleSheet,
   TouchableOpacity,
   ImageBackground,
+  ScrollView,
+  Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import Header from '@components/Header';
 import CompleteProfileModal from '@components/CompleteProfileModal';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import { useProfileCompletion } from '../../../hooks/useProfileCompletion';
+import apiClient from '@config/api';
 
 export default function MyPetsScreen() {
   const router = useRouter();
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
+  const [pets, setPets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { isProfileComplete } = useProfileCompletion();
 
   const renderTitle = () => (
@@ -28,6 +36,55 @@ export default function MyPetsScreen() {
     </View>
   );
 
+  // Fetch pets data
+  const fetchPets = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      const response = await apiClient.get('/pets');
+      
+      if (response.status === 200 && response.data.success) {
+        setPets(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pets:', error);
+      if (error.response) {
+        const status = error.response.status;
+        if (status === 401) {
+          Alert.alert('Authentication Error', 'Please log in again.');
+          router.replace('/(auth)/login');
+        } else {
+          Alert.alert('Error', 'Failed to load pets. Please try again.');
+        }
+      } else if (error.request) {
+        Alert.alert('Network Error', 'Please check your connection and try again.');
+      }
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Fetch pets on component mount and when screen is focused
+  useEffect(() => {
+    if (isProfileComplete) {
+      fetchPets();
+    }
+  }, [isProfileComplete]);
+
+  // Refresh pets when screen is focused (e.g., returning from add/edit pet)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isProfileComplete && !isLoading) {
+        fetchPets(true);
+      }
+    }, [isProfileComplete])
+  );
+
   // Show modal if profile is incomplete
   useEffect(() => {
     if (!isProfileComplete) {
@@ -36,6 +93,41 @@ export default function MyPetsScreen() {
   }, [isProfileComplete]);
 
 
+
+  const renderPetCard = (pet) => (
+    <TouchableOpacity
+      key={pet._id}
+      style={styles.petCard}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/(user)/(tabs)/my-pets/${pet._id}`)}
+    >
+      <View style={styles.petImageContainer}>
+        {pet.images?.profile ? (
+          <Image source={{ uri: pet.images.profile }} style={styles.petImage} />
+        ) : (
+          <View style={styles.petImagePlaceholder}>
+            <Ionicons name="paw" size={moderateScale(30)} color="#1C86FF" />
+          </View>
+        )}
+      </View>
+      
+      <View style={styles.petInfo}>
+        <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
+        <Text style={styles.petDetails} numberOfLines={2}>
+          {pet.species?.charAt(0).toUpperCase() + pet.species?.slice(1)}
+          {pet.breed && ` • ${pet.breed}`}
+        </Text>
+        <View style={styles.petMeta}>
+          <Text style={styles.petAge}>{pet.age} years old</Text>
+          <Text style={styles.petGender}>
+            {pet.gender === 'male' ? '♂' : '♀'} {pet.gender}
+          </Text>
+        </View>
+      </View>
+      
+      <Ionicons name="chevron-forward" size={moderateScale(20)} color="#666" />
+    </TouchableOpacity>
+  );
 
   const renderAddPetCard = () => (
     <TouchableOpacity
@@ -48,6 +140,23 @@ export default function MyPetsScreen() {
       </View>
       <Text style={styles.addPetText}>Add New Pet</Text>
     </TouchableOpacity>
+  );
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#1C86FF" />
+      <Text style={styles.loadingText}>Loading your pets...</Text>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyStateContainer}>
+      <Ionicons name="paw" size={moderateScale(60)} color="#ccc" />
+      <Text style={styles.emptyStateTitle}>No Pets Yet</Text>
+      <Text style={styles.emptyStateText}>
+        Add your first pet to get started with PetTapp services
+      </Text>
+    </View>
   );
 
   return (
@@ -67,9 +176,28 @@ export default function MyPetsScreen() {
       />
 
       {/* Content */}
-      <View style={styles.content}>
-        {renderAddPetCard()}
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {isLoading ? (
+          renderLoadingState()
+        ) : (
+          <>
+            {pets.length > 0 && (
+              <View style={styles.petsSection}>
+                <Text style={styles.sectionTitle}>Your Pets</Text>
+                {pets.map(renderPetCard)}
+              </View>
+            )}
+            
+            {pets.length === 0 && (
+              <View style={styles.emptyStateWrapper}>
+                {renderEmptyState()}
+              </View>
+            )}
+            
+            {renderAddPetCard()}
+          </>
+        )}
+      </ScrollView>
 
       {/* Profile Incomplete Modal */}
       <CompleteProfileModal
@@ -132,5 +260,108 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     fontWeight: '600',
     color: '#1C86FF',
+  },
+  petsSection: {
+    marginBottom: moderateScale(20),
+  },
+  sectionTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: '600',
+    color: '#333',
+    marginHorizontal: wp(4),
+    marginBottom: moderateScale(12),
+  },
+  petCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  petImageContainer: {
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
+    marginRight: moderateScale(12),
+    overflow: 'hidden',
+  },
+  petImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  petImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  petInfo: {
+    flex: 1,
+  },
+  petName: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(4),
+  },
+  petDetails: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginBottom: moderateScale(6),
+  },
+  petMeta: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+  },
+  petAge: {
+    fontSize: scaleFontSize(12),
+    color: '#888',
+  },
+  petGender: {
+    fontSize: scaleFontSize(12),
+    color: '#888',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(60),
+  },
+  loadingText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#666',
+  },
+  emptyStateWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(60),
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    paddingHorizontal: wp(8),
+  },
+  emptyStateTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: '600',
+    color: '#333',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
+  },
+  emptyStateText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: moderateScale(20),
   },
 });

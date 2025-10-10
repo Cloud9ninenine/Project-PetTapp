@@ -31,6 +31,8 @@ const SPECIES_OPTIONS = [
   { label: 'Fish', value: 'fish' },
   { label: 'Rabbit', value: 'rabbit' },
   { label: 'Hamster', value: 'hamster' },
+  { label: 'Guinea Pig', value: 'guinea-pig' },
+  { label: 'Reptile', value: 'reptile' },
   { label: 'Other', value: 'other' },
 ];
 
@@ -98,6 +100,26 @@ const BREED_OPTIONS_BY_SPECIES = {
     { label: 'Chinese', value: 'chinese' },
     { label: 'Other', value: 'other' },
   ],
+  'guinea-pig': [
+    { label: 'Select breed', value: '' },
+    { label: 'American', value: 'american' },
+    { label: 'Abyssinian', value: 'abyssinian' },
+    { label: 'Peruvian', value: 'peruvian' },
+    { label: 'Silkie', value: 'silkie' },
+    { label: 'Teddy', value: 'teddy' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
+  reptile: [
+    { label: 'Select breed', value: '' },
+    { label: 'Bearded Dragon', value: 'bearded-dragon' },
+    { label: 'Leopard Gecko', value: 'leopard-gecko' },
+    { label: 'Ball Python', value: 'ball-python' },
+    { label: 'Corn Snake', value: 'corn-snake' },
+    { label: 'Red-Eared Slider', value: 'red-eared-slider' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
   other: [
     { label: 'Select breed', value: '' },
     { label: 'Mixed', value: 'mixed' },
@@ -109,13 +131,14 @@ const BREED_OPTIONS_BY_SPECIES = {
 export default function AddPetScreen() {
   const router = useRouter();
   const [petInfo, setPetInfo] = useState({
-    petName: '',
+    name: '',
+    age: '',
     birthday: '',
     species: '',
     breed: '',
     gender: '',
     weight: '',
-    additionalInfo: '',
+    color: '',
     specialInstructions: '',
   });
 
@@ -281,25 +304,56 @@ export default function AddPetScreen() {
 
   // Page Navigation
   const goToNextPage = () => {
-    const { petName, birthday, species, breed, gender, weight } = petInfo;
-    if (!petName || !birthday || !species || !breed || !gender || !weight) {
-      Alert.alert('Error', 'Please fill in all required fields before proceeding');
-      return;
+    if (validatePetData()) {
+      setCurrentPage(2);
     }
-    setCurrentPage(2);
   };
 
   const goToPreviousPage = () => {
     setCurrentPage(1);
   };
 
-  const handleSave = () => {
-    const { petName, birthday, species, breed, gender, weight } = petInfo;
-    if (!petName || !birthday || !species || !breed || !gender || !weight) {
+  const validatePetData = () => {
+    const { name, age, birthday, species, breed, gender, weight, color } = petInfo;
+    
+    // Check required fields
+    if (!name || !age || !birthday || !species || !breed || !gender || !weight) {
       Alert.alert('Error', 'Please fill in all required fields');
-      return;
+      return false;
     }
-    setShowConfirmModal(true);
+    
+    // Validate field lengths
+    if (name.length > 50) {
+      Alert.alert('Error', 'Pet name must be 50 characters or less');
+      return false;
+    }
+    
+    if (color && color.length > 30) {
+      Alert.alert('Error', 'Color description must be 30 characters or less');
+      return false;
+    }
+    
+    // Validate weight
+    const weightNum = parseFloat(weight);
+    if (isNaN(weightNum) || weightNum < 0 || weightNum > 200) {
+      Alert.alert('Error', 'Weight must be between 0 and 200 kg');
+      return false;
+    }
+    
+    // Validate age
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 30) {
+      Alert.alert('Error', 'Age must be between 0 and 30 years');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSave = () => {
+    if (validatePetData()) {
+      setShowConfirmModal(true);
+    }
   };
 
   const confirmSave = async () => {
@@ -309,85 +363,83 @@ export default function AddPetScreen() {
     try {
       console.log('=== PET INFO STATE ===');
       console.log('petInfo:', petInfo);
-      console.log('petName:', petInfo.petName);
+      console.log('name:', petInfo.name);
       console.log('species:', petInfo.species);
       console.log('breed:', petInfo.breed);
       console.log('gender:', petInfo.gender);
       console.log('weight:', petInfo.weight);
       console.log('birthday:', petInfo.birthday);
 
-      // Convert birthday from MM/DD/YYYY to YYYY-MM-DD format
-      const [month, day, year] = petInfo.birthday.split('/');
-      const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      console.log('Age from input:', petInfo.age);
 
-      // Calculate age from birthday
-      const birthDate = new Date(formattedBirthday);
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
+      // Create FormData for multipart/form-data request
+      const formData = new FormData();
 
-      console.log('Calculated age:', age);
-
-      // Prepare pet data for API - only include non-null fields
-      const petData = {
-        name: petInfo.petName,
-        species: petInfo.species,
-        breed: petInfo.breed,
-        age: age,
-        gender: petInfo.gender,
-        weight: parseFloat(petInfo.weight),
-      };
+      // Add required fields with proper data types
+      formData.append('name', petInfo.name.trim());
+      formData.append('species', petInfo.species);
+      formData.append('breed', petInfo.breed || '');
+      formData.append('age', petInfo.age); // Use direct age input
+      formData.append('gender', petInfo.gender);
+      formData.append('weight', parseFloat(petInfo.weight).toString()); // Ensure numeric value
 
       // Add optional fields only if they have values
-      if (petInfo.additionalInfo && petInfo.additionalInfo.trim()) {
-        petData.color = petInfo.additionalInfo;
+      if (petInfo.color && petInfo.color.trim()) {
+        formData.append('color', petInfo.color.trim());
       }
 
       if (petInfo.specialInstructions && petInfo.specialInstructions.trim()) {
-        petData.specialInstructions = petInfo.specialInstructions;
+        formData.append('specialInstructions', petInfo.specialInstructions.trim());
       }
 
+      // Add medical history as JSON string with proper date conversion
       if (medicalHistory.length > 0) {
-        petData.medicalHistory = medicalHistory;
+        const transformedMedicalHistory = medicalHistory.map(m => ({
+          condition: m.condition,
+          diagnosedDate: m.diagnosedDate ? new Date(m.diagnosedDate.split('/').reverse().join('-')).toISOString() : null,
+          treatment: m.treatment,
+          notes: m.notes,
+        })).filter(m => m.condition && m.diagnosedDate); // Only include valid entries
+        formData.append('medicalHistory', JSON.stringify(transformedMedicalHistory));
       }
 
+      // Add vaccinations as JSON string with correct field mapping and date conversion
       if (vaccinations.length > 0) {
-        // Transform vaccinations to match API structure
-        petData.vaccinations = vaccinations.map(v => ({
+        const transformedVaccinations = vaccinations.map(v => ({
           vaccine: v.vaccineName,
-          administeredDate: v.administeredDate,
-          nextDueDate: v.nextDueDate,
+          administeredDate: v.administeredDate ? new Date(v.administeredDate.split('/').reverse().join('-')).toISOString() : null,
+          nextDueDate: v.nextDueDate ? new Date(v.nextDueDate.split('/').reverse().join('-')).toISOString() : null,
           veterinarian: v.veterinarian,
-        }));
+        })).filter(v => v.vaccine && v.administeredDate); // Only include valid entries
+        formData.append('vaccinations', JSON.stringify(transformedVaccinations));
+      }
+
+      // Add image if selected
+      if (petImage) {
+        // Get file extension from URI
+        const uriParts = petImage.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+
+        formData.append('image', {
+          uri: petImage,
+          name: `pet_${Date.now()}.${fileType}`,
+          type: `image/${fileType}`,
+        });
       }
 
       console.log('=== SUBMITTING PET DATA ===');
-      console.log(JSON.stringify(petData, null, 2));
+      console.log('FormData created with image:', !!petImage);
 
-      // Try explicit JSON stringification as a workaround
-      const response = await apiClient.post('/pets', petData, {
+      // Send multipart/form-data request
+      const response = await apiClient.post('/pets', formData, {
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'multipart/form-data',
         },
       });
 
       console.log('API Response:', response.data);
 
       if (response.status === 201 || response.status === 200) {
-        // Handle different possible response structures
-        const createdPet = response.data.data || response.data;
-        const petId = createdPet._id || createdPet.id;
-
-        console.log('Created pet ID:', petId);
-
-        // Upload image if selected
-        if (petImage && petId) {
-          await uploadPetImage(petId);
-        }
-
         Alert.alert('Success', 'Pet added successfully!', [
           { text: 'OK', onPress: () => router.back() }
         ]);
@@ -404,7 +456,7 @@ export default function AddPetScreen() {
         if (status === 401) {
           Alert.alert('Authentication Error', 'Please log in again.');
           router.replace('/(auth)/login');
-        } else if (status === 422) {
+        } else if (status === 400 || status === 422) {
           const errorMsg = data?.message || data?.error || 'Please check your input and try again.';
           console.error('Validation error details:', data);
           Alert.alert('Validation Error', errorMsg);
@@ -421,30 +473,6 @@ export default function AddPetScreen() {
     }
   };
 
-  const uploadPetImage = async (petId) => {
-    try {
-      const formData = new FormData();
-
-      // Get file extension from URI
-      const uriParts = petImage.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      formData.append('image', {
-        uri: petImage,
-        name: `pet_${petId}.${fileType}`,
-        type: `image/${fileType}`,
-      });
-
-      await apiClient.put(`/pets/${petId}/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      // Don't show alert for image upload failure, pet is already created
-    }
-  };
 
   const handleReset = () => {
     setShowResetModal(true);
@@ -452,14 +480,15 @@ export default function AddPetScreen() {
 
   const confirmReset = () => {
     setPetInfo({
-      petName: '',
+      name: '',
+      age: '',
       birthday: '',
       species: '',
       breed: '',
       gender: '',
       weight: '',
-      additionalInfo: '',
-      specialInstructions: '', // ADD THIS
+      color: '',
+      specialInstructions: '',
     });
     setPetImage(null);
     setMedicalHistory([]); // ADD THIS
@@ -514,9 +543,10 @@ export default function AddPetScreen() {
           <Text style={styles.label}>Pet Name *</Text>
           <TextInput
             style={styles.input}
-            value={petInfo.petName}
-            onChangeText={(value) => updatePetInfo('petName', value)}
+            value={petInfo.name}
+            onChangeText={(value) => updatePetInfo('name', value)}
             placeholder="Enter pet name"
+            maxLength={50}
           />
         </View>
 
@@ -547,6 +577,19 @@ export default function AddPetScreen() {
             </Text>
             <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
           </TouchableOpacity>
+        </View>
+
+        {/* Age */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Age (years) *</Text>
+          <TextInput
+            style={styles.input}
+            value={petInfo.age}
+            onChangeText={(value) => updatePetInfo('age', value)}
+            placeholder="Enter age in years"
+            keyboardType="numeric"
+            maxLength={2}
+          />
         </View>
 
         {/* Birthday */}
@@ -589,17 +632,18 @@ export default function AddPetScreen() {
           </View>
         </View>
 
-        {/* Additional Info */}
+        {/* Color */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Additional Info</Text>
+          <Text style={styles.label}>Color</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            value={petInfo.additionalInfo}
-            onChangeText={(value) => updatePetInfo('additionalInfo', value)}
+            value={petInfo.color}
+            onChangeText={(value) => updatePetInfo('color', value)}
             placeholder="Color, markings, etc."
             multiline
             numberOfLines={3}
             textAlignVertical="top"
+            maxLength={30}
           />
         </View>
       </View>
@@ -901,7 +945,7 @@ export default function AddPetScreen() {
             <Ionicons name="checkmark-circle" size={moderateScale(60)} color="#1C86FF" style={styles.confirmIcon} />
             <Text style={styles.confirmModalTitle}>Confirm Add Pet</Text>
             <Text style={styles.confirmModalText}>
-              Are you sure you want to add {petInfo.petName} to your pets list?
+              Are you sure you want to add {petInfo.name} to your pets list?
             </Text>
             <View style={styles.confirmModalButtons}>
               <TouchableOpacity

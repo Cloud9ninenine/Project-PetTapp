@@ -19,7 +19,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import Header from '@components/Header';
 import CompleteProfileModal from "@components/CompleteProfileModal";
-import BookingConfirmationModal from "@components/BookingConfirmationModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "../../../config/api";
 import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
@@ -37,8 +36,6 @@ export default function ServicesScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
 
   const router = useRouter();
   const { isProfileComplete } = useProfileCompletion();
@@ -207,36 +204,19 @@ export default function ServicesScreen() {
       setShowProfileIncompleteModal(true);
       return;
     }
-    // Show booking modal
-    setSelectedService(service);
-    setShowBookingModal(true);
+    
+    // Navigate to service details page
+    router.push({
+      pathname: '/(user)/(tabs)/home/service-details',
+      params: {
+        id: service._id,
+        name: service.name,
+        category: service.category,
+        serviceType: service.category,
+      }
+    });
   };
 
-  const handleBookingConfirm = async (bookingData) => {
-    try {
-      // Here you would send the booking data to the backend
-      console.log('Booking confirmed:', bookingData);
-
-      // Close modal and show success
-      setShowBookingModal(false);
-      Alert.alert(
-        'Booking Confirmed',
-        'Your service has been booked successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to bookings tab
-              router.push('/(user)/(tabs)/booking');
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Booking error:', error);
-      Alert.alert('Error', 'Failed to book service. Please try again.');
-    }
-  };
 
   const renderServiceCard = ({ item }) => (
     <TouchableOpacity
@@ -441,16 +421,6 @@ export default function ServicesScreen() {
         visible={showProfileIncompleteModal}
         onClose={() => setShowProfileIncompleteModal(false)}
         message="Please complete your profile information before booking services. You need to provide your first name, last name, address, and contact number."
-      />
-
-      {/* Booking Confirmation Modal */}
-      <BookingConfirmationModal
-        visible={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
-        onConfirm={handleBookingConfirm}
-        bookingData={{
-          service: selectedService,
-        }}
       />
     </SafeAreaView>
   );

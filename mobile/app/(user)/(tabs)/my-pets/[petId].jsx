@@ -31,6 +31,8 @@ const SPECIES_OPTIONS = [
   { label: 'Fish', value: 'fish' },
   { label: 'Rabbit', value: 'rabbit' },
   { label: 'Hamster', value: 'hamster' },
+  { label: 'Guinea Pig', value: 'guinea-pig' },
+  { label: 'Reptile', value: 'reptile' },
   { label: 'Other', value: 'other' },
 ];
 
@@ -98,6 +100,26 @@ const BREED_OPTIONS_BY_SPECIES = {
     { label: 'Chinese', value: 'chinese' },
     { label: 'Other', value: 'other' },
   ],
+  'guinea-pig': [
+    { label: 'Select breed', value: '' },
+    { label: 'American', value: 'american' },
+    { label: 'Abyssinian', value: 'abyssinian' },
+    { label: 'Peruvian', value: 'peruvian' },
+    { label: 'Silkie', value: 'silkie' },
+    { label: 'Teddy', value: 'teddy' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
+  reptile: [
+    { label: 'Select breed', value: '' },
+    { label: 'Bearded Dragon', value: 'bearded-dragon' },
+    { label: 'Leopard Gecko', value: 'leopard-gecko' },
+    { label: 'Ball Python', value: 'ball-python' },
+    { label: 'Corn Snake', value: 'corn-snake' },
+    { label: 'Red-Eared Slider', value: 'red-eared-slider' },
+    { label: 'Mixed Breed', value: 'mixed' },
+    { label: 'Other', value: 'other' },
+  ],
   other: [
     { label: 'Select breed', value: '' },
     { label: 'Mixed', value: 'mixed' },
@@ -121,11 +143,16 @@ export default function PetDetailScreen() {
     name: '',
     species: '',
     breed: '',
+    age: '',
     birthday: '',
     gender: '',
     weight: '',
     color: '',
+    specialInstructions: '',
   });
+  const [medicalHistory, setMedicalHistory] = useState([]);
+  const [vaccinations, setVaccinations] = useState([]);
+  const [currentDateField, setCurrentDateField] = useState(null);
   const [petImage, setPetImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
@@ -145,29 +172,33 @@ export default function PetDetailScreen() {
         setIsLoading(true);
         const response = await apiClient.get(`/pets/${petId}`);
 
-        if (response.status === 200) {
-          const pet = response.data;
+        if (response.status === 200 && response.data.success) {
+          const pet = response.data.data;
 
-          // Convert birthday from YYYY-MM-DD to MM/DD/YYYY
-          let formattedBirthday = '';
-          if (pet.birthday) {
-            const [year, month, day] = pet.birthday.split('-');
-            formattedBirthday = `${month}/${day}/${year}`;
-          }
+          // Calculate birthday from age (backend doesn't store birthday, only age)
+          const today = new Date();
+          const birthYear = today.getFullYear() - pet.age;
+          const formattedBirthday = `01/01/${birthYear}`;
 
           setPetInfo({
             name: pet.name || '',
             species: pet.species || '',
             breed: pet.breed || '',
+            age: pet.age ? pet.age.toString() : '',
             birthday: formattedBirthday,
             gender: pet.gender || '',
             weight: pet.weight ? pet.weight.toString() : '',
             color: pet.color || '',
+            specialInstructions: pet.specialInstructions || '',
           });
 
-          if (pet.avatar) {
-            setPetImage(pet.avatar);
-            setOriginalImage(pet.avatar);
+          // Load medical history and vaccinations
+          setMedicalHistory(pet.medicalHistory || []);
+          setVaccinations(pet.vaccinations || []);
+
+          if (pet.images?.profile) {
+            setPetImage(pet.images.profile);
+            setOriginalImage(pet.images.profile);
           }
         }
       } catch (error) {
@@ -271,24 +302,112 @@ export default function PetDetailScreen() {
       setShowDatePicker(false);
     }
 
-    if (date) {
-      setSelectedDate(date);
+    if (date && currentDateField) {
       const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
-      updatePetInfo('birthday', formattedDate);
+
+      if (currentDateField.type === 'birthday') {
+        setSelectedDate(date);
+        updatePetInfo('birthday', formattedDate);
+      } else if (currentDateField.type === 'medical') {
+        updateMedicalHistoryField(currentDateField.id, currentDateField.field, formattedDate);
+      } else if (currentDateField.type === 'vaccination') {
+        updateVaccinationField(currentDateField.id, currentDateField.field, formattedDate);
+      }
+
+      setCurrentDateField(null);
     }
   };
 
-  const showDatePickerModal = () => {
+  const showDatePickerModal = (type, id = null, field = null) => {
+    setCurrentDateField({ type, id, field });
     setShowDatePicker(true);
   };
 
-  const handleSave = () => {
-    const { name, birthday, species, breed, gender, weight, color } = petInfo;
-    if (!name || !birthday || !species || !breed || !gender || !weight || !color) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
+  // Medical History Management
+  const addMedicalHistory = () => {
+    const newEntry = {
+      id: Date.now().toString(),
+      condition: '',
+      diagnosedDate: '',
+      treatment: '',
+      notes: ''
+    };
+    setMedicalHistory([...medicalHistory, newEntry]);
+  };
+
+  const deleteMedicalHistory = (id) => {
+    setMedicalHistory(medicalHistory.filter(entry => entry.id !== id));
+  };
+
+  const updateMedicalHistoryField = (id, field, value) => {
+    setMedicalHistory(medicalHistory.map(entry =>
+      entry.id === id ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  // Vaccination Management
+  const addVaccination = () => {
+    const newEntry = {
+      id: Date.now().toString(),
+      vaccineName: '',
+      administeredDate: '',
+      nextDueDate: '',
+      veterinarian: ''
+    };
+    setVaccinations([...vaccinations, newEntry]);
+  };
+
+  const deleteVaccination = (id) => {
+    setVaccinations(vaccinations.filter(entry => entry.id !== id));
+  };
+
+  const updateVaccinationField = (id, field, value) => {
+    setVaccinations(vaccinations.map(entry =>
+      entry.id === id ? { ...entry, [field]: value } : entry
+    ));
+  };
+
+  const validatePetData = () => {
+    const { name, birthday, species, breed, age, gender, weight, color } = petInfo;
+    
+    // Check required fields
+    if (!name || !birthday || !species || !breed || !age || !gender || !weight) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return false;
     }
-    setShowConfirmModal(true);
+    
+    // Validate field lengths
+    if (name.length > 50) {
+      Alert.alert('Error', 'Pet name must be 50 characters or less');
+      return false;
+    }
+    
+    if (color && color.length > 30) {
+      Alert.alert('Error', 'Color description must be 30 characters or less');
+      return false;
+    }
+    
+    // Validate age
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 30) {
+      Alert.alert('Error', 'Age must be between 0 and 30 years');
+      return false;
+    }
+    
+    // Validate weight
+    const weightNum = parseFloat(weight);
+    if (isNaN(weightNum) || weightNum < 0 || weightNum > 200) {
+      Alert.alert('Error', 'Weight must be between 0 and 200 kg');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSave = () => {
+    if (validatePetData()) {
+      setShowConfirmModal(true);
+    }
   };
 
   const confirmSave = async () => {
@@ -296,37 +415,68 @@ export default function PetDetailScreen() {
     setIsSaving(true);
 
     try {
-      // Convert birthday from MM/DD/YYYY to YYYY-MM-DD format
-      const [month, day, year] = petInfo.birthday.split('/');
-      const formattedBirthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      // Create FormData for multipart/form-data request
+      const formData = new FormData();
 
-      // Prepare pet data for API
-      const petData = {
-        name: petInfo.name,
-        species: petInfo.species,
-        breed: petInfo.breed,
-        birthday: formattedBirthday,
-        gender: petInfo.gender,
-        weight: parseFloat(petInfo.weight),
-        color: petInfo.color || null,
-      };
+      // Add fields to FormData with proper data types
+      formData.append('name', petInfo.name.trim());
+      formData.append('species', petInfo.species);
+      formData.append('breed', petInfo.breed || '');
+      formData.append('age', petInfo.age); // Use direct age input
+      formData.append('gender', petInfo.gender);
+      formData.append('weight', parseFloat(petInfo.weight).toString());
 
-      const response = await apiClient.put(`/pets/${petId}`, petData);
+      // Add optional fields only if they have values
+      if (petInfo.color && petInfo.color.trim()) {
+        formData.append('color', petInfo.color.trim());
+      }
+
+      if (petInfo.specialInstructions && petInfo.specialInstructions.trim()) {
+        formData.append('specialInstructions', petInfo.specialInstructions.trim());
+      }
+
+      // Add medical history as JSON string with proper date conversion
+      if (medicalHistory.length > 0) {
+        const transformedMedicalHistory = medicalHistory.map(m => ({
+          condition: m.condition,
+          diagnosedDate: m.diagnosedDate ? new Date(m.diagnosedDate.split('/').reverse().join('-')).toISOString() : null,
+          treatment: m.treatment,
+          notes: m.notes,
+        })).filter(m => m.condition && m.diagnosedDate); // Only include valid entries
+        formData.append('medicalHistory', JSON.stringify(transformedMedicalHistory));
+      }
+
+      // Add vaccinations as JSON string with correct field mapping and date conversion
+      if (vaccinations.length > 0) {
+        const transformedVaccinations = vaccinations.map(v => ({
+          vaccine: v.vaccineName,
+          administeredDate: v.administeredDate ? new Date(v.administeredDate.split('/').reverse().join('-')).toISOString() : null,
+          nextDueDate: v.nextDueDate ? new Date(v.nextDueDate.split('/').reverse().join('-')).toISOString() : null,
+          veterinarian: v.veterinarian,
+        })).filter(v => v.vaccine && v.administeredDate); // Only include valid entries
+        formData.append('vaccinations', JSON.stringify(transformedVaccinations));
+      }
+
+      // Add image if selected and different from original
+      if (petImage && petImage !== originalImage) {
+        // Get file extension from URI
+        const uriParts = petImage.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+
+        formData.append('image', {
+          uri: petImage,
+          name: `pet_${petId}_${Date.now()}.${fileType}`,
+          type: `image/${fileType}`,
+        });
+      }
+
+      const response = await apiClient.put(`/pets/${petId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (response.status === 200) {
-        // Handle image update
-        const imageChanged = petImage !== originalImage;
-
-        if (imageChanged) {
-          if (petImage && petImage !== originalImage) {
-            // New image selected - upload it
-            await uploadPetImage();
-          } else if (!petImage && originalImage) {
-            // Image was removed
-            await deletePetImage();
-          }
-        }
-
         Alert.alert('Success', 'Pet information updated successfully!', [
           { text: 'OK', onPress: () => router.back() }
         ]);
@@ -359,23 +509,9 @@ export default function PetDetailScreen() {
 
   const uploadPetImage = async () => {
     try {
-      const formData = new FormData();
-
-      // Get file extension from URI
-      const uriParts = petImage.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      formData.append('image', {
-        uri: petImage,
-        name: `pet_${petId}.${fileType}`,
-        type: `image/${fileType}`,
-      });
-
-      await apiClient.put(`/pets/${petId}/image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // For now, we'll skip the separate image upload since the backend expects a URL
+      // The image should be uploaded during pet creation/update with multipart/form-data
+      console.log('Image upload skipped - should be handled in main pet update');
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Warning', 'Pet updated but image upload failed.');
@@ -384,7 +520,13 @@ export default function PetDetailScreen() {
 
   const deletePetImage = async () => {
     try {
-      await apiClient.delete(`/pets/${petId}/image`);
+      // Backend expects imageType and imageUrl in request body
+      await apiClient.delete(`/pets/${petId}/image`, {
+        data: {
+          imageType: 'profile',
+          imageUrl: originalImage
+        }
+      });
     } catch (error) {
       console.error('Error deleting image:', error);
       Alert.alert('Warning', 'Pet updated but image deletion failed.');
@@ -496,10 +638,23 @@ export default function PetDetailScreen() {
               />
             </View>
 
+            {/* Age */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Age (years) *</Text>
+              <TextInput
+                style={styles.input}
+                value={petInfo.age}
+                onChangeText={(value) => updatePetInfo('age', value)}
+                placeholder="Enter age in years"
+                keyboardType="numeric"
+                maxLength={2}
+              />
+            </View>
+
             {/* Birthday */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Birthday</Text>
-              <TouchableOpacity onPress={showDatePickerModal}>
+              <TouchableOpacity onPress={() => showDatePickerModal('birthday')}>
                 <View style={styles.dateInputContainer}>
                   <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
                     {petInfo.birthday || 'MM/DD/YYYY'}
@@ -565,29 +720,188 @@ export default function PetDetailScreen() {
               </View>
             </View>
 
-            {/* Additional Info */}
+            {/* Color */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Additional Info</Text>
+              <Text style={styles.label}>Color</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={petInfo.color}
                 onChangeText={(value) => updatePetInfo('color', value)}
-                placeholder="Enter additional information (color, markings, etc.)"
+                placeholder="Color, markings, etc."
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
+                maxLength={30}
               />
             </View>
+          </View>
 
-            {/* Buttons */}
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
-                <Text style={styles.confirmButtonText}>Save Changes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-                <Text style={styles.deleteButtonText}>Delete</Text>
-              </TouchableOpacity>
+          {/* SECTION: Medical History */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="medical" size={moderateScale(24)} color="#1C86FF" />
+              <Text style={styles.sectionHeader}>Medical History</Text>
             </View>
+
+            {medicalHistory.map((entry, index) => (
+              <View key={entry.id} style={styles.entryCard}>
+                <View style={styles.entryHeader}>
+                  <Text style={styles.entryTitle}>Record #{index + 1}</Text>
+                  <TouchableOpacity onPress={() => deleteMedicalHistory(entry.id)}>
+                    <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Condition</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={entry.condition}
+                    onChangeText={(value) => updateMedicalHistoryField(entry.id, 'condition', value)}
+                    placeholder="Enter condition"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Diagnosed Date</Text>
+                  <TouchableOpacity onPress={() => showDatePickerModal('medical', entry.id, 'diagnosedDate')}>
+                    <View style={styles.dateInputContainer}>
+                      <Text style={[styles.dateInput, !entry.diagnosedDate && styles.placeholderTextInput]}>
+                        {entry.diagnosedDate || 'MM/DD/YYYY'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Treatment</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={entry.treatment}
+                    onChangeText={(value) => updateMedicalHistoryField(entry.id, 'treatment', value)}
+                    placeholder="Enter treatment"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Notes</Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={entry.notes}
+                    onChangeText={(value) => updateMedicalHistoryField(entry.id, 'notes', value)}
+                    placeholder="Additional notes"
+                    multiline
+                    numberOfLines={2}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.addButton} onPress={addMedicalHistory}>
+              <Ionicons name="add-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.addButtonText}>Add Medical Record</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* SECTION: Vaccinations */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="shield-checkmark" size={moderateScale(24)} color="#1C86FF" />
+              <Text style={styles.sectionHeader}>Vaccinations</Text>
+            </View>
+
+            {vaccinations.map((entry, index) => (
+              <View key={entry.id} style={styles.entryCard}>
+                <View style={styles.entryHeader}>
+                  <Text style={styles.entryTitle}>Vaccination #{index + 1}</Text>
+                  <TouchableOpacity onPress={() => deleteVaccination(entry.id)}>
+                    <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Vaccine Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={entry.vaccineName}
+                    onChangeText={(value) => updateVaccinationField(entry.id, 'vaccineName', value)}
+                    placeholder="Enter vaccine name"
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Administered Date</Text>
+                  <TouchableOpacity onPress={() => showDatePickerModal('vaccination', entry.id, 'administeredDate')}>
+                    <View style={styles.dateInputContainer}>
+                      <Text style={[styles.dateInput, !entry.administeredDate && styles.placeholderTextInput]}>
+                        {entry.administeredDate || 'MM/DD/YYYY'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Next Due Date</Text>
+                  <TouchableOpacity onPress={() => showDatePickerModal('vaccination', entry.id, 'nextDueDate')}>
+                    <View style={styles.dateInputContainer}>
+                      <Text style={[styles.dateInput, !entry.nextDueDate && styles.placeholderTextInput]}>
+                        {entry.nextDueDate || 'MM/DD/YYYY'}
+                      </Text>
+                      <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Veterinarian</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={entry.veterinarian}
+                    onChangeText={(value) => updateVaccinationField(entry.id, 'veterinarian', value)}
+                    placeholder="Enter veterinarian name"
+                  />
+                </View>
+              </View>
+            ))}
+
+            <TouchableOpacity style={styles.addButton} onPress={addVaccination}>
+              <Ionicons name="add-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.addButtonText}>Add Vaccination</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* SECTION: Special Instructions */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="document-text" size={moderateScale(24)} color="#1C86FF" />
+              <Text style={styles.sectionHeader}>Special Instructions</Text>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Instructions for Service Providers</Text>
+              <TextInput
+                style={[styles.input, styles.textAreaLarge]}
+                value={petInfo.specialInstructions}
+                onChangeText={(value) => updatePetInfo('specialInstructions', value)}
+                placeholder="Feeding schedules, behavioral notes, special care requirements, etc."
+                multiline
+                numberOfLines={5}
+                textAlignVertical="top"
+              />
+            </View>
+          </View>
+
+          {/* Buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.confirmButton} onPress={handleSave}>
+              <Text style={styles.confirmButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -913,27 +1227,28 @@ const styles = StyleSheet.create({
     paddingTop: moderateScale(12),
   },
   buttonContainer: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     gap: moderateScale(12),
-    marginTop: moderateScale(10),
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(10),
   },
   deleteButton: {
     flex: 1,
     backgroundColor: '#fff',
     borderWidth: 2,
-    borderColor: '#1C86FF',
+    borderColor: '#dc3545',
     paddingVertical: moderateScale(14),
     borderRadius: moderateScale(10),
     alignItems: 'center',
   },
   deleteButtonText: {
-    color: '#1C86FF',
+    color: '#dc3545',
     fontSize: scaleFontSize(16),
-    fontFamily: 'SFProReg',
+    fontFamily: 'SFProSB',
     fontWeight: '600',
   },
   confirmButton: {
-    flex: 1,
+    flex: 2,
     backgroundColor: '#1C86FF',
     paddingVertical: moderateScale(14),
     borderRadius: moderateScale(10),
@@ -1077,5 +1392,72 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     color: '#333',
     fontFamily: 'SFProReg',
+  },
+  sectionContainer: {
+    marginBottom: moderateScale(16),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    width: '100%',
+    alignSelf: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(16),
+    gap: moderateScale(8),
+  },
+  sectionHeader: {
+    fontSize: scaleFontSize(20),
+    color: '#1C86FF',
+    fontFamily: 'SFProBold',
+  },
+  entryCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+    paddingBottom: moderateScale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  entryTitle: {
+    fontSize: scaleFontSize(16),
+    fontFamily: 'SFProSB',
+    color: '#333',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    borderStyle: 'dashed',
+    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(12),
+    gap: moderateScale(8),
+  },
+  addButtonText: {
+    color: '#1C86FF',
+    fontSize: scaleFontSize(16),
+    fontFamily: 'SFProSB',
+  },
+  textAreaLarge: {
+    minHeight: moderateScale(120),
+    paddingTop: moderateScale(12),
   },
 });
