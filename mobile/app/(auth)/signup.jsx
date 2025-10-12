@@ -94,7 +94,10 @@ export default function SignUpScreen() {
 
       // 201 - Registration successful
       if (response.status === 201) {
-        router.replace("account-created");
+        router.replace({
+          pathname: "account-created",
+          params: { email: email.trim().toLowerCase() },
+        });
       }
     } catch (error) {
       console.error('Registration error:', error);

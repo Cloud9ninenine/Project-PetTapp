@@ -3,9 +3,15 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@assets/*": ["./app/assets/*"],
+      "@components/*": ["./app/components/*"],
+      "@utils/*": ["./utils/*"],
+      "@config/*": ["./app/config/*"],
+      "@services/*": ["./services/*"],
+      "@auth/*": ["./app/(auth)/*"],
+      "@user/*": ["./app/(user)/*"],
+      "@bsn/*": ["./app/(bsn)/*"]
     }
   },
   "include": [

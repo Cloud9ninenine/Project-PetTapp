@@ -118,6 +118,14 @@ export default function MapPicker({ initialLocation, onLocationSelect, onBack, a
               div.innerHTML = '<a href="#" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: white; text-decoration: none; color: #333; font-size: 20px;" title="My Location">📍</a>';
               div.onclick = function(e) {
                 e.preventDefault();
+                // Check if geolocation is available
+                if (!navigator.geolocation) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'locationError',
+                    message: 'Geolocation is not supported by this device'
+                  }));
+                  return;
+                }
                 map.locate({setView: true, maxZoom: 16});
               };
               return div;
@@ -139,6 +147,10 @@ export default function MapPicker({ initialLocation, onLocationSelect, onBack, a
 
             map.on('locationerror', function(e) {
               console.error('Location error:', e.message);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'locationError',
+                message: e.message
+              }));
             });
           </script>
         </body>
@@ -148,8 +160,20 @@ export default function MapPicker({ initialLocation, onLocationSelect, onBack, a
 
   const handleMessage = (event) => {
     try {
-      const location = JSON.parse(event.nativeEvent.data);
-      setSelectedLocation(location);
+      const data = JSON.parse(event.nativeEvent.data);
+
+      // Check if it's a location error
+      if (data.type === 'locationError') {
+        Alert.alert(
+          'Location Unavailable',
+          'Unable to access your current location. Please ensure location services are enabled for this app, or manually select your location on the map.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Otherwise, it's a location update
+      setSelectedLocation(data);
     } catch (error) {
       console.error('Error parsing location:', error);
     }

@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ImageBackground,
+  ActivityIndicator,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,11 +17,11 @@ import { router } from "expo-router";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 import apiClient from "@config/api";
 
-export default function ForgotPasswordScreen() {
+export default function VerifyEmailScreen() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendCode = async () => {
+  const handleSendVerification = async () => {
     if (!email) {
       Alert.alert("Error", "Please enter your email address");
       return;
@@ -34,29 +35,31 @@ export default function ForgotPasswordScreen() {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.post("/auth/forgot-password", {
+      await apiClient.post("/auth/resend-verification", {
         email: email.trim().toLowerCase(),
       });
 
       setIsLoading(false);
 
-      // Navigate to reset-password page with email as parameter
-      router.push({
-        pathname: "/reset-password",
-        params: { email: email.trim().toLowerCase() },
-      });
+      Alert.alert(
+        "Success",
+        "Verification email has been sent. Please check your inbox and click the verification link.",
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ]
+      );
     } catch (error) {
       setIsLoading(false);
 
       if (error.response) {
-        // Server responded with an error
-        const errorMessage = error.response.data?.message || "Failed to send reset OTP";
+        const errorMessage = error.response.data?.message || "Failed to send verification email";
         Alert.alert("Error", errorMessage);
       } else if (error.request) {
-        // Request made but no response
         Alert.alert("Network Error", "Unable to connect to the server. Please check your internet connection.");
       } else {
-        // Something else happened
         Alert.alert("Error", "An unexpected error occurred. Please try again.");
       }
     }
@@ -81,9 +84,9 @@ export default function ForgotPasswordScreen() {
       >
         <View style={styles.content}>
           {/* Title */}
-          <Text style={styles.title}>Forgot Password</Text>
+          <Text style={styles.title}>Verify Account</Text>
           <Text style={styles.subtitle}>
-            Fill in your email and we'll send an OTP to reset your password
+            Enter your email address and we'll send you a verification link
           </Text>
 
           {/* Email input */}
@@ -103,13 +106,17 @@ export default function ForgotPasswordScreen() {
 
           {/* Buttons */}
           <TouchableOpacity
-            style={styles.sendCodeButton}
-            onPress={handleSendCode}
+            style={styles.sendVerificationButton}
+            onPress={handleSendVerification}
             disabled={isLoading}
           >
-            <Text style={styles.sendCodeButtonText}>
-              {isLoading ? "Sending..." : "Send OTP"}
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.sendVerificationButtonText}>
+                Send Verification Email
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -180,7 +187,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
 
-  sendCodeButton: {
+  sendVerificationButton: {
     backgroundColor: "#1C86FF",
     paddingVertical: hp(1.5),
     borderRadius: moderateScale(10),
@@ -190,7 +197,7 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: hp(5.5),
   },
-  sendCodeButtonText: {
+  sendVerificationButtonText: {
     color: "#fff",
     fontSize: scaleFontSize(16),
     fontFamily: "SFProReg",

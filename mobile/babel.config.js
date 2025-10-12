@@ -7,17 +7,25 @@ module.exports = function (api) {
       [
         "module-resolver",
         {
-          root: ["./app"],
+          root: ["./"],
           alias: {
             "@": "./app",
             "@assets": "./app/assets",
             "@components": "./app/components",
-            "@utils": "./app/utils",
+            "@utils": "./utils",
             "@config": "./app/config",
+            "@services": "./services",
             "@auth": "./app/(auth)",
             "@user": "./app/(user)",
             "@bsn": "./app/(bsn)",
           },
+          extensions: [
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".json"
+          ]
         },
       ],
     ],

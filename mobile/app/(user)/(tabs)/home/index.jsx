@@ -19,12 +19,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import * as Location from 'expo-location';
 import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
-import apiClient from "../../../config/api";
 import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
+import { fetchCarouselServices, searchServices as searchServicesAPI, fetchNearbyServices } from "@services/api/serviceService";
+import { getUserLocation } from "@services/locationService";
+import { formatPrice } from "@utils/formatters";
+import { getServiceCategoryIcon, renderStars, getDefaultCarouselImages } from "@utils/serviceHelpers";
 
 export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,36 +54,7 @@ export default function HomeScreen() {
   const translateX = useRef(new Animated.Value(0)).current;
 
   // Default carousel fallback images
-  const defaultCarouselImages = [
-    {
-      id: 'default-1',
-      image: require("@assets/images/serviceimages/19.png"),
-      title: "Wellness Check-up",
-      subtitle: "PetCo Clinic",
-      isDefault: true,
-    },
-    {
-      id: 'default-2',
-      image: require("@assets/images/serviceimages/21.png"),
-      title: "Professional Grooming",
-      subtitle: "Pet Spa",
-      isDefault: true,
-    },
-    {
-      id: 'default-3',
-      image: require("@assets/images/serviceimages/22.png"),
-      title: "Pet Boarding",
-      subtitle: "Pet Hotel",
-      isDefault: true,
-    },
-    {
-      id: 'default-4',
-      image: require("@assets/images/serviceimages/23.png"),
-      title: "Pet Training",
-      subtitle: "Training Center",
-      isDefault: true,
-    },
-  ];
+  const defaultCarouselImages = getDefaultCarouselImages();
 
   // build extended array: [last, ...images, first] for looping
   const imagesToUse = carouselImages.length > 0 ? carouselImages : defaultCarouselImages;
@@ -253,94 +226,19 @@ export default function HomeScreen() {
   // Fetch user location
   useEffect(() => {
     (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const currentLocation = await Location.getCurrentPositionAsync({});
-          setLocation({
-            latitude: currentLocation.coords.latitude,
-            longitude: currentLocation.coords.longitude,
-          });
-        }
-      } catch (error) {
-        console.error('Error getting location:', error);
+      const userLocation = await getUserLocation();
+      if (userLocation) {
+        setLocation(userLocation);
       }
     })();
   }, []);
 
   // Fetch carousel images from different service categories and nearby services
   useEffect(() => {
-    const fetchCarouselServices = async () => {
+    const loadCarouselServices = async () => {
       try {
         setLoadingCarousel(true);
-        const categories = ['veterinary', 'grooming', 'boarding', 'training', 'daycare', 'emergency', 'consultation'];
-        const carouselData = [];
-        const usedServiceIds = new Set();
-
-        // Fetch one service from each category
-        for (const category of categories) {
-          try {
-            const response = await apiClient.get('/services', {
-              params: {
-                category,
-                limit: 1,
-              },
-            });
-
-            if (response.data.success && response.data.data.length > 0) {
-              const service = response.data.data[0];
-              // Avoid duplicates
-              if (!usedServiceIds.has(service._id)) {
-                carouselData.push({
-                  id: service._id,
-                  serviceId: service._id,
-                  image: service.imageUrl ? { uri: service.imageUrl } : null,
-                  title: service.name,
-                  subtitle: service.businessId?.businessName || 'Pet Service',
-                  category: service.category,
-                  isDefault: false,
-                });
-                usedServiceIds.add(service._id);
-              }
-            }
-          } catch (error) {
-            console.error(`Error fetching ${category} service:`, error);
-          }
-        }
-
-        // Optionally add nearby services if location is available
-        if (location && carouselData.length < 6) {
-          try {
-            const nearbyResponse = await apiClient.get('/services', {
-              params: {
-                latitude: location.latitude,
-                longitude: location.longitude,
-                radius: 10,
-                limit: 3,
-              },
-            });
-
-            if (nearbyResponse.data.success && nearbyResponse.data.data.length > 0) {
-              nearbyResponse.data.data.forEach((service) => {
-                // Add nearby services if not already in carousel and haven't reached max
-                if (!usedServiceIds.has(service._id) && carouselData.length < 8) {
-                  carouselData.push({
-                    id: service._id,
-                    serviceId: service._id,
-                    image: service.imageUrl ? { uri: service.imageUrl } : null,
-                    title: service.name,
-                    subtitle: service.businessId?.businessName || 'Pet Service',
-                    category: service.category,
-                    isDefault: false,
-                  });
-                  usedServiceIds.add(service._id);
-                }
-              });
-            }
-          } catch (error) {
-            console.error('Error fetching nearby services for carousel:', error);
-          }
-        }
+        const carouselData = await fetchCarouselServices(location);
 
         // If we have at least 2 services from API, use them. Otherwise use defaults
         if (carouselData.length >= 2) {
@@ -356,7 +254,7 @@ export default function HomeScreen() {
       }
     };
 
-    fetchCarouselServices();
+    loadCarouselServices();
   }, [location]);
 
   // Search services function
@@ -371,16 +269,8 @@ export default function HomeScreen() {
       setIsSearching(true);
       setShowSearchResults(true);
 
-      const response = await apiClient.get('/services', {
-        params: {
-          search: query.trim(),
-          limit: 20, // Show more results for search
-        },
-      });
-
-      if (response.data.success) {
-        setSearchResults(response.data.data || []);
-      }
+      const results = await searchServicesAPI(query, 20);
+      setSearchResults(results);
     } catch (error) {
       console.error('Error searching services:', error);
       Alert.alert('Search Error', 'Failed to search services. Please try again.');
@@ -418,25 +308,11 @@ export default function HomeScreen() {
 
   // Fetch nearby services from API
   useEffect(() => {
-    const fetchNearbyServices = async () => {
+    const loadNearbyServices = async () => {
       try {
         setLoadingServices(true);
-        const params = {
-          limit: 6, // Fetch 6 services
-        };
-
-        // Add location if available
-        if (location) {
-          params.latitude = location.latitude;
-          params.longitude = location.longitude;
-          params.radius = 10; // 10km radius
-        }
-
-        const response = await apiClient.get('/services', { params });
-
-        if (response.data.success) {
-          setNearbyServices(response.data.data || []);
-        }
+        const services = await fetchNearbyServices(location, 10, 6);
+        setNearbyServices(services);
       } catch (error) {
         console.error('Error fetching nearby services:', error);
       } finally {
@@ -444,7 +320,7 @@ export default function HomeScreen() {
       }
     };
 
-    fetchNearbyServices();
+    loadNearbyServices();
   }, [location]);
 
   const handleServicePress = (service) => {
@@ -520,58 +396,6 @@ export default function HomeScreen() {
     });
   };
 
-  // Get service icon for search results
-  const getServiceCategoryIcon = (category) => {
-    switch (category?.toLowerCase()) {
-      case 'veterinary':
-        return 'medical-outline';
-      case 'grooming':
-        return 'cut-outline';
-      case 'boarding':
-      case 'daycare':
-        return 'home-outline';
-      case 'training':
-        return 'school-outline';
-      case 'emergency':
-        return 'alert-circle-outline';
-      case 'consultation':
-        return 'chatbubble-outline';
-      default:
-        return 'paw-outline';
-    }
-  };
-
-  // Format price for display
-  const formatPrice = (price) => {
-    if (!price) return 'Price not available';
-    if (typeof price === 'object' && price.amount) {
-      return `₱${parseFloat(price.amount).toLocaleString()}`;
-    }
-    return `₱${parseFloat(price).toLocaleString()}`;
-  };
-
-
-
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={moderateScale(12)} color="#ff9b79" />);
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <Ionicons key={i} name="star-half" size={moderateScale(12)} color="#ff9b79" />
-        );
-      } else {
-        stars.push(
-          <Ionicons key={i} name="star-outline" size={moderateScale(12)} color="#E0E0E0" />
-        );
-      }
-    }
-    return stars;
-  };
 
   return (
     <SafeAreaView style={styles.container}>

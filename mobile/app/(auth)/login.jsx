@@ -111,6 +111,10 @@ export default function LoginScreen() {
     router.push("/(auth)/forgot-password");
   };
 
+  const handleVerifyAccount = () => {
+    router.push("/(auth)/verify-email");
+  };
+
   const handleSocialLogin = (provider) => {
     Alert.alert("Social Login", `${provider} login coming soon!`);
   };
@@ -176,12 +180,21 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                style={styles.forgotPassword}
-                onPress={handleForgotPassword}
-              >
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
+              <View style={styles.linksRow}>
+                <TouchableOpacity
+                  style={styles.verifyAccount}
+                  onPress={handleVerifyAccount}
+                >
+                  <Text style={styles.verifyAccountText}>Verify Account</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.forgotPassword}
+                  onPress={handleForgotPassword}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Buttons */}
@@ -290,11 +303,26 @@ const styles = StyleSheet.create({
     padding: moderateScale(12),
     paddingHorizontal: wp(4),
   },
-  forgotPassword: {
-    alignSelf: "flex-end",
+  linksRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: hp(1),
+    width: "100%",
+  },
+  forgotPassword: {
+    alignSelf: "flex-start",
   },
   forgotPasswordText: {
+    color: "Black",
+    fontSize: scaleFontSize(13),
+    fontFamily: "SFProReg",
+    textDecorationLine: 'underline',
+  },
+  verifyAccount: {
+    alignSelf: "flex-end",
+  },
+  verifyAccountText: {
     color: "Black",
     fontSize: scaleFontSize(13),
     fontFamily: "SFProReg",
