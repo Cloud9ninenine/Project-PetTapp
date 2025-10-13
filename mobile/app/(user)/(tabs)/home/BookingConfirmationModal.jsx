@@ -97,19 +97,56 @@ export default function BookingConfirmationModal({
   }, [visible]);
 
   const getServiceImageSource = () => {
-    // If service has an imageUrl (from API), use it
-    if (bookingData?.service?.imageUrl) {
+    // Priority 1: Use imageUrl from API response if available
+    if (bookingData?.service?.imageUrl && typeof bookingData.service.imageUrl === 'string') {
       return { uri: bookingData.service.imageUrl };
     }
-    // Otherwise, try to get from hardcoded images based on name
+
+    // Priority 2: Fallback to category-based images
+    const category = bookingData?.service?.category || bookingData?.service?.type;
     const serviceName = bookingData?.service?.name;
-    if (serviceName === 'Animed Veterinary Clinic') {
+
+    // Veterinary services
+    if (category === 'veterinary') {
+      if (serviceName === 'Animed Veterinary Clinic') {
+        return require('@assets/images/serviceimages/17.png');
+      } else if (serviceName === 'Vetfusion Animal Clinic') {
+        return require('@assets/images/serviceimages/19.png');
+      } else {
+        return require('@assets/images/serviceimages/18.png');
+      }
+    }
+
+    // Grooming services
+    if (category === 'grooming') {
+      return require('@assets/images/serviceimages/21.png');
+    }
+
+    // Boarding services
+    if (category === 'boarding' || category === 'daycare') {
+      if (serviceName === 'PetCity Daycare') {
+        return require('@assets/images/serviceimages/16.png');
+      }
+      return require('@assets/images/serviceimages/22.png');
+    }
+
+    // Training services
+    if (category === 'training') {
       return require('@assets/images/serviceimages/17.png');
-    } else if (serviceName === 'Vetfusion Animal Clinic') {
+    }
+
+    // Emergency services
+    if (category === 'emergency') {
       return require('@assets/images/serviceimages/19.png');
-    } else {
+    }
+
+    // Consultation services
+    if (category === 'consultation') {
       return require('@assets/images/serviceimages/18.png');
     }
+
+    // Default fallback
+    return require('@assets/images/serviceimages/18.png');
   };
 
   const renderStars = (rating = 4.9) => {
@@ -275,16 +312,19 @@ export default function BookingConfirmationModal({
               <View style={styles.serviceInfo}>
                 <Text style={styles.serviceName}>{bookingData?.service?.name}</Text>
                 <Text style={styles.serviceCategory}>
-                  {bookingData?.service?.category || bookingData?.service?.type}
+                  {((bookingData?.service?.category || bookingData?.service?.type || '').charAt(0).toUpperCase() +
+                   (bookingData?.service?.category || bookingData?.service?.type || '').slice(1))}
                 </Text>
                 <View style={styles.starsContainer}>
                   {renderStars(bookingData?.service?.rating)}
                 </View>
                 {bookingData?.service?.price && (
                   <Text style={styles.servicePriceText}>
-                    ₱{typeof bookingData.service.price === 'object'
-                      ? bookingData.service.price.amount
-                      : bookingData.service.price}
+                    {typeof bookingData.service.price === 'string' && bookingData.service.price.startsWith('₱')
+                      ? bookingData.service.price
+                      : typeof bookingData.service.price === 'object'
+                      ? `₱${bookingData.service.price.amount}`
+                      : `₱${bookingData.service.price}`}
                   </Text>
                 )}
               </View>

@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
-import apiClient from "../../../config/api";
+import apiClient from "@config/api";
 
 const ScheduleDetail = () => {
   const router = useRouter();
@@ -120,6 +120,7 @@ const ScheduleDetail = () => {
       'paymaya': 'PayMaya',
       'credit-card': 'Credit Card',
       'debit-card': 'Debit Card',
+      'qr-payment': 'QR Payment',
     };
     return methodMap[method] || method;
   };
@@ -230,10 +231,35 @@ const ScheduleDetail = () => {
     });
   };
 
+  const handleViewQR = () => {
+    if (!booking) return;
+
+    router.push({
+      pathname: '../booking/payment-qr',
+      params: {
+        bookingId: booking._id,
+        businessName: booking.businessId?.businessName || 'Business',
+        amount: booking.totalAmount?.amount || 0,
+      },
+    });
+  };
+
+  const handleUploadProof = () => {
+    if (!booking) return;
+
+    router.push({
+      pathname: '../booking/upload-payment-proof',
+      params: {
+        bookingId: booking._id,
+      },
+    });
+  };
+
   const renderActionButtons = () => {
     if (!booking) return null;
 
     const status = booking.status?.toLowerCase();
+    const paymentStatus = booking.paymentStatus?.toLowerCase();
 
     // Show rate button for completed bookings without rating
     if (status === "completed" && !booking.rating) {
@@ -247,11 +273,49 @@ const ScheduleDetail = () => {
       );
     }
 
-    // Show cancel button for pending/confirmed bookings
-    if (status === "pending" || status === "confirmed") {
+    // Show payment buttons for pending/confirmed bookings with pending payment
+    if ((status === "pending" || status === "confirmed") && paymentStatus === "pending") {
       return (
         <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.fullButton} onPress={handleCancelPress}>
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity style={styles.sideBySideButton} onPress={handleViewQR}>
+              <Ionicons name="qr-code" size={moderateScale(20)} color="#fff" />
+              <Text style={styles.sideBySideButtonText}>View QR</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.sideBySideButtonOutline} onPress={handleUploadProof}>
+              <Ionicons name="cloud-upload-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.sideBySideButtonOutlineText}>Upload Proof</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
+            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Cancel Booking</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Show re-upload button if payment proof was rejected
+    if ((status === "pending" || status === "confirmed") && paymentStatus === "failed") {
+      return (
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleUploadProof}>
+            <Ionicons name="cloud-upload-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Re-upload Payment Proof</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
+            <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Cancel Booking</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Show cancel button only for pending/confirmed bookings with proof uploaded or paid
+    if ((status === "pending" || status === "confirmed") && (paymentStatus === "proof-uploaded" || paymentStatus === "paid")) {
+      return (
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
             <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
             <Text style={styles.fullButtonText}>Cancel Booking</Text>
           </TouchableOpacity>
@@ -345,34 +409,67 @@ const ScheduleDetail = () => {
             <Text style={styles.detailValue}>{formatDateTime(booking.appointmentDateTime)}</Text>
           </View>
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Duration</Text>
-            <Text style={styles.detailValue}>{booking.duration} minutes</Text>
-          </View>
+          {booking.duration && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Duration</Text>
+              <Text style={styles.detailValue}>{booking.duration} minutes</Text>
+            </View>
+          )}
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Pet</Text>
-            <Text style={styles.detailValue}>{booking.petId?.name || 'Pet'}</Text>
+            <Text style={styles.detailValue}>
+              {booking.petId?.name || 'Pet'}
+              {booking.petId?.species && ` (${booking.petId.species})`}
+            </Text>
           </View>
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Amount</Text>
-            <Text style={styles.detailValuePrice}>{formatPrice(booking.totalAmount)}</Text>
-          </View>
+          {booking.totalAmount && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Total Amount</Text>
+              <Text style={styles.detailValuePrice}>{formatPrice(booking.totalAmount)}</Text>
+            </View>
+          )}
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Payment Method</Text>
-            <Text style={styles.detailValue}>{formatPaymentMethod(booking.paymentMethod)}</Text>
-          </View>
+          {booking.paymentMethod && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Payment Method</Text>
+              <Text style={styles.detailValue}>{formatPaymentMethod(booking.paymentMethod)}</Text>
+            </View>
+          )}
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Payment Status</Text>
             <Text style={[styles.detailValue, {
-              color: booking.paymentStatus === 'paid' ? '#4CAF50' : '#FF9B79'
+              color: booking.paymentStatus === 'paid' ? '#4CAF50' :
+                     booking.paymentStatus === 'proof-uploaded' ? '#1C86FF' :
+                     booking.paymentStatus === 'failed' ? '#FF6B6B' :
+                     booking.paymentStatus === 'refunded' ? '#9E9E9E' : '#FF9B79'
             }]}>
-              {booking.paymentStatus?.charAt(0).toUpperCase() + booking.paymentStatus?.slice(1) || 'Pending'}
+              {booking.paymentStatus === 'proof-uploaded' ? 'Proof Uploaded' :
+               booking.paymentStatus?.charAt(0).toUpperCase() + booking.paymentStatus?.slice(1) || 'Pending'}
             </Text>
           </View>
+
+          {booking.paymentProof && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Payment Proof</Text>
+              <TouchableOpacity
+                style={styles.viewProofButton}
+                onPress={() => {/* View image logic */}}
+              >
+                <Ionicons name="image-outline" size={moderateScale(16)} color="#1C86FF" />
+                <Text style={styles.viewProofText}>View</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {booking.paymentRejectionReason && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Payment Rejection</Text>
+              <Text style={styles.detailValueNote}>{booking.paymentRejectionReason}</Text>
+            </View>
+          )}
 
           {booking.notes && (
             <View style={styles.detailRow}>
@@ -539,6 +636,22 @@ const styles = StyleSheet.create({
     borderColor: "#2196F3",
   },
   copyButtonText: { color: "#2196F3", fontSize: scaleFontSize(12), fontWeight: "600" },
+  viewProofButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    backgroundColor: '#F0F8FF',
+  },
+  viewProofText: {
+    color: '#1C86FF',
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+  },
   actionButtonsContainer: { gap: moderateScale(12) },
   loadingContainer: {
     flex: 1,

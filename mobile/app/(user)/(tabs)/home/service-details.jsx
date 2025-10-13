@@ -229,22 +229,22 @@ export default function ServiceDetailsScreen() {
 
   // Format availability for display
   const formatAvailability = (availability) => {
-    if (!availability) return 'Availability not specified';
-    
+    if (!availability) return 'Not specified';
+
     try {
       if (typeof availability === 'string') {
         return availability;
       }
-      
+
       if (typeof availability === 'object') {
         // Handle different availability object structures
         if (availability.days && availability.timeSlots) {
-          const days = Array.isArray(availability.days) 
-            ? availability.days.map(day => 
+          const days = Array.isArray(availability.days)
+            ? availability.days.map(day =>
                 typeof day === 'string' ? day.charAt(0).toUpperCase() + day.slice(1) : String(day)
               ).join(', ')
             : String(availability.days);
-          
+
           const timeSlots = Array.isArray(availability.timeSlots)
             ? availability.timeSlots.map(slot => {
                 if (typeof slot === 'object' && slot.start && slot.end) {
@@ -253,18 +253,61 @@ export default function ServiceDetailsScreen() {
                 return String(slot);
               }).join(', ')
             : String(availability.timeSlots);
-          
+
           return `${days}\n${timeSlots}`;
         }
-        
+
         // If it's an object but not the expected structure, stringify it safely
         return JSON.stringify(availability, null, 2);
       }
-      
+
       return String(availability);
     } catch (error) {
       console.warn('Error formatting availability:', error);
-      return 'Availability information unavailable';
+      return 'Not available';
+    }
+  };
+
+  // Format availability for quick info card (abbreviated)
+  const formatAvailabilityShort = (availability) => {
+    if (!availability) return 'N/A';
+
+    try {
+      if (typeof availability === 'string') {
+        return availability.length > 15 ? availability.substring(0, 12) + '...' : availability;
+      }
+
+      if (typeof availability === 'object') {
+        if (availability.days && Array.isArray(availability.days)) {
+          const dayAbbreviations = {
+            'monday': 'Mon',
+            'tuesday': 'Tue',
+            'wednesday': 'Wed',
+            'thursday': 'Thu',
+            'friday': 'Fri',
+            'saturday': 'Sat',
+            'sunday': 'Sun'
+          };
+
+          const abbrevDays = availability.days.map(day => {
+            const dayLower = String(day).toLowerCase();
+            return dayAbbreviations[dayLower] || day.substring(0, 3);
+          });
+
+          // Show count if more than 3 days
+          if (abbrevDays.length > 3) {
+            return `${abbrevDays.length} days/week`;
+          } else if (abbrevDays.length === 7) {
+            return 'Daily';
+          } else {
+            return abbrevDays.join(', ');
+          }
+        }
+      }
+
+      return 'See details';
+    } catch (error) {
+      return 'N/A';
     }
   };
 
@@ -311,6 +354,8 @@ export default function ServiceDetailsScreen() {
         businessId: businessIdValue,
         name: serviceData.name,
         type: serviceData.category,
+        category: serviceData.category,
+        imageUrl: serviceData.imageUrl,
         price: formatPrice(serviceData.price),
         duration: formatDuration(serviceData.duration),
       },
@@ -402,42 +447,80 @@ export default function ServiceDetailsScreen() {
     if (activeTab === 'details') {
       return (
         <View style={styles.tabContent}>
-          {/* Service Category */}
-          <Text style={styles.serviceCategory}>
-            {serviceData.category?.charAt(0).toUpperCase() + serviceData.category?.slice(1)} Service
-          </Text>
-
-          {/* Service Details */}
-          <Text style={styles.sectionTitle}>Service Details</Text>
-          <Text style={styles.description}>{String(serviceData.description || 'No description available')}</Text>
-
-          {/* Service Information */}
-          <View style={styles.infoSection}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Duration</Text>
-              <Text style={styles.infoValue}>{formatDuration(serviceData.duration)}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Price</Text>
-              <Text style={styles.infoValue}>{formatPrice(serviceData.price)}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Availability</Text>
-              <Text style={styles.infoValue}>{formatAvailability(serviceData.availability)}</Text>
-            </View>
-          </View>
-
           {/* Business Information */}
           {businessData && (
             <>
               <Text style={styles.sectionTitle}>Business Information</Text>
-              <View style={styles.businessInfo}>
-                <Text style={styles.businessName}>{String(businessData.name || 'Business Name')}</Text>
+              <View style={styles.businessInfoCard}>
+                <View style={styles.businessInfoRow}>
+                  <Ionicons name="business" size={moderateScale(20)} color="#1C86FF" />
+                  <View style={styles.businessInfoTextContainer}>
+                    <Text style={styles.businessInfoLabel}>Provider</Text>
+                    <Text style={styles.businessName}>{String(businessData.name || 'Business Name')}</Text>
+                  </View>
+                </View>
                 {businessData.address && (
-                  <Text style={styles.businessAddress}>{String(businessData.address)}</Text>
+                  <View style={styles.businessInfoRow}>
+                    <Ionicons name="location" size={moderateScale(20)} color="#FF9B79" />
+                    <View style={styles.businessInfoTextContainer}>
+                      <Text style={styles.businessInfoLabel}>Address</Text>
+                      <Text style={styles.businessAddress}>{String(businessData.address)}</Text>
+                    </View>
+                  </View>
                 )}
                 {businessData.contactNumber && (
-                  <Text style={styles.businessContact}>{String(businessData.contactNumber)}</Text>
+                  <View style={styles.businessInfoRow}>
+                    <Ionicons name="call" size={moderateScale(20)} color="#4CAF50" />
+                    <View style={styles.businessInfoTextContainer}>
+                      <Text style={styles.businessInfoLabel}>Contact</Text>
+                      <Text style={styles.businessContact}>{String(businessData.contactNumber)}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Availability & Time Slots */}
+          {serviceData.availability && (
+            <>
+              <Text style={styles.sectionTitle}>Availability & Time Slots</Text>
+              <View style={styles.availabilitySection}>
+                {serviceData.availability.days && Array.isArray(serviceData.availability.days) && (
+                  <View style={styles.availabilityItem}>
+                    <Ionicons name="calendar" size={moderateScale(18)} color="#1C86FF" />
+                    <View style={styles.availabilityTextContainer}>
+                      <Text style={styles.availabilityLabel}>Available Days</Text>
+                      <View style={styles.daysContainer}>
+                        {serviceData.availability.days.map((day, index) => (
+                          <View key={index} style={styles.dayChip}>
+                            <Text style={styles.dayChipText}>
+                              {String(day).charAt(0).toUpperCase() + String(day).slice(1)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                )}
+                {serviceData.availability.timeSlots && Array.isArray(serviceData.availability.timeSlots) && (
+                  <View style={styles.availabilityItem}>
+                    <Ionicons name="time" size={moderateScale(18)} color="#FF9B79" />
+                    <View style={styles.availabilityTextContainer}>
+                      <Text style={styles.availabilityLabel}>Time Slots</Text>
+                      <View style={styles.timeSlotsContainer}>
+                        {serviceData.availability.timeSlots.map((slot, index) => (
+                          <View key={index} style={styles.timeSlotChip}>
+                            <Text style={styles.timeSlotText}>
+                              {typeof slot === 'object' && slot.start && slot.end
+                                ? `${slot.start} - ${slot.end}`
+                                : String(slot)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
                 )}
               </View>
             </>
@@ -446,25 +529,30 @@ export default function ServiceDetailsScreen() {
           {/* Requirements */}
           {serviceData.requirements && (
             <>
-              <Text style={styles.sectionTitle}>Requirements</Text>
+              <Text style={styles.sectionTitle}>Service Requirements</Text>
               <View style={styles.requirementsSection}>
                 {serviceData.requirements.petTypes && Array.isArray(serviceData.requirements.petTypes) && (
                   <View style={styles.requirementItem}>
                     <Text style={styles.requirementLabel}>Pet Types</Text>
-                    <Text style={styles.requirementValue}>
-                      {serviceData.requirements.petTypes.map(type => {
-                        const stringType = String(type);
-                        return stringType.charAt(0).toUpperCase() + stringType.slice(1);
-                      }).join(', ')}
-                    </Text>
+                    {serviceData.requirements.petTypes.map((type, index) => (
+                      <View key={index} style={styles.bulletPoint}>
+                        <View style={styles.bullet} />
+                        <Text style={styles.bulletText}>
+                          {String(type).charAt(0).toUpperCase() + String(type).slice(1)}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 )}
                 {serviceData.requirements.healthRequirements && Array.isArray(serviceData.requirements.healthRequirements) && (
                   <View style={styles.requirementItem}>
                     <Text style={styles.requirementLabel}>Health Requirements</Text>
-                    <Text style={styles.requirementValue}>
-                      {serviceData.requirements.healthRequirements.map(req => String(req)).join(', ')}
-                    </Text>
+                    {serviceData.requirements.healthRequirements.map((req, index) => (
+                      <View key={index} style={styles.bulletPoint}>
+                        <View style={styles.bullet} />
+                        <Text style={styles.bulletText}>{String(req)}</Text>
+                      </View>
+                    ))}
                   </View>
                 )}
                 {serviceData.requirements.specialNotes && (
@@ -481,17 +569,13 @@ export default function ServiceDetailsScreen() {
     } else {
       return (
         <View style={styles.tabContent}>
-          <Text style={styles.serviceCategory}>
-            {serviceData.category?.charAt(0).toUpperCase() + serviceData.category?.slice(1)} Service
-          </Text>
-
           {/* Reviews Section - Placeholder for future implementation */}
           <Text style={styles.sectionTitle}>Reviews</Text>
           <View style={styles.noReviewsContainer}>
             <Ionicons name="star-outline" size={moderateScale(40)} color="#ccc" />
             <Text style={styles.noReviewsText}>No reviews yet</Text>
             <Text style={styles.noReviewsSubtext}>Be the first to review this service</Text>
-            </View>
+          </View>
         </View>
       );
     }
@@ -554,40 +638,105 @@ export default function ServiceDetailsScreen() {
         imageStyle={styles.backgroundImageStyle}
         resizeMode="repeat"
       />
-      {/* Header */}
-      <Header
-        backgroundColor="#1C86FF"
-        titleColor="#fff"
-        customTitle={renderTitle()}
-        rightComponent={
-          <TouchableOpacity onPress={() => setIsFavorite(!isFavorite)}>
-            <Ionicons
-              name={isFavorite ? "heart" : "heart-outline"}
-              size={moderateScale(28)}
-              color="#fff"
-            />
-          </TouchableOpacity>
-        }
-        showBack={true}
-      />
-      <ScrollView style={styles.scrollView}>
-        {/* Service Image */}
-        <Image source={getServiceImage()} style={styles.serviceImage} />
-        {/* Tab Navigation */}
-        <View style={styles.tabContainer}>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Hero Image Section with Overlay */}
+        <View style={styles.heroSection}>
+          <Image source={getServiceImage()} style={styles.heroImage} />
+
+          {/* Overlay Gradient Effect */}
+          <View style={styles.imageOverlay} />
+
+          {/* Back and Favorite Buttons on Image */}
+          <View style={styles.topButtonsContainer}>
+            <TouchableOpacity style={styles.circularButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={moderateScale(24)} color="#1C86FF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.circularButton} onPress={() => setIsFavorite(!isFavorite)}>
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={moderateScale(24)}
+                color={isFavorite ? "#FF9B79" : "#1C86FF"}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Service Title Card Overlapping Image */}
+          <View style={styles.titleCard}>
+            <View style={styles.titleRow}>
+              <Text style={styles.serviceTitleText} numberOfLines={2}>
+                {serviceData?.name || 'Loading...'}
+              </Text>
+              <View style={styles.categoryBadge}>
+                <Ionicons name="pricetag" size={moderateScale(14)} color="#FF9B79" />
+                <Text style={styles.categoryBadgeText}>
+                  {serviceData?.category?.charAt(0).toUpperCase() + serviceData?.category?.slice(1)}
+                </Text>
+              </View>
+            </View>
+            {serviceData?.description && (
+              <Text style={styles.descriptionPreview} numberOfLines={3}>
+                {String(serviceData.description)}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Quick Info Cards */}
+        <View style={styles.quickInfoContainer}>
+          <View style={styles.quickInfoCard}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+            </View>
+            <Text style={styles.quickInfoLabel}>Duration</Text>
+            <Text style={styles.quickInfoValue}>{formatDuration(serviceData?.duration)}</Text>
+          </View>
+
+          <View style={styles.quickInfoCard}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="calendar-outline" size={moderateScale(20)} color="#FF9B79" />
+            </View>
+            <Text style={styles.quickInfoLabel}>Available</Text>
+            <Text style={styles.quickInfoValue} numberOfLines={2}>
+              {formatAvailabilityShort(serviceData?.availability)}
+            </Text>
+          </View>
+
+          <View style={styles.quickInfoCard}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="cash-outline" size={moderateScale(20)} color="#4CAF50" />
+            </View>
+            <Text style={styles.quickInfoLabel}>Price</Text>
+            <Text style={styles.quickInfoValue}>{formatPrice(serviceData?.price)}</Text>
+          </View>
+        </View>
+
+        {/* Tab Navigation with Pills Design */}
+        <View style={styles.tabPillsContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'details' && styles.activeTab]}
+            style={[styles.tabPill, activeTab === 'details' && styles.activeTabPill]}
             onPress={() => setActiveTab('details')}
           >
-            <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
-              Info
+            <Ionicons
+              name="information-circle"
+              size={moderateScale(18)}
+              color={activeTab === 'details' ? '#fff' : '#666'}
+            />
+            <Text style={[styles.tabPillText, activeTab === 'details' && styles.activeTabPillText]}>
+              Details
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
+            style={[styles.tabPill, activeTab === 'reviews' && styles.activeTabPill]}
             onPress={() => setActiveTab('reviews')}
           >
-            <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>
+            <Ionicons
+              name="star"
+              size={moderateScale(18)}
+              color={activeTab === 'reviews' ? '#fff' : '#666'}
+            />
+            <Text style={[styles.tabPillText, activeTab === 'reviews' && styles.activeTabPillText]}>
               Reviews
             </Text>
           </TouchableOpacity>
@@ -595,15 +744,20 @@ export default function ServiceDetailsScreen() {
 
         {/* Tab Content */}
         {renderTabContent()}
+
+        {/* Bottom Spacing for Fixed Button */}
+        <View style={{ height: hp(10) }} />
       </ScrollView>
 
-      {/* Bottom Action Buttons */}
-      <View style={styles.bottomActions}>
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceText}>{formatPrice(serviceData.price)}</Text>
+      {/* Floating Book Button */}
+      <View style={styles.floatingButtonContainer}>
+        <View style={styles.priceTagContainer}>
+          <Text style={styles.priceTagLabel}>Starting from</Text>
+          <Text style={styles.priceTagValue}>{formatPrice(serviceData?.price)}</Text>
         </View>
-        <TouchableOpacity style={styles.bookButton} onPress={handleBooking}>
-          <Text style={styles.bookButtonText}>Book</Text>
+        <TouchableOpacity style={styles.floatingBookButton} onPress={handleBooking}>
+          <Ionicons name="calendar" size={moderateScale(20)} color="#fff" />
+          <Text style={styles.floatingBookButtonText}>Book Now</Text>
         </TouchableOpacity>
       </View>
 
@@ -621,7 +775,7 @@ export default function ServiceDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f7fa',
   },
 
   backgroundimg: {
@@ -629,58 +783,166 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.5 }],
   },
 
-  backgroundImageStyle: { opacity: 0.1 },
+  backgroundImageStyle: { opacity: 0.08 },
 
-  titleContainer: {
-    flex: 1,
-  },
-  titleText: {
-    color: '#fff',
-    fontSize: scaleFontSize(24),
-    fontFamily: "SFProBold",
-    textAlign: 'center',
-    textDecorationLine: 'underline',
-  },
   scrollView: {
     flex: 1,
   },
-  serviceImage: {
-    width: "90%",
-    height: hp(35),
-    resizeMode: 'cover',
-    marginHorizontal: wp(5),
-    marginTop: moderateScale(10),
-    marginBottom: moderateScale(15),
-    borderRadius: moderateScale(12),
+
+  // Hero Section Styles
+  heroSection: {
+    position: 'relative',
+    width: '100%',
+    height: hp(40),
   },
-  tabContainer: {
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+  },
+  topButtonsContainer: {
+    position: 'absolute',
+    top: moderateScale(10),
+    left: 0,
+    right: 0,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+  },
+  circularButton: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
     backgroundColor: '#fff',
-    marginHorizontal: wp(5),
-    marginBottom: moderateScale(10),
-    borderRadius: moderateScale(8),
-    overflow: 'hidden',
-    elevation: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
+    elevation: 5,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: moderateScale(15),
-    alignItems: 'center',
+  titleCard: {
+    position: 'absolute',
+    bottom: moderateScale(-30),
+    left: wp(5),
+    right: wp(5),
     backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(16),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  activeTab: {
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: moderateScale(12),
+  },
+  serviceTitleText: {
+    flex: 1,
+    fontSize: scaleFontSize(22),
+    fontFamily: 'SFProBold',
+    color: '#1C86FF',
+    marginRight: moderateScale(12),
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+  },
+  categoryBadgeText: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#FF9B79',
+  },
+  descriptionPreview: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    lineHeight: moderateScale(19),
+  },
+
+  // Quick Info Cards
+  quickInfoContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(5),
+    marginTop: moderateScale(45),
+    marginBottom: moderateScale(20),
+    gap: moderateScale(10),
+  },
+  quickInfoCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  iconCircle: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
+  },
+  quickInfoLabel: {
+    fontSize: scaleFontSize(11),
+    color: '#999',
+    marginBottom: moderateScale(4),
+  },
+  quickInfoValue: {
+    fontSize: scaleFontSize(13),
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+
+  // Tab Pills Design
+  tabPillsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(5),
+    marginBottom: moderateScale(16),
+    gap: moderateScale(12),
+  },
+  tabPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#fff',
+    gap: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  activeTabPill: {
     backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
   },
-  tabText: {
-    fontSize: scaleFontSize(16),
+  tabPillText: {
+    fontSize: scaleFontSize(14),
     fontWeight: '600',
     color: '#666',
   },
-  activeTabText: {
+  activeTabPillText: {
     color: '#fff',
   },
   serviceCategory: {
@@ -757,36 +1019,55 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: moderateScale(18),
   },
-  bottomActions: {
+  // Floating Button Container
+  floatingButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
     paddingHorizontal: wp(5),
-    paddingVertical: moderateScale(15),
-    alignItems: 'center',
-    elevation: 4,
+    paddingVertical: moderateScale(12),
+    paddingBottom: moderateScale(16),
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -5 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    borderTopLeftRadius: moderateScale(12),
-    borderTopRightRadius: moderateScale(12),
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 10,
+    gap: moderateScale(12),
   },
-  priceContainer: {
+  priceTagContainer: {
     flex: 1,
   },
-  priceText: {
+  priceTagLabel: {
+    fontSize: scaleFontSize(11),
+    color: '#999',
+    marginBottom: moderateScale(2),
+  },
+  priceTagValue: {
     fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#1C86FF',
   },
-  bookButton: {
+  floatingBookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1C86FF',
-    paddingHorizontal: moderateScale(30),
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(8),
-    marginRight: moderateScale(10),
+    paddingHorizontal: moderateScale(28),
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(25),
+    gap: moderateScale(8),
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  bookButtonText: {
+  floatingBookButtonText: {
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
@@ -853,46 +1134,148 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: moderateScale(16),
   },
-  businessInfo: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: moderateScale(8),
+  businessInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
+    marginTop: moderateScale(8),
+    overflow: 'hidden',
+  },
+  businessInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     padding: moderateScale(16),
-    marginTop: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: moderateScale(12),
+  },
+  businessInfoTextContainer: {
+    flex: 1,
+  },
+  businessInfoLabel: {
+    fontSize: scaleFontSize(11),
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: moderateScale(4),
   },
   businessName: {
     fontSize: scaleFontSize(16),
     color: '#333',
     fontWeight: 'bold',
-    marginBottom: moderateScale(8),
   },
   businessAddress: {
     fontSize: scaleFontSize(14),
     color: '#666',
-    marginBottom: moderateScale(4),
+    lineHeight: moderateScale(20),
   },
   businessContact: {
     fontSize: scaleFontSize(14),
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+
+  // Availability Section
+  availabilitySection: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
+    marginTop: moderateScale(8),
+    padding: moderateScale(16),
+  },
+  availabilityItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: moderateScale(16),
+    gap: moderateScale(12),
+  },
+  availabilityTextContainer: {
+    flex: 1,
+  },
+  availabilityLabel: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: moderateScale(8),
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(8),
+  },
+  dayChip: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(16),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+  },
+  dayChipText: {
+    fontSize: scaleFontSize(12),
     color: '#1C86FF',
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  timeSlotsContainer: {
+    gap: moderateScale(8),
+  },
+  timeSlotChip: {
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#FF9B79',
+    alignSelf: 'flex-start',
+  },
+  timeSlotText: {
+    fontSize: scaleFontSize(13),
+    color: '#FF9B79',
+    fontWeight: '600',
   },
   requirementsSection: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: moderateScale(8),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
     padding: moderateScale(16),
-    marginTop: moderateScale(16),
+    marginTop: moderateScale(8),
   },
   requirementItem: {
-    marginBottom: moderateScale(12),
+    marginBottom: moderateScale(16),
   },
   requirementLabel: {
     fontSize: scaleFontSize(14),
-    color: '#666',
-    fontWeight: '500',
-    marginBottom: moderateScale(4),
+    color: '#333',
+    fontWeight: '600',
+    marginBottom: moderateScale(12),
   },
   requirementValue: {
     fontSize: scaleFontSize(14),
-    color: '#333',
+    color: '#666',
+    lineHeight: moderateScale(20),
+    marginTop: moderateScale(8),
+  },
+  bulletPoint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: moderateScale(8),
+    paddingLeft: moderateScale(8),
+  },
+  bullet: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
+    backgroundColor: '#1C86FF',
+    marginRight: moderateScale(12),
+    marginTop: moderateScale(6),
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: scaleFontSize(14),
+    color: '#666',
     lineHeight: moderateScale(20),
   },
   noReviewsContainer: {

@@ -19,7 +19,7 @@ import { useRouter } from "expo-router";
 import Header from "@components/Header";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
-import apiClient from "../../../config/api";
+import apiClient from "@config/api";
 import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
 
 const Bookings = () => {
