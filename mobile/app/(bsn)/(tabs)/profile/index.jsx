@@ -14,9 +14,11 @@ import {
   RefreshControl,
   Image,
   Linking,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
@@ -28,17 +30,19 @@ export default function BusinessProfileScreen() {
   const [businessData, setBusinessData] = useState(null);
   const [operatingHoursModal, setOperatingHoursModal] = useState(false);
   const [operatingHours, setOperatingHours] = useState({
-    monday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    tuesday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    wednesday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    thursday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    friday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    saturday: { open: true, start: '8:00 AM', end: '6:00 PM' },
-    sunday: { open: false, start: '8:00 AM', end: '6:00 PM' },
+    monday: { open: true, start: '09:00', end: '17:00' },
+    tuesday: { open: true, start: '09:00', end: '17:00' },
+    wednesday: { open: true, start: '09:00', end: '17:00' },
+    thursday: { open: true, start: '09:00', end: '17:00' },
+    friday: { open: true, start: '09:00', end: '17:00' },
+    saturday: { open: true, start: '09:00', end: '17:00' },
+    sunday: { open: false, start: '09:00', end: '17:00' },
   });
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [currentTimePicker, setCurrentTimePicker] = useState(null); // { day: 'monday', field: 'start' }
 
   useEffect(() => {
     fetchBusinessData();
@@ -67,8 +71,8 @@ export default function BusinessProfileScreen() {
             if (business.businessHours[day]) {
               hours[day] = {
                 open: business.businessHours[day].isOpen || false,
-                start: business.businessHours[day].open || '8:00 AM',
-                end: business.businessHours[day].close || '6:00 PM',
+                start: business.businessHours[day].open || '09:00',
+                end: business.businessHours[day].close || '17:00',
               };
             } else {
               hours[day] = operatingHours[day];
@@ -130,14 +134,14 @@ export default function BusinessProfileScreen() {
       title: 'Credentials',
       icon: 'ribbon',
       color: '#FF9B79',
-      action: 'credentials',
+      route: '/(bsn)/(tabs)/profile/credentials',
     },
     {
       id: '3',
       title: 'Verification Document',
       icon: 'document-text',
       color: '#9C27B0',
-      action: 'verification',
+      route: '/(bsn)/(tabs)/profile/verification-documents',
     },
     {
       id: '4',
@@ -146,6 +150,13 @@ export default function BusinessProfileScreen() {
       color: '#2196F3',
       route: '/(bsn)/(tabs)/profile/payment-gateways',
     },
+    {
+      id: '5',
+      title: 'Settings',
+      icon: 'settings',
+      color: '#607D8B',
+      route: '/(bsn)/(tabs)/profile/settings',
+    },
   ];
 
   const toggleDayOpen = (day) => {
@@ -153,6 +164,49 @@ export default function BusinessProfileScreen() {
       ...prev,
       [day]: { ...prev[day], open: !prev[day].open }
     }));
+  };
+
+  const openTimePicker = (day, field) => {
+    setCurrentTimePicker({ day, field });
+    setShowTimePicker(true);
+  };
+
+  const handleTimeChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+
+    if (event.type === 'set' && selectedDate && currentTimePicker) {
+      const hours = selectedDate.getHours().toString().padStart(2, '0');
+      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
+
+      setOperatingHours(prev => ({
+        ...prev,
+        [currentTimePicker.day]: {
+          ...prev[currentTimePicker.day],
+          [currentTimePicker.field]: timeString
+        }
+      }));
+
+      if (Platform.OS === 'ios') {
+        // On iOS, we'll keep the picker open until they tap outside
+        // So we don't clear currentTimePicker here
+      } else {
+        setCurrentTimePicker(null);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowTimePicker(false);
+      setCurrentTimePicker(null);
+    }
+  };
+
+  const getTimeForPicker = (timeString) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours);
+    date.setMinutes(minutes);
+    return date;
   };
 
   const saveOperatingHours = async () => {
@@ -198,28 +252,6 @@ export default function BusinessProfileScreen() {
   const handleShortcutPress = (action, route) => {
     if (action === 'modal') {
       setOperatingHoursModal(true);
-    } else if (action === 'credentials') {
-      // Show credentials info
-      if (!businessData?.credentials) {
-        Alert.alert('No Credentials', 'Please update your business information to add credentials.');
-        return;
-      }
-
-      const { licenseNumber, certifications, insuranceInfo } = businessData.credentials;
-      const credInfo = [
-        licenseNumber && `License: ${licenseNumber}`,
-        certifications?.length > 0 && `Certifications: ${certifications.join(', ')}`,
-        insuranceInfo && `Insurance: ${insuranceInfo}`,
-      ].filter(Boolean).join('\n\n');
-
-      Alert.alert('Credentials', credInfo || 'No credentials information available.');
-    } else if (action === 'verification') {
-      // Show verification document info
-      if (!businessData?.verificationDocument) {
-        Alert.alert('No Verification Document', 'Please upload your verification document in Business Information.');
-        return;
-      }
-      Alert.alert('Verification Document', 'Document uploaded and pending review.');
     } else if (route) {
       router.push(route);
     }
@@ -317,9 +349,9 @@ export default function BusinessProfileScreen() {
         >
           <View style={styles.profileHeader}>
             <View style={styles.profilePicContainer}>
-              {businessData.logo ? (
+              {(businessData.images?.logo || businessData.logo) ? (
                 <Image
-                  source={{ uri: businessData.logo }}
+                  source={{ uri: businessData.images?.logo || businessData.logo }}
                   style={styles.profilePic}
                 />
               ) : (
@@ -338,14 +370,32 @@ export default function BusinessProfileScreen() {
               <Text style={styles.businessName} numberOfLines={2}>
                 {businessData.businessName || 'Business Name'}
               </Text>
-              <Text style={styles.businessType}>
-                {getBusinessTypeLabel(businessData.businessType)}
-              </Text>
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={moderateScale(16)} color="#FFD700" />
-                <Text style={styles.ratingText}>
-                  {businessData.ratings?.averageRating || 0} ({businessData.ratings?.totalReviews || 0} reviews)
-                </Text>
+
+              {/* Status Tags */}
+              <View style={styles.tagsContainer}>
+                {/* Service Type Tag */}
+                <View style={[styles.tag, styles.serviceTag]}>
+                  <Ionicons name="pricetag" size={moderateScale(12)} color="#2196F3" />
+                  <Text style={styles.tagText}>
+                    {getBusinessTypeLabel(businessData.businessType)}
+                  </Text>
+                </View>
+
+                {/* Verified Tag */}
+                {businessData.isVerified && (
+                  <View style={[styles.tag, styles.verifiedTag]}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(12)} color="#4CAF50" />
+                    <Text style={styles.tagText}>Verified</Text>
+                  </View>
+                )}
+
+                {/* Active Tag */}
+                <View style={[styles.tag, businessData.isActive ? styles.activeTag : styles.inactiveTag]}>
+                  <View style={[styles.statusDot, businessData.isActive ? styles.activeDot : styles.inactiveDot]} />
+                  <Text style={styles.tagText}>
+                    {businessData.isActive ? 'Active' : 'Inactive'}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -497,26 +547,48 @@ export default function BusinessProfileScreen() {
 
             <ScrollView style={styles.modalBody}>
               {Object.keys(operatingHours).map((day) => (
-                <View key={day} style={styles.dayRow}>
-                  <View style={styles.dayInfo}>
+                <View key={day} style={styles.dayContainer}>
+                  <View style={styles.dayHeader}>
                     <Text style={styles.dayName}>
                       {day.charAt(0).toUpperCase() + day.slice(1)}
                     </Text>
-                    {operatingHours[day].open && (
-                      <Text style={styles.dayTime}>
-                        {operatingHours[day].start} - {operatingHours[day].end}
-                      </Text>
-                    )}
-                    {!operatingHours[day].open && (
-                      <Text style={styles.dayClosed}>Closed</Text>
-                    )}
+                    <Switch
+                      value={operatingHours[day].open}
+                      onValueChange={() => toggleDayOpen(day)}
+                      trackColor={{ false: '#ccc', true: '#1C86FF' }}
+                      thumbColor="#fff"
+                    />
                   </View>
-                  <Switch
-                    value={operatingHours[day].open}
-                    onValueChange={() => toggleDayOpen(day)}
-                    trackColor={{ false: '#ccc', true: '#1C86FF' }}
-                    thumbColor="#fff"
-                  />
+
+                  {operatingHours[day].open ? (
+                    <View style={styles.timePickersRow}>
+                      <View style={styles.timePickerContainer}>
+                        <Text style={styles.timeLabel}>Open</Text>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => openTimePicker(day, 'start')}
+                        >
+                          <Ionicons name="time-outline" size={moderateScale(16)} color="#1C86FF" />
+                          <Text style={styles.timeText}>{operatingHours[day].start}</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text style={styles.timeSeparator}>to</Text>
+
+                      <View style={styles.timePickerContainer}>
+                        <Text style={styles.timeLabel}>Close</Text>
+                        <TouchableOpacity
+                          style={styles.timeButton}
+                          onPress={() => openTimePicker(day, 'end')}
+                        >
+                          <Ionicons name="time-outline" size={moderateScale(16)} color="#1C86FF" />
+                          <Text style={styles.timeText}>{operatingHours[day].end}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text style={styles.dayClosed}>Closed</Text>
+                  )}
                 </View>
               ))}
             </ScrollView>
@@ -535,6 +607,52 @@ export default function BusinessProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Time Picker */}
+      {showTimePicker && currentTimePicker && (
+        Platform.OS === 'ios' ? (
+          <Modal
+            visible={showTimePicker}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => {
+              setShowTimePicker(false);
+              setCurrentTimePicker(null);
+            }}
+          >
+            <View style={styles.timePickerModalOverlay}>
+              <View style={styles.timePickerModalContent}>
+                <View style={styles.timePickerHeader}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowTimePicker(false);
+                      setCurrentTimePicker(null);
+                    }}
+                  >
+                    <Text style={styles.timePickerDoneButton}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={getTimeForPicker(operatingHours[currentTimePicker.day][currentTimePicker.field])}
+                  mode="time"
+                  is24Hour={true}
+                  display="spinner"
+                  onChange={handleTimeChange}
+                  style={styles.timePicker}
+                />
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={getTimeForPicker(operatingHours[currentTimePicker.day][currentTimePicker.field])}
+            mode="time"
+            is24Hour={true}
+            display="default"
+            onChange={handleTimeChange}
+          />
+        )
+      )}
     </SafeAreaView>
   );
 }
@@ -617,22 +735,49 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(20),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: moderateScale(4),
+    marginBottom: moderateScale(8),
   },
-  businessType: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    marginBottom: moderateScale(6),
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
+    marginTop: moderateScale(4),
   },
-  ratingContainer: {
+  tag: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
     gap: moderateScale(4),
   },
-  ratingText: {
-    fontSize: scaleFontSize(12),
+  serviceTag: {
+    backgroundColor: '#E3F2FD',
+  },
+  verifiedTag: {
+    backgroundColor: '#E8F5E9',
+  },
+  activeTag: {
+    backgroundColor: '#E8F5E9',
+  },
+  inactiveTag: {
+    backgroundColor: '#FFEBEE',
+  },
+  tagText: {
+    fontSize: scaleFontSize(11),
     color: '#333',
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  statusDot: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
+  },
+  activeDot: {
+    backgroundColor: '#4CAF50',
+  },
+  inactiveDot: {
+    backgroundColor: '#F44336',
   },
   description: {
     fontSize: scaleFontSize(14),
@@ -776,31 +921,64 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: moderateScale(20),
   },
-  dayRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  dayContainer: {
     paddingVertical: moderateScale(15),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  dayInfo: {
-    flex: 1,
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(10),
   },
   dayName: {
     fontSize: scaleFontSize(16),
     fontWeight: '600',
     color: '#333',
-    marginBottom: moderateScale(4),
   },
-  dayTime: {
+  timePickersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: moderateScale(8),
+  },
+  timePickerContainer: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    marginBottom: moderateScale(4),
+    fontWeight: '500',
+  },
+  timeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    gap: moderateScale(8),
+  },
+  timeText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    fontWeight: '600',
+  },
+  timeSeparator: {
     fontSize: scaleFontSize(13),
     color: '#666',
+    marginHorizontal: moderateScale(8),
+    fontWeight: '500',
   },
   dayClosed: {
     fontSize: scaleFontSize(13),
     color: '#999',
     fontStyle: 'italic',
+    marginTop: moderateScale(8),
   },
   saveButton: {
     backgroundColor: '#1C86FF',
@@ -852,5 +1030,34 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
+  },
+  timePickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  timePickerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    paddingBottom: moderateScale(20),
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  timePickerDoneButton: {
+    fontSize: scaleFontSize(16),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  timePicker: {
+    width: '100%',
+    height: moderateScale(200),
   },
 });

@@ -25,7 +25,7 @@ export default function PaymentQRScreen() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [businessId, setBusinessId] = useState(null);
-  const [paymentQR, setPaymentQR] = useState(null);
+  const [paymentQRCodes, setPaymentQRCodes] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [paymentType, setPaymentType] = useState('gcash');
   const [accountName, setAccountName] = useState('');
@@ -45,12 +45,16 @@ export default function PaymentQRScreen() {
         const business = businessRes.data.data[0];
         setBusinessId(business._id);
 
-        // Check if business has paymentQRCode field (single QR)
-        if (business.paymentQRCode) {
-          setPaymentQR({
-            imageUrl: business.paymentQRCode,
-            type: 'qr-code',
-          });
+        // Fetch payment QR codes using the dedicated endpoint
+        try {
+          const qrRes = await apiClient.get(`/businesses/${business._id}/payment-qr`);
+          if (qrRes.data && qrRes.data.data && qrRes.data.data.qrCodes) {
+            // Store all QR codes
+            setPaymentQRCodes(qrRes.data.data.qrCodes);
+          }
+        } catch (qrError) {
+          // QR codes not found is not an error, just means none uploaded yet
+          console.log('No payment QR codes found');
         }
       }
     } catch (error) {
@@ -155,8 +159,8 @@ export default function PaymentQRScreen() {
     }
   };
 
-  const handleDeleteQR = () => {
-    if (!businessId || !paymentQR) return;
+  const handleDeleteQR = (qrCode) => {
+    if (!businessId || !qrCode) return;
 
     Alert.alert(
       'Delete QR Code',
@@ -169,10 +173,10 @@ export default function PaymentQRScreen() {
           onPress: async () => {
             try {
               await apiClient.delete(`/businesses/${businessId}/payment-qr`, {
-                data: { imageUrl: paymentQR.imageUrl },
+                data: { imageUrl: qrCode.imageUrl },
               });
               Alert.alert('Success', 'Payment QR code deleted successfully');
-              setPaymentQR(null);
+              fetchBusinessAndQR(); // Refresh the list
             } catch (error) {
               console.error('Error deleting QR:', error);
               Alert.alert('Error', 'Failed to delete payment QR code');
@@ -237,31 +241,66 @@ export default function PaymentQRScreen() {
           </Text>
         </View>
 
-        {/* Current QR Code */}
-        {paymentQR && (
-          <View style={styles.currentQRCard}>
-            <Text style={styles.sectionTitle}>Current Payment QR Code</Text>
-            <View style={styles.qrImageContainer}>
-              <Image
-                source={{ uri: paymentQR.imageUrl }}
-                style={styles.qrImage}
-                resizeMode="contain"
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleDeleteQR}
-            >
-              <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
-              <Text style={styles.deleteButtonText}>Delete QR Code</Text>
-            </TouchableOpacity>
+        {/* Current QR Codes */}
+        {paymentQRCodes.length > 0 && (
+          <View style={styles.qrCodesSection}>
+            <Text style={styles.sectionTitle}>Current Payment QR Codes ({paymentQRCodes.length})</Text>
+            {paymentQRCodes.map((qrCode, index) => (
+              <View key={index} style={styles.currentQRCard}>
+                <View style={styles.qrHeader}>
+                  <View style={styles.qrTypeContainer}>
+                    <Ionicons
+                      name={
+                        qrCode.type === 'gcash' ? 'wallet' :
+                        qrCode.type === 'paymaya' ? 'card' :
+                        qrCode.type === 'bank' ? 'business' :
+                        'ellipsis-horizontal'
+                      }
+                      size={moderateScale(20)}
+                      color="#1C86FF"
+                    />
+                    <Text style={styles.qrTypeText}>
+                      {qrCode.type === 'gcash' ? 'GCash' :
+                       qrCode.type === 'paymaya' ? 'PayMaya' :
+                       qrCode.type === 'bank' ? 'Bank' :
+                       'Other'}
+                    </Text>
+                  </View>
+                  {qrCode.accountName && (
+                    <Text style={styles.qrAccountName}>{qrCode.accountName}</Text>
+                  )}
+                  {qrCode.accountNumber && (
+                    <Text style={styles.qrAccountNumber}>Account #: {qrCode.accountNumber}</Text>
+                  )}
+                  {qrCode.uploadedAt && (
+                    <Text style={styles.qrUploadDate}>
+                      Uploaded: {new Date(qrCode.uploadedAt).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.qrImageContainer}>
+                  <Image
+                    source={{ uri: qrCode.imageUrl }}
+                    style={styles.qrImage}
+                    resizeMode="contain"
+                  />
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteQR(qrCode)}
+                >
+                  <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+                  <Text style={styles.deleteButtonText}>Delete QR Code</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
         )}
 
         {/* Upload New QR */}
         <View style={styles.uploadCard}>
           <Text style={styles.sectionTitle}>
-            {paymentQR ? 'Update Payment QR Code' : 'Upload Payment QR Code'}
+            {paymentQRCodes.length > 0 ? 'Add Another Payment QR Code' : 'Upload Payment QR Code'}
           </Text>
 
           {/* Payment Type Selection */}
@@ -436,16 +475,50 @@ const styles = StyleSheet.create({
     lineHeight: scaleFontSize(18),
     marginLeft: moderateScale(12),
   },
+  qrCodesSection: {
+    marginBottom: moderateScale(20),
+  },
   currentQRCard: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(16),
     padding: moderateScale(20),
-    marginBottom: moderateScale(20),
+    marginBottom: moderateScale(15),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  qrHeader: {
+    marginBottom: moderateScale(12),
+  },
+  qrTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(4),
+  },
+  qrTypeText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#1C86FF',
+  },
+  qrAccountName: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginTop: moderateScale(2),
+  },
+  qrAccountNumber: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    marginTop: moderateScale(4),
+    fontWeight: '500',
+  },
+  qrUploadDate: {
+    fontSize: scaleFontSize(12),
+    color: '#999',
+    marginTop: moderateScale(6),
+    fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: scaleFontSize(18),

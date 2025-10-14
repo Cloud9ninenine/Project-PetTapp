@@ -37,17 +37,10 @@ export default function BusinessInformationScreen() {
       phone: '',
       website: '',
     },
-    credentials: {
-      licenseNumber: '',
-      certifications: [],
-      insuranceInfo: '',
-    },
     logo: null,
-    verificationDocument: null,
   });
 
   const [showBusinessTypeDropdown, setShowBusinessTypeDropdown] = useState(false);
-  const [newCertification, setNewCertification] = useState('');
 
   const businessTypes = [
     { value: 'veterinary', label: 'Veterinary Services' },
@@ -80,13 +73,7 @@ export default function BusinessInformationScreen() {
             phone: business.contactInfo?.phone || '',
             website: business.contactInfo?.website || '',
           },
-          credentials: {
-            licenseNumber: business.credentials?.licenseNumber || '',
-            certifications: business.credentials?.certifications || [],
-            insuranceInfo: business.credentials?.insuranceInfo || '',
-          },
-          logo: business.logo || null,
-          verificationDocument: business.verificationDocument || null,
+          logo: business.images?.logo || business.logo || null,
         });
       }
     } catch (error) {
@@ -121,50 +108,6 @@ export default function BusinessInformationScreen() {
     }
   };
 
-  const handleDocumentPicker = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/pdf',
-        copyToCacheDirectory: true,
-      });
-
-      if (result.type === 'success' || !result.canceled) {
-        const doc = result.assets ? result.assets[0] : result;
-        if (doc.size > 5 * 1024 * 1024) {
-          Alert.alert('File Too Large', 'Please select a PDF file smaller than 5MB');
-          return;
-        }
-        setBusinessInfo({...businessInfo, verificationDocument: doc});
-      }
-    } catch (error) {
-      console.error('Error picking document:', error);
-      Alert.alert('Error', 'Failed to pick document');
-    }
-  };
-
-  const addCertification = () => {
-    if (newCertification.trim()) {
-      setBusinessInfo({
-        ...businessInfo,
-        credentials: {
-          ...businessInfo.credentials,
-          certifications: [...businessInfo.credentials.certifications, newCertification.trim()],
-        },
-      });
-      setNewCertification('');
-    }
-  };
-
-  const removeCertification = (index) => {
-    const newCerts = businessInfo.credentials.certifications.filter((_, i) => i !== index);
-    setBusinessInfo({
-      ...businessInfo,
-      credentials: {
-        ...businessInfo.credentials,
-        certifications: newCerts,
-      },
-    });
-  };
 
   const handleSave = async () => {
     // Validation
@@ -199,7 +142,6 @@ export default function BusinessInformationScreen() {
 
       // Append complex fields as JSON strings
       formData.append('contactInfo', JSON.stringify(businessInfo.contactInfo));
-      formData.append('credentials', JSON.stringify(businessInfo.credentials));
 
       // Append logo if it's new
       if (businessInfo.logo && typeof businessInfo.logo === 'object' && businessInfo.logo.uri) {
@@ -229,22 +171,6 @@ export default function BusinessInformationScreen() {
         if (response.data && response.data._id) {
           setBusinessId(response.data._id);
         }
-      }
-
-      // Upload verification document separately if new
-      if (businessInfo.verificationDocument && typeof businessInfo.verificationDocument === 'object' && businessInfo.verificationDocument.uri) {
-        const docFormData = new FormData();
-        const docUri = Platform.OS === 'ios' ? businessInfo.verificationDocument.uri.replace('file://', '') : businessInfo.verificationDocument.uri;
-
-        docFormData.append('verificationDocument', {
-          uri: docUri,
-          name: businessInfo.verificationDocument.name || 'verification.pdf',
-          type: 'application/pdf',
-        });
-
-        await apiClient.post(`/businesses/verification/upload?businessId=${businessId || response.data._id}`, docFormData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
       }
 
       Alert.alert('Success', 'Business information updated successfully!', [
@@ -314,7 +240,11 @@ export default function BusinessInformationScreen() {
               >
                 {businessInfo.logo ? (
                   <Image
-                    source={{ uri: typeof businessInfo.logo === 'string' ? businessInfo.logo : businessInfo.logo.uri }}
+                    source={{
+                      uri: typeof businessInfo.logo === 'string'
+                        ? businessInfo.logo
+                        : businessInfo.logo.uri
+                    }}
                     style={styles.circleImage}
                   />
                 ) : (
@@ -469,128 +399,6 @@ export default function BusinessInformationScreen() {
                 autoCapitalize="none"
               />
             </View>
-          </View>
-        </View>
-
-        {/* Credentials Section */}
-        <View style={styles.formSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="ribbon-outline" size={moderateScale(24)} color="#1C86FF" />
-            <Text style={styles.sectionTitle}>Credentials</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>
-            Add your professional licenses and certifications to build trust with customers
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>License Number</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="card" size={moderateScale(20)} color="#1C86FF" />
-              <TextInput
-                style={styles.input}
-                value={businessInfo.credentials.licenseNumber}
-                onChangeText={(text) => setBusinessInfo({
-                  ...businessInfo,
-                  credentials: {...businessInfo.credentials, licenseNumber: text}
-                })}
-                placeholder="Enter license number"
-                placeholderTextColor="#999"
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Certifications</Text>
-            <View style={styles.addCertContainer}>
-              <View style={[styles.inputContainer, {flex: 1, marginRight: moderateScale(10)}]}>
-                <TextInput
-                  style={styles.input}
-                  value={newCertification}
-                  onChangeText={setNewCertification}
-                  placeholder="Add certification"
-                  placeholderTextColor="#999"
-                  onSubmitEditing={addCertification}
-                />
-              </View>
-              <TouchableOpacity style={styles.addButton} onPress={addCertification}>
-                <Ionicons name="add-circle" size={moderateScale(28)} color="#1C86FF" />
-              </TouchableOpacity>
-            </View>
-            {businessInfo.credentials.certifications.length > 0 && (
-              <View style={styles.certList}>
-                {businessInfo.credentials.certifications.map((cert, index) => (
-                  <View key={index} style={styles.certItem}>
-                    <Ionicons name="ribbon" size={moderateScale(18)} color="#4CAF50" />
-                    <Text style={styles.certText}>{cert}</Text>
-                    <TouchableOpacity onPress={() => removeCertification(index)}>
-                      <Ionicons name="close-circle" size={moderateScale(22)} color="#FF6B6B" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Insurance Information</Text>
-            <View style={styles.textAreaContainer}>
-              <TextInput
-                style={styles.textArea}
-                value={businessInfo.credentials.insuranceInfo}
-                onChangeText={(text) => setBusinessInfo({
-                  ...businessInfo,
-                  credentials: {...businessInfo.credentials, insuranceInfo: text}
-                })}
-                placeholder="Enter insurance details (provider, policy number, coverage)"
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Verification Document Section */}
-        <View style={styles.formSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="document-text-outline" size={moderateScale(24)} color="#1C86FF" />
-            <Text style={styles.sectionTitle}>Verification Document</Text>
-          </View>
-          <Text style={styles.sectionSubtitle}>
-            Upload official documents to verify your business (business registration, permits, or licenses)
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Upload Document (PDF)</Text>
-            <Text style={styles.hint}>Maximum file size: 5MB</Text>
-            <TouchableOpacity
-              style={styles.documentUploadContainer}
-              onPress={handleDocumentPicker}
-            >
-              {businessInfo.verificationDocument ? (
-                <View style={styles.documentUploaded}>
-                  <Ionicons name="document-text" size={moderateScale(40)} color="#4CAF50" />
-                  <View style={styles.documentInfo}>
-                    <Text style={styles.documentUploadedText}>
-                      {typeof businessInfo.verificationDocument === 'string'
-                        ? 'Document Uploaded'
-                        : businessInfo.verificationDocument.name || 'Document Selected'}
-                    </Text>
-                    <Text style={styles.documentSubtext}>Tap to replace</Text>
-                  </View>
-                  <Ionicons name="checkmark-circle" size={moderateScale(28)} color="#4CAF50" />
-                </View>
-              ) : (
-                <View style={styles.documentPlaceholder}>
-                  <Ionicons name="cloud-upload-outline" size={moderateScale(48)} color="#1C86FF" />
-                  <Text style={styles.documentUploadTitle}>Upload Verification Document</Text>
-                  <Text style={styles.documentUploadSubtext}>
-                    Tap to select a PDF file from your device
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -836,76 +644,5 @@ const styles = StyleSheet.create({
   dropdownItemTextSelected: {
     color: '#1C86FF',
     fontWeight: '600',
-  },
-  addCertContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addButton: {
-    padding: moderateScale(4),
-  },
-  certList: {
-    marginTop: moderateScale(8),
-  },
-  certItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    borderRadius: moderateScale(8),
-    padding: moderateScale(12),
-    marginBottom: moderateScale(8),
-    gap: moderateScale(10),
-    borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
-  },
-  certText: {
-    flex: 1,
-    fontSize: scaleFontSize(14),
-    color: '#333',
-    fontWeight: '500',
-  },
-  documentUploadContainer: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: moderateScale(12),
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    padding: moderateScale(20),
-    minHeight: moderateScale(120),
-    justifyContent: 'center',
-  },
-  documentPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  documentUploadTitle: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '600',
-    color: '#1C86FF',
-    marginTop: moderateScale(12),
-    marginBottom: moderateScale(4),
-  },
-  documentUploadSubtext: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    textAlign: 'center',
-  },
-  documentUploaded: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: moderateScale(12),
-  },
-  documentInfo: {
-    flex: 1,
-  },
-  documentUploadedText: {
-    fontSize: scaleFontSize(15),
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginBottom: moderateScale(4),
-  },
-  documentSubtext: {
-    fontSize: scaleFontSize(12),
-    color: '#666',
   },
 });
