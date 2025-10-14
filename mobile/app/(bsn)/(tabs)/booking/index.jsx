@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   FlatList,
   TouchableOpacity,
   ImageBackground,
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,126 +17,232 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
 
 const CustomerBookings = () => {
   const [searchText, setSearchText] = useState('');
+  const [bookings, setBookings] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const router = useRouter();
 
-  const [bookings] = useState([
-    {
-      id: '109-177-748',
-      customerName: 'John Doe',
-      petName: 'Max',
-      petType: 'Dog',
-      service: 'Veterinary Check-up',
-      date: '10-08-2025',
-      time: '1:00 PM',
-      icon: 'medical-outline',
-      status: 'Scheduled',
-      phone: '+63 912 345 6789'
-    },
-    {
-      id: '356-455-349',
-      customerName: 'Jane Smith',
-      petName: 'Luna',
-      petType: 'Cat',
-      service: 'Pet Grooming',
-      date: '10-02-2025',
-      time: '8:00 AM',
-      icon: 'cut-outline',
-      status: 'Cancelled',
-      phone: '+63 923 456 7890'
-    },
-    {
-      id: '497-370-547',
-      customerName: 'Mike Johnson',
-      petName: 'Buddy',
-      petType: 'Dog',
-      service: 'Pet Boarding',
-      date: '09-30-2025',
-      time: '6:00 PM',
-      icon: 'home-outline',
-      status: 'Completed',
-      phone: '+63 934 567 8901'
-    },
-    {
-      id: '266-139-886',
-      customerName: 'Sarah Wilson',
-      petName: 'Whiskers',
-      petType: 'Cat',
-      service: 'Vaccination',
-      date: '10-03-2025',
-      time: '8:00 AM',
-      icon: 'medical-outline',
-      status: 'Scheduled',
-      phone: '+63 945 678 9012'
-    },
-    {
-      id: '976-630-165',
-      customerName: 'David Brown',
-      petName: 'Charlie',
-      petType: 'Dog',
-      service: 'Pet Training',
-      date: '10-06-2025',
-      time: '10:00 AM',
-      icon: 'school-outline',
-      status: 'Completed',
-      phone: '+63 956 789 0123'
-    }
-  ]);
+  useEffect(() => {
+    fetchBookings();
+    fetchAllBookingsForStats();
+  }, [selectedStatus]);
 
-  const filteredBookings = bookings.filter(booking =>
-    booking.customerName.toLowerCase().includes(searchText.toLowerCase()) ||
-    booking.petName.toLowerCase().includes(searchText.toLowerCase()) ||
-    booking.service.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const fetchAllBookingsForStats = async () => {
+    try {
+      // Fetch first 100 bookings for filter counts only
+      const response = await apiClient.get('/bookings', {
+        params: { page: 1, limit: 100 }
+      });
+
+      if (response.data && response.data.success) {
+        setAllBookings(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings for stats:', error);
+    }
+  };
+
+  const fetchBookings = async (pageNum = 1) => {
+    try {
+      if (pageNum === 1) {
+        setLoading(true);
+      }
+
+      const params = {
+        page: pageNum,
+        limit: 20,
+      };
+
+      // Add status filter if not 'all'
+      if (selectedStatus !== 'all') {
+        params.status = selectedStatus;
+      }
+
+      const response = await apiClient.get('/bookings', { params });
+
+      if (response.data && response.data.success) {
+        const newBookings = response.data.data || [];
+
+        if (pageNum === 1) {
+          setBookings(newBookings);
+        } else {
+          setBookings(prev => [...prev, ...newBookings]);
+        }
+
+        // Check if there are more pages
+        const pagination = response.data.pagination;
+        setHasMore(pagination && pagination.page < pagination.pages);
+        setPage(pageNum);
+      }
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setPage(1);
+    setHasMore(true);
+    fetchBookings(1);
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      fetchBookings(page + 1);
+    }
+  };
+
+  const getServiceIcon = (serviceName) => {
+    const name = serviceName?.toLowerCase() || '';
+    if (name.includes('vet') || name.includes('check')) return 'medical-outline';
+    if (name.includes('groom')) return 'cut-outline';
+    if (name.includes('board')) return 'home-outline';
+    if (name.includes('train')) return 'school-outline';
+    if (name.includes('vaccin')) return 'medical-outline';
+    return 'paw-outline';
+  };
+
+  const filteredBookings = bookings.filter(booking => {
+    const searchLower = searchText.toLowerCase();
+    const customerName = `${booking.petOwnerDetails?.firstName || ''} ${booking.petOwnerDetails?.lastName || ''}`.toLowerCase();
+    const petName = booking.petDetails?.name?.toLowerCase() || '';
+    const service = booking.serviceDetails?.name?.toLowerCase() || '';
+
+    return customerName.includes(searchLower) ||
+           petName.includes(searchLower) ||
+           service.includes(searchLower);
+  });
 
   const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'scheduled':
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return '#FF9B79'; // orange
+      case 'confirmed':
         return '#28a745'; // green
-      case 'cancelled':
-        return '#dc3545'; // red
+      case 'in-progress':
+        return '#FFC107'; // yellow
       case 'completed':
         return '#007bff'; // blue
+      case 'cancelled':
+        return '#dc3545'; // red
+      case 'no-show':
+        return '#6c757d'; // gray
       default:
         return '#6c757d';
     }
   };
 
-  const renderBookingItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.bookingItem}
-      onPress={() => router.push({
-        pathname: "../booking/AppointmentDetails",
-        params: {
-          ...item,
-          businessName: 'Your Business', // Add business context
-          businessType: item.service
-        }
-      })}
-    >
-      {/* Icon inside circle */}
-      <View style={styles.circlePlaceholder}>
-        <Ionicons name={item.icon} size={hp(4)} color="#1C86FF" />
-      </View>
+  const getStatusLabel = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'Pending';
+      case 'confirmed':
+        return 'Confirmed';
+      case 'in-progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'no-show':
+        return 'No Show';
+      default:
+        return status || 'Unknown';
+    }
+  };
 
-      {/* Details */}
-      <View style={styles.bookingDetails}>
-        <Text style={styles.customerName}>{item.customerName}</Text>
-        <Text style={styles.petInfo}>
-          {item.petName} • {item.petType}
-        </Text>
-        <Text style={styles.serviceText}>{item.service}</Text>
-        <Text style={styles.bookingDateTime}>{item.date} | {item.time}</Text>
-      </View>
+  const formatDateTime = (dateTime) => {
+    if (!dateTime) return 'N/A';
+    const date = new Date(dateTime);
+    const dateStr = date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `${dateStr} | ${timeStr}`;
+  };
 
-      {/* Status */}
-      <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-        {item.status}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderBookingItem = ({ item }) => {
+    const customerName = item.petOwnerDetails
+      ? `${item.petOwnerDetails.firstName || ''} ${item.petOwnerDetails.lastName || ''}`.trim()
+      : 'Unknown Customer';
+    const petName = item.petDetails?.name || 'Unknown Pet';
+    const petType = item.petDetails?.species || 'Pet';
+    const service = item.serviceDetails?.name || 'Service';
+    const hasPaymentProof = !!item.paymentProof;
+    const paymentStatus = item.paymentStatus?.toLowerCase();
+
+    return (
+      <TouchableOpacity
+        style={styles.bookingCard}
+        onPress={() => router.push({
+          pathname: "../booking/AppointmentDetails",
+          params: {
+            bookingId: item._id,
+          }
+        })}
+        activeOpacity={0.6}
+      >
+        <View style={styles.cardContent}>
+          {/* Top Row: Customer & Status */}
+          <View style={styles.topRow}>
+            <Text style={styles.customerName}>{customerName}</Text>
+            <Text style={[styles.status, { color: getStatusColor(item.status) }]}>
+              {getStatusLabel(item.status)}
+            </Text>
+          </View>
+
+          {/* Service */}
+          <Text style={styles.service}>{service}</Text>
+
+          {/* Pet & Date/Time Row */}
+          <View style={styles.metaRow}>
+            <Text style={styles.metaText}>{petName}</Text>
+            <Text style={styles.metaDot}>•</Text>
+            <Text style={styles.metaText}>{formatDateTime(item.appointmentDateTime)}</Text>
+          </View>
+
+          {/* Payment Indicator */}
+          {(paymentStatus === 'paid' || (hasPaymentProof && paymentStatus === 'proof-uploaded')) && (
+            <View style={styles.paymentIndicator}>
+              {paymentStatus === 'paid' && (
+                <Ionicons name="checkmark-circle" size={moderateScale(14)} color="#4CAF50" />
+              )}
+              {hasPaymentProof && paymentStatus === 'proof-uploaded' && (
+                <Ionicons name="time-outline" size={moderateScale(14)} color="#FFC107" />
+              )}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const statusFilters = [
+    { label: 'All', value: 'all' },
+    { label: 'Pending', value: 'pending' },
+    { label: 'Confirmed', value: 'confirmed' },
+    { label: 'In Progress', value: 'in-progress' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Cancelled', value: 'cancelled' },
+    { label: 'No Show', value: 'no-show' },
+  ];
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -142,6 +251,111 @@ const CustomerBookings = () => {
       </Text>
     </View>
   );
+
+
+  const getStatusCount = (status) => {
+    if (status === 'all') return allBookings.length;
+    const statusMap = {
+      'pending': 'pending',
+      'confirmed': 'confirmed',
+      'in-progress': 'in-progress',
+      'completed': 'completed',
+      'cancelled': 'cancelled',
+      'no-show': 'no-show',
+    };
+    return allBookings.filter(b => b.status === statusMap[status]).length;
+  };
+
+  const renderStatusFilters = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.filterContainer}
+    >
+      {statusFilters.map((filter) => {
+        const count = getStatusCount(filter.value);
+        return (
+          <TouchableOpacity
+            key={filter.value}
+            style={[
+              styles.filterChip,
+              selectedStatus === filter.value && styles.filterChipActive
+            ]}
+            onPress={() => {
+              setSelectedStatus(filter.value);
+              setPage(1);
+              setHasMore(true);
+            }}
+          >
+            <Text style={[
+              styles.filterChipText,
+              selectedStatus === filter.value && styles.filterChipTextActive
+            ]}>
+              {filter.label}
+            </Text>
+            {allBookings.length > 0 && count > 0 && (
+              <View style={[
+                styles.filterBadge,
+                selectedStatus === filter.value && styles.filterBadgeActive
+              ]}>
+                <Text style={[
+                  styles.filterBadgeText,
+                  selectedStatus === filter.value && styles.filterBadgeTextActive
+                ]}>
+                  {count}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+
+  const renderFooter = () => {
+    if (!loading || page === 1) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#1C86FF" />
+      </View>
+    );
+  };
+
+  const renderEmpty = () => {
+    if (loading) return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="calendar-outline" size={moderateScale(80)} color="#ccc" />
+        <Text style={styles.emptyText}>No bookings found</Text>
+        <Text style={styles.emptySubtext}>
+          Bookings from customers will appear here
+        </Text>
+      </View>
+    );
+  };
+
+  if (loading && page === 1) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={false}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading bookings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -171,13 +385,28 @@ const CustomerBookings = () => {
         />
       </View>
 
+      {/* Status Filters */}
+      {renderStatusFilters()}
+
       {/* List */}
       <FlatList
         data={filteredBookings}
         renderItem={renderBookingItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#1C86FF']}
+            tintColor="#1C86FF"
+          />
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmpty}
       />
     </SafeAreaView>
   );
@@ -225,57 +454,141 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(10),
     color: '#333',
   },
+  filterContainer: {
+    paddingHorizontal: wp(4),
+    paddingVertical: moderateScale(10),
+    gap: moderateScale(8),
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#F0F0F0',
+    marginRight: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: moderateScale(6),
+  },
+  filterChipActive: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+  },
+  filterChipText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  filterBadge: {
+    backgroundColor: '#1C86FF',
+    borderRadius: moderateScale(10),
+    minWidth: moderateScale(20),
+    height: moderateScale(20),
+    paddingHorizontal: moderateScale(6),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeActive: {
+    backgroundColor: '#fff',
+  },
+  filterBadgeText: {
+    fontSize: scaleFontSize(11),
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  filterBadgeTextActive: {
+    color: '#1C86FF',
+  },
   listContent: {
     paddingHorizontal: wp(4),
     paddingBottom: moderateScale(20),
   },
-  bookingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  bookingCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(10),
-    padding: moderateScale(15),
     marginBottom: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#1C86FF',
-    minHeight: hp(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    position: 'relative',
   },
-  circlePlaceholder: {
-    width: hp(9),
-    height: hp(9),
-    borderRadius: hp(4.5),
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
+  cardContent: {
+    paddingVertical: moderateScale(16),
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: moderateScale(15),
-  },
-  bookingDetails: {
-    flex: 1,
+    marginBottom: moderateScale(8),
   },
   customerName: {
     fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginBottom: moderateScale(2),
-  },
-  petInfo: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    marginBottom: moderateScale(4),
-  },
-  serviceText: {
-    fontSize: scaleFontSize(14),
-    color: '#333',
-    fontWeight: '500',
-    marginBottom: moderateScale(4),
-  },
-  bookingDateTime: {
-    fontSize: scaleFontSize(12),
-    color: '#777777',
-  },
-  statusText: {
-    fontSize: scaleFontSize(14),
     fontWeight: '600',
+    color: '#000',
+    flex: 1,
+  },
+  status: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    marginLeft: moderateScale(12),
+  },
+  service: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    marginBottom: moderateScale(6),
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    fontSize: scaleFontSize(13),
+    color: '#8E8E93',
+  },
+  metaDot: {
+    fontSize: scaleFontSize(13),
+    color: '#8E8E93',
+    marginHorizontal: moderateScale(6),
+  },
+  paymentIndicator: {
+    position: 'absolute',
+    top: moderateScale(16),
+    right: moderateScale(4),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
+  footerLoader: {
+    paddingVertical: moderateScale(20),
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(80),
+  },
+  emptyText: {
+    fontSize: scaleFontSize(18),
+    fontWeight: '600',
+    color: '#666',
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(8),
+  },
+  emptySubtext: {
+    fontSize: scaleFontSize(14),
+    color: '#999',
+    textAlign: 'center',
   },
 });
 

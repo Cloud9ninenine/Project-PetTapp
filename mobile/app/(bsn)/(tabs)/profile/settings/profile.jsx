@@ -131,12 +131,9 @@ export default function ProfileScreen() {
         typeof profileData.profilePicture === 'object' &&
         profileData.profilePicture.uri;
 
+      // First, upload profile picture if there's a new one
       if (hasNewProfilePicture) {
-        // Use FormData for file upload
-        const formData = new FormData();
-
-        formData.append('user', JSON.stringify(userData));
-        formData.append('profile', JSON.stringify(profileUpdateData));
+        const imageFormData = new FormData();
 
         const pictureUri = Platform.OS === 'ios'
           ? profileData.profilePicture.uri.replace('file://', '')
@@ -145,22 +142,22 @@ export default function ProfileScreen() {
         const match = /\.(\w+)$/.exec(filename);
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-        formData.append('profilePicture', {
+        imageFormData.append('image', {
           uri: pictureUri,
           name: filename || 'profile.jpg',
           type,
         });
 
-        await apiClient.put('/users/profile', formData, {
+        await apiClient.post('/files/users/profile', imageFormData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-      } else {
-        // Send as JSON when no file upload
-        await apiClient.put('/users/profile', {
-          user: userData,
-          profile: profileUpdateData,
-        });
       }
+
+      // Then, update user profile data
+      await apiClient.put('/users/profile', {
+        user: userData,
+        profile: profileUpdateData,
+      });
 
       Alert.alert('Success', 'Profile updated successfully!', [
         { text: 'OK', onPress: () => router.back() }
