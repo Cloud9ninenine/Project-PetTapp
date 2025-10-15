@@ -9,7 +9,7 @@ import {
   ImageBackground,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
+  Modal,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,7 @@ const CustomerBookings = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -115,9 +116,11 @@ const CustomerBookings = () => {
 
   const filteredBookings = bookings.filter(booking => {
     const searchLower = searchText.toLowerCase();
-    const customerName = `${booking.petOwnerDetails?.firstName || ''} ${booking.petOwnerDetails?.lastName || ''}`.toLowerCase();
-    const petName = booking.petDetails?.name?.toLowerCase() || '';
-    const service = booking.serviceDetails?.name?.toLowerCase() || '';
+    // Access populated fields correctly
+    const petOwner = booking.petOwnerId || {};
+    const customerName = `${petOwner.firstName || ''} ${petOwner.lastName || ''}`.toLowerCase();
+    const petName = booking.petId?.name?.toLowerCase() || '';
+    const service = booking.serviceId?.name?.toLowerCase() || '';
 
     return customerName.includes(searchLower) ||
            petName.includes(searchLower) ||
@@ -179,14 +182,24 @@ const CustomerBookings = () => {
   };
 
   const renderBookingItem = ({ item }) => {
-    const customerName = item.petOwnerDetails
-      ? `${item.petOwnerDetails.firstName || ''} ${item.petOwnerDetails.lastName || ''}`.trim()
+    // Backend returns populated fields as petOwnerId, petId, serviceId (not petOwnerDetails, etc.)
+    const petOwner = item.petOwnerId || {};
+    const customerName = (petOwner.firstName && petOwner.lastName)
+      ? `${petOwner.firstName} ${petOwner.lastName}`.trim()
       : 'Unknown Customer';
-    const petName = item.petDetails?.name || 'Unknown Pet';
-    const petType = item.petDetails?.species || 'Pet';
-    const service = item.serviceDetails?.name || 'Service';
-    const hasPaymentProof = !!item.paymentProof;
+
+    const pet = item.petId || {};
+    const petName = pet.name || 'Unknown Pet';
+    const petType = pet.species || 'Pet';
+
+    const service = item.serviceId?.name || 'Service';
+
+    // Payment proof is stored as an object with imageUrl
+    const hasPaymentProof = !!(item.paymentProof?.imageUrl);
     const paymentStatus = item.paymentStatus?.toLowerCase();
+
+    // Format booking ID for display
+    const bookingId = item._id ? `#${item._id.slice(-8).toUpperCase()}` : 'N/A';
 
     return (
       <TouchableOpacity
@@ -200,32 +213,55 @@ const CustomerBookings = () => {
         activeOpacity={0.6}
       >
         <View style={styles.cardContent}>
-          {/* Top Row: Customer & Status */}
-          <View style={styles.topRow}>
+          {/* Header Row: Booking ID & Status */}
+          <View style={styles.headerRow}>
+            <View style={styles.bookingIdContainer}>
+              <Ionicons name="receipt-outline" size={moderateScale(16)} color="#666" />
+              <Text style={styles.bookingId}>{bookingId}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+              <Text style={styles.statusText}>{getStatusLabel(item.status)}</Text>
+            </View>
+          </View>
+
+          {/* Customer Name */}
+          <View style={styles.customerRow}>
+            <Ionicons name="person-outline" size={moderateScale(18)} color="#1C86FF" />
             <Text style={styles.customerName}>{customerName}</Text>
-            <Text style={[styles.status, { color: getStatusColor(item.status) }]}>
-              {getStatusLabel(item.status)}
-            </Text>
           </View>
 
           {/* Service */}
-          <Text style={styles.service}>{service}</Text>
+          <View style={styles.infoRow}>
+            <Ionicons name="cut-outline" size={moderateScale(16)} color="#666" />
+            <Text style={styles.service}>{service}</Text>
+          </View>
 
-          {/* Pet & Date/Time Row */}
-          <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{petName}</Text>
-            <Text style={styles.metaDot}>•</Text>
+          {/* Pet Info */}
+          <View style={styles.infoRow}>
+            <Ionicons name="paw-outline" size={moderateScale(16)} color="#666" />
+            <Text style={styles.metaText}>{petName} ({petType})</Text>
+          </View>
+
+          {/* Date/Time */}
+          <View style={styles.infoRow}>
+            <Ionicons name="calendar-outline" size={moderateScale(16)} color="#666" />
             <Text style={styles.metaText}>{formatDateTime(item.appointmentDateTime)}</Text>
           </View>
 
           {/* Payment Indicator */}
           {(paymentStatus === 'paid' || (hasPaymentProof && paymentStatus === 'proof-uploaded')) && (
-            <View style={styles.paymentIndicator}>
+            <View style={styles.paymentRow}>
               {paymentStatus === 'paid' && (
-                <Ionicons name="checkmark-circle" size={moderateScale(14)} color="#4CAF50" />
+                <>
+                  <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#4CAF50" />
+                  <Text style={[styles.paymentText, { color: '#4CAF50' }]}>Payment Verified</Text>
+                </>
               )}
               {hasPaymentProof && paymentStatus === 'proof-uploaded' && (
-                <Ionicons name="time-outline" size={moderateScale(14)} color="#FFC107" />
+                <>
+                  <Ionicons name="time-outline" size={moderateScale(16)} color="#FFC107" />
+                  <Text style={[styles.paymentText, { color: '#FFC107' }]}>Awaiting Verification</Text>
+                </>
               )}
             </View>
           )}
@@ -266,50 +302,66 @@ const CustomerBookings = () => {
     return allBookings.filter(b => b.status === statusMap[status]).length;
   };
 
-  const renderStatusFilters = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.filterContainer}
+  const renderFilterModal = () => (
+    <Modal
+      visible={filterModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setFilterModalVisible(false)}
     >
-      {statusFilters.map((filter) => {
-        const count = getStatusCount(filter.value);
-        return (
-          <TouchableOpacity
-            key={filter.value}
-            style={[
-              styles.filterChip,
-              selectedStatus === filter.value && styles.filterChipActive
-            ]}
-            onPress={() => {
-              setSelectedStatus(filter.value);
-              setPage(1);
-              setHasMore(true);
-            }}
-          >
-            <Text style={[
-              styles.filterChipText,
-              selectedStatus === filter.value && styles.filterChipTextActive
-            ]}>
-              {filter.label}
-            </Text>
-            {allBookings.length > 0 && count > 0 && (
-              <View style={[
-                styles.filterBadge,
-                selectedStatus === filter.value && styles.filterBadgeActive
-              ]}>
-                <Text style={[
-                  styles.filterBadgeText,
-                  selectedStatus === filter.value && styles.filterBadgeTextActive
-                ]}>
-                  {count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={() => setFilterModalVisible(false)}
+      >
+        <View style={styles.filterDropdown}>
+          {statusFilters.map((filter) => {
+            const count = getStatusCount(filter.value);
+            const isSelected = selectedStatus === filter.value;
+            return (
+              <TouchableOpacity
+                key={filter.value}
+                style={[
+                  styles.filterOption,
+                  isSelected && styles.filterOptionSelected
+                ]}
+                onPress={() => {
+                  setSelectedStatus(filter.value);
+                  setPage(1);
+                  setHasMore(true);
+                  setFilterModalVisible(false);
+                }}
+              >
+                <View style={styles.filterOptionContent}>
+                  <Text style={[
+                    styles.filterOptionText,
+                    isSelected && styles.filterOptionTextSelected
+                  ]}>
+                    {filter.label}
+                  </Text>
+                  {allBookings.length > 0 && count > 0 && (
+                    <View style={[
+                      styles.filterCountBadge,
+                      isSelected && styles.filterCountBadgeSelected
+                    ]}>
+                      <Text style={[
+                        styles.filterCountText,
+                        isSelected && styles.filterCountTextSelected
+                      ]}>
+                        {count}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {isSelected && (
+                  <Ionicons name="checkmark" size={moderateScale(20)} color="#1C86FF" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </TouchableOpacity>
+    </Modal>
   );
 
   const renderFooter = () => {
@@ -373,7 +425,7 @@ const CustomerBookings = () => {
         showBack={false}
       />
 
-      {/* Search Bar */}
+      {/* Search Bar with Filter Button */}
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
         <TextInput
@@ -383,10 +435,19 @@ const CustomerBookings = () => {
           value={searchText}
           onChangeText={setSearchText}
         />
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <Ionicons name="filter" size={moderateScale(22)} color="#1C86FF" />
+          {selectedStatus !== 'all' && (
+            <View style={styles.filterActiveDot} />
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Status Filters */}
-      {renderStatusFilters()}
+      {/* Filter Modal */}
+      {renderFilterModal()}
 
       {/* List */}
       <FlatList
@@ -454,55 +515,86 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(10),
     color: '#333',
   },
-  filterContainer: {
-    paddingHorizontal: wp(4),
-    paddingVertical: moderateScale(10),
-    gap: moderateScale(8),
+  filterButton: {
+    padding: moderateScale(8),
+    marginLeft: moderateScale(8),
+    position: 'relative',
   },
-  filterChip: {
+  filterActiveDot: {
+    position: 'absolute',
+    top: moderateScale(6),
+    right: moderateScale(6),
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    backgroundColor: '#FF6B6B',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: hp(13),
+    paddingRight: wp(4),
+  },
+  filterDropdown: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    minWidth: wp(50),
+    maxWidth: wp(80),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#F0F0F0',
-    marginRight: moderateScale(8),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    gap: moderateScale(6),
+    paddingVertical: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  filterChipActive: {
-    backgroundColor: '#1C86FF',
-    borderColor: '#1C86FF',
+  filterOptionSelected: {
+    backgroundColor: '#F0F7FF',
   },
-  filterChipText: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
+  filterOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: moderateScale(8),
+  },
+  filterOptionText: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
     fontWeight: '500',
   },
-  filterChipTextActive: {
-    color: '#fff',
+  filterOptionTextSelected: {
+    color: '#1C86FF',
     fontWeight: '600',
   },
-  filterBadge: {
-    backgroundColor: '#1C86FF',
+  filterCountBadge: {
+    backgroundColor: '#E8E8E8',
     borderRadius: moderateScale(10),
-    minWidth: moderateScale(20),
-    height: moderateScale(20),
-    paddingHorizontal: moderateScale(6),
+    minWidth: moderateScale(24),
+    height: moderateScale(24),
+    paddingHorizontal: moderateScale(8),
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filterBadgeActive: {
-    backgroundColor: '#fff',
+  filterCountBadgeSelected: {
+    backgroundColor: '#1C86FF',
   },
-  filterBadgeText: {
-    fontSize: scaleFontSize(11),
-    color: '#fff',
+  filterCountText: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
     fontWeight: 'bold',
   },
-  filterBadgeTextActive: {
-    color: '#1C86FF',
+  filterCountTextSelected: {
+    color: '#FFFFFF',
   },
   listContent: {
     paddingHorizontal: wp(4),
@@ -510,53 +602,90 @@ const styles = StyleSheet.create({
   },
   bookingCard: {
     backgroundColor: '#FFFFFF',
-    marginBottom: moderateScale(12),
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
-    position: 'relative',
+    marginBottom: moderateScale(16),
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardContent: {
-    paddingVertical: moderateScale(16),
+    padding: moderateScale(16),
   },
-  topRow: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: moderateScale(8),
+    marginBottom: moderateScale(12),
+    paddingBottom: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  customerName: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '600',
-    color: '#000',
-    flex: 1,
+  bookingIdContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
   },
-  status: {
+  bookingId: {
     fontSize: scaleFontSize(13),
     fontWeight: '600',
-    marginLeft: moderateScale(12),
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+  statusBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+  },
+  statusText: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(10),
+  },
+  customerName: {
+    fontSize: scaleFontSize(17),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    flex: 1,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(8),
   },
   service: {
     fontSize: scaleFontSize(15),
     color: '#333',
-    marginBottom: moderateScale(6),
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: '500',
+    flex: 1,
   },
   metaText: {
-    fontSize: scaleFontSize(13),
-    color: '#8E8E93',
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    flex: 1,
   },
-  metaDot: {
-    fontSize: scaleFontSize(13),
-    color: '#8E8E93',
-    marginHorizontal: moderateScale(6),
+  paymentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    marginTop: moderateScale(8),
+    paddingTop: moderateScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
-  paymentIndicator: {
-    position: 'absolute',
-    top: moderateScale(16),
-    right: moderateScale(4),
+  paymentText: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

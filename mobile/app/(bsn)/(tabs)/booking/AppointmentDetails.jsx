@@ -8,7 +8,6 @@ import {
   Alert,
   ImageBackground,
   Modal,
-  Platform,
   ActivityIndicator,
   Image,
   Linking,
@@ -18,7 +17,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
@@ -29,11 +27,6 @@ const AppointmentDetail = () => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [bookingData, setBookingData] = useState(null);
-  const [rescheduleModal, setRescheduleModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [selectedTime, setSelectedTime] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -49,13 +42,7 @@ const AppointmentDetail = () => {
       const response = await apiClient.get(`/bookings/${params.bookingId}`);
 
       if (response.data && response.data.success) {
-        const bookingInfo = response.data.data;
-        console.log('=== BOOKING DATA ===');
-        console.log('Full booking:', JSON.stringify(bookingInfo, null, 2));
-        console.log('Pet Owner Details:', bookingInfo.petOwnerDetails);
-        console.log('Pet Details:', bookingInfo.petDetails);
-        console.log('Service Details:', bookingInfo.serviceDetails);
-        setBookingData(bookingInfo);
+        setBookingData(response.data.data);
       }
     } catch (error) {
       console.error('Error fetching booking details:', error);
@@ -235,8 +222,8 @@ const AppointmentDetail = () => {
   };
 
   const handleCallCustomer = () => {
-    const petOwner = bookingData?.petOwnerDetails || bookingData?.petOwner || {};
-    const contactNumber = petOwner.contactNumber || petOwner.phone || petOwner.user?.contactNumber;
+    const petOwner = bookingData?.petOwnerId || {};
+    const contactNumber = petOwner.contactNumber;
 
     if (contactNumber) {
       Linking.openURL(`tel:${contactNumber}`);
@@ -245,44 +232,6 @@ const AppointmentDetail = () => {
     }
   };
 
-  const handleDateChange = (event, date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (date) {
-      setSelectedDate(date);
-    }
-  };
-
-  const handleTimeChange = (event, time) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-    if (time) {
-      setSelectedTime(time);
-    }
-  };
-
-  const confirmReschedule = () => {
-    const formattedDate = selectedDate.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-    const formattedTime = selectedTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-
-    setRescheduleModal(false);
-    Alert.alert(
-      'Reschedule Confirmed',
-      `Appointment rescheduled to ${formattedDate} at ${formattedTime}`,
-      [{ text: 'OK' }]
-    );
-    // TODO: Implement actual reschedule API call when backend supports it
-  };
 
   const renderActionButtons = () => {
     if (!bookingData) return null;
@@ -408,86 +357,6 @@ const AppointmentDetail = () => {
     return null;
   };
 
-  const renderPaymentSection = () => {
-    if (!bookingData) return null;
-
-    const paymentProof = bookingData.paymentProof;
-    const paymentStatus = bookingData.paymentStatus?.toLowerCase();
-
-    // Ensure paymentProof is a string, not an object
-    const paymentProofUri = typeof paymentProof === 'string' ? paymentProof : paymentProof?.uri || null;
-
-    return (
-      <View style={styles.paymentSection}>
-        <View style={styles.sectionHeader}>
-          <Ionicons name="wallet" size={moderateScale(24)} color="#1C86FF" />
-          <Text style={styles.sectionTitle}>Payment Information</Text>
-        </View>
-
-        <View style={styles.paymentDetails}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Amount</Text>
-            <Text style={styles.detailValue}>
-              {bookingData.totalAmount?.currency || 'PHP'} {bookingData.totalAmount?.amount?.toFixed(2) || '0.00'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status</Text>
-            <Text style={[styles.detailValue, {
-              color: paymentStatus === 'paid' ? '#4CAF50' :
-                     paymentStatus === 'failed' ? '#FF6B6B' :
-                     paymentStatus === 'proof-uploaded' ? '#FFC107' : '#666'
-            }]}>
-              {getPaymentStatusLabel(paymentStatus)}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Method</Text>
-            <Text style={styles.detailValue}>{getPaymentMethodLabel(bookingData.paymentMethod)}</Text>
-          </View>
-        </View>
-
-        {/* Payment Proof */}
-        {paymentProofUri && (
-          <View style={styles.paymentProofContainer}>
-            <Text style={styles.paymentProofLabel}>Payment Proof:</Text>
-            <Image
-              source={{ uri: paymentProofUri }}
-              style={styles.paymentProofImage}
-              resizeMode="contain"
-            />
-
-            {paymentStatus === 'proof-uploaded' && (
-              <View style={styles.paymentProofActions}>
-                <TouchableOpacity
-                  style={[styles.verifyButton, updating && styles.buttonDisabled]}
-                  onPress={handleVerifyPayment}
-                  disabled={updating}
-                >
-                  {updating ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                      <Text style={styles.verifyButtonText}>Verify Payment</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rejectButton, updating && styles.buttonDisabled]}
-                  onPress={handleRejectPayment}
-                  disabled={updating}
-                >
-                  <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
-                  <Text style={styles.rejectButtonText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-      </View>
-    );
-  };
 
   if (loading) {
     return (
@@ -535,35 +404,44 @@ const AppointmentDetail = () => {
     );
   }
 
+  // Extract all data
   const statusConfig = getStatusConfig(bookingData.status);
 
-  // Extract pet owner details - handle both populated object and direct fields
-  const petOwner = bookingData.petOwnerDetails || bookingData.petOwner || {};
-  const firstName = petOwner.firstName || petOwner.user?.firstName || '';
-  const lastName = petOwner.lastName || petOwner.user?.lastName || '';
-  const customerName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : 'Unknown Customer';
+  // Service information
+  const service = bookingData.serviceId || {};
+  const serviceName = service.name || 'Service';
+  const serviceCategory = service.category || 'N/A';
+  const serviceDuration = bookingData.duration || 'N/A';
+  const servicePrice = bookingData.totalAmount || {};
 
-  // Extract pet details
-  const pet = bookingData.petDetails || bookingData.pet || {};
+  // Pet owner information
+  const petOwner = bookingData.petOwnerId || {};
+  const ownerName = (petOwner.firstName && petOwner.lastName)
+    ? `${petOwner.firstName} ${petOwner.lastName}`.trim()
+    : 'Unknown Customer';
+  const ownerEmail = petOwner.email || 'N/A';
+  const ownerPhone = petOwner.contactNumber || 'N/A';
+
+  // Pet information
+  const pet = bookingData.petId || {};
   const petName = pet.name || 'Unknown Pet';
-  const petType = pet.species || pet.petType || 'Pet';
+  const petSpecies = pet.species || 'N/A';
+  const petAge = pet.age ? `${pet.age} years` : 'N/A';
 
-  // Extract service details
-  const serviceData = bookingData.serviceDetails || bookingData.service || {};
-  const service = serviceData.name || serviceData.serviceName || 'Service';
+  // Appointment details
+  const bookingId = bookingData._id ? `#${bookingData._id.slice(-8).toUpperCase()}` : 'N/A';
+  const appointmentTime = formatDateTime(bookingData.appointmentDateTime);
+  const createdAt = formatDateTime(bookingData.createdAt);
 
-  // Extract contact info
-  const phone = petOwner.contactNumber || petOwner.phone || petOwner.user?.contactNumber || 'No contact number';
+  // Payment information
+  const paymentAmount = `${servicePrice.currency || 'PHP'} ${servicePrice.amount?.toFixed(2) || '0.00'}`;
+  const paymentStatus = bookingData.paymentStatus?.toLowerCase();
+  const paymentMethod = getPaymentMethodLabel(bookingData.paymentMethod);
 
-  // Ensure profile image is a string, not an object
-  const profileImageUri = petOwner.images?.profile || petOwner.profilePicture || petOwner.user?.images?.profile;
-  const profileImageUrl = typeof profileImageUri === 'string' ? profileImageUri : profileImageUri?.uri || null;
-
-  console.log('=== EXTRACTED DATA ===');
-  console.log('Customer Name:', customerName);
-  console.log('Pet Name:', petName);
-  console.log('Service:', service);
-  console.log('Phone:', phone);
+  // Payment proof
+  const paymentProof = bookingData.paymentProof;
+  const paymentProofUri = paymentProof?.imageUrl || null;
+  const proofRejectionReason = paymentProof?.rejectionReason || null;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -573,7 +451,6 @@ const AppointmentDetail = () => {
         imageStyle={styles.backgroundImageStyle}
         resizeMode="repeat"
       />
-      {/* Header */}
       <Header
         backgroundColor="#1C86FF"
         titleColor="#fff"
@@ -581,174 +458,201 @@ const AppointmentDetail = () => {
         showBack={true}
       />
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Status Bar */}
-        <View style={[styles.statusBar, { backgroundColor: statusConfig.backgroundColor }]}>
-          <Text style={styles.statusBarText}>{statusConfig.label}</Text>
-        </View>
 
-        {/* Customer Info */}
-        <View style={styles.customerSection}>
-          <View style={styles.customerLogo}>
-            {profileImageUrl ? (
-              <Image
-                source={{ uri: profileImageUrl }}
-                style={styles.customerImage}
-              />
-            ) : (
-              <Ionicons name="person" size={hp(4.5)} color="#1C86FF" />
-            )}
+        {/* 1. Service Information */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="briefcase-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Service Information</Text>
           </View>
-          <Text style={styles.customerName}>{customerName}</Text>
-          <Text style={styles.petInfo}>{petName} • {petType}</Text>
-          <TouchableOpacity style={styles.phoneButton} onPress={handleCallCustomer}>
-            <Ionicons name="call-outline" size={moderateScale(16)} color="#1C86FF" />
-            <Text style={styles.phoneText}>{phone}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Booking Information */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="calendar" size={moderateScale(24)} color="#1C86FF" />
-            <Text style={styles.sectionTitle}>Booking Information</Text>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Service Name</Text>
+            <Text style={styles.dataValue}>{serviceName}</Text>
           </View>
-
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Service</Text>
-              <Text style={styles.infoValue}>{service}</Text>
-            </View>
-
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Duration</Text>
-              <Text style={styles.infoValue}>{bookingData.duration} min</Text>
-            </View>
-
-            <View style={styles.infoItemFull}>
-              <Text style={styles.infoLabel}>Appointment Time</Text>
-              <Text style={styles.infoValue}>{formatDateTime(bookingData.appointmentDateTime)}</Text>
-            </View>
-
-            {bookingData.notes && (
-              <View style={styles.infoItemFull}>
-                <Text style={styles.infoLabel}>Customer Notes</Text>
-                <Text style={styles.infoValue}>{bookingData.notes}</Text>
-              </View>
-            )}
-
-            {bookingData.specialRequests && (
-              <View style={styles.infoItemFull}>
-                <Text style={styles.infoLabel}>Special Requests</Text>
-                <Text style={styles.infoValue}>{bookingData.specialRequests}</Text>
-              </View>
-            )}
-
-            {bookingData.cancellationReason && (
-              <View style={styles.infoItemFull}>
-                <Text style={styles.infoLabel}>Cancellation Reason</Text>
-                <Text style={[styles.infoValue, { color: '#FF6B6B' }]}>{bookingData.cancellationReason}</Text>
-              </View>
-            )}
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Category</Text>
+            <Text style={styles.dataValue}>{serviceCategory}</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Duration</Text>
+            <Text style={styles.dataValue}>{serviceDuration} min</Text>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Price</Text>
+            <Text style={styles.dataValue}>{paymentAmount}</Text>
           </View>
         </View>
 
-        {/* Payment Section */}
-        {renderPaymentSection()}
+        {/* 2. Pet Owner Information */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="person-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Pet Owner Information</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Name</Text>
+            <Text style={styles.dataValue}>{ownerName}</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Email</Text>
+            <Text style={styles.dataValue}>{ownerEmail}</Text>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Contact</Text>
+            <TouchableOpacity onPress={handleCallCustomer} style={styles.callButton}>
+              <Ionicons name="call-outline" size={moderateScale(14)} color="#1C86FF" />
+              <Text style={styles.callButtonText}>{ownerPhone}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-        {/* Action Buttons */}
+        {/* 3. Pet Information */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="paw-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Pet Information</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Pet Name</Text>
+            <Text style={styles.dataValue}>{petName}</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Species</Text>
+            <Text style={styles.dataValue}>{petSpecies}</Text>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Age</Text>
+            <Text style={styles.dataValue}>{petAge}</Text>
+          </View>
+        </View>
+
+        {/* 4. Appointment Details */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="calendar-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Appointment Details</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Booking ID</Text>
+            <Text style={[styles.dataValue, styles.bookingIdText]}>{bookingId}</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Status</Text>
+            <View style={[styles.statusBadgeInline, { backgroundColor: statusConfig.backgroundColor }]}>
+              <Text style={styles.statusBadgeText}>{statusConfig.label}</Text>
+            </View>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Appointment Time</Text>
+            <Text style={styles.dataValue}>{appointmentTime}</Text>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Booked On</Text>
+            <Text style={styles.dataValue}>{createdAt}</Text>
+          </View>
+
+          {bookingData.notes && (
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Customer Notes</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline]}>{bookingData.notes}</Text>
+            </View>
+          )}
+
+          {bookingData.specialRequests && (
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Special Requests</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline]}>{bookingData.specialRequests}</Text>
+            </View>
+          )}
+
+          {bookingData.cancellationReason && (
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Cancellation Reason</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline, { color: '#FF6B6B' }]}>
+                {bookingData.cancellationReason}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* 5. Payment Information */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="wallet-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Payment Information</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Amount</Text>
+            <Text style={styles.dataValue}>{paymentAmount}</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Status</Text>
+            <Text style={[styles.dataValue, {
+              color: paymentStatus === 'paid' ? '#4CAF50' :
+                     paymentStatus === 'failed' ? '#FF6B6B' :
+                     paymentStatus === 'proof-uploaded' ? '#FFC107' : '#666'
+            }]}>
+              {getPaymentStatusLabel(paymentStatus)}
+            </Text>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Method</Text>
+            <Text style={styles.dataValue}>{paymentMethod}</Text>
+          </View>
+        </View>
+
+        {/* 6. Payment Proof */}
+        {paymentProofUri && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="image-outline" size={moderateScale(22)} color="#1C86FF" />
+              <Text style={styles.sectionTitle}>Payment Proof</Text>
+            </View>
+            <Image
+              source={{ uri: paymentProofUri }}
+              style={styles.paymentProofImage}
+              resizeMode="contain"
+            />
+
+            {rejectionReason && (
+              <View style={styles.rejectionReasonBox}>
+                <Text style={styles.rejectionReasonLabel}>Rejection Reason:</Text>
+                <Text style={styles.rejectionReasonText}>{rejectionReason}</Text>
+              </View>
+            )}
+
+            {paymentStatus === 'proof-uploaded' && (
+              <View style={styles.paymentProofActions}>
+                <TouchableOpacity
+                  style={[styles.verifyButton, updating && styles.buttonDisabled]}
+                  onPress={handleVerifyPayment}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
+                      <Text style={styles.verifyButtonText}>Verify Payment</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.rejectButton, updating && styles.buttonDisabled]}
+                  onPress={handleRejectPayment}
+                  disabled={updating}
+                >
+                  <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
+                  <Text style={styles.rejectButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* 7. Action Buttons */}
         {renderActionButtons()}
       </ScrollView>
-
-      {/* Reschedule Modal */}
-      <Modal
-        visible={rescheduleModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setRescheduleModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reschedule Appointment</Text>
-              <TouchableOpacity onPress={() => setRescheduleModal(false)}>
-                <Ionicons name="close" size={moderateScale(28)} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>Select New Date & Time</Text>
-
-              {/* Date Selection */}
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Ionicons name="calendar-outline" size={moderateScale(20)} color="#1C86FF" />
-                <Text style={styles.dateTimeButtonText}>
-                  {selectedDate.toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </Text>
-                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-              </TouchableOpacity>
-
-              {/* Time Selection */}
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
-                <Text style={styles.dateTimeButtonText}>
-                  {selectedTime.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </Text>
-                <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-              </TouchableOpacity>
-
-              <View style={styles.modalButtonsRow}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => setRescheduleModal(false)}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalConfirmButton}
-                  onPress={confirmReschedule}
-                >
-                  <Text style={styles.modalConfirmButtonText}>Confirm</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-
-      {/* Time Picker */}
-      {showTimePicker && (
-        <DateTimePicker
-          value={selectedTime}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleTimeChange}
-        />
-      )}
 
       {/* Reject Payment Modal */}
       <Modal
@@ -858,131 +762,122 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(20),
     paddingBottom: moderateScale(40),
   },
-  statusBar: {
-    width: "100%",
-    paddingVertical: hp(1.2),
-    borderRadius: moderateScale(8),
-    alignItems: "center",
-    marginBottom: moderateScale(20),
-  },
-  statusBarText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
-  customerSection: { alignItems: "center", marginBottom: moderateScale(20) },
-  customerLogo: {
-    width: hp(9),
-    height: hp(9),
-    borderRadius: hp(4.5),
-    backgroundColor: "#E3F2FD",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: moderateScale(10),
-    overflow: 'hidden',
-  },
-  customerImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  customerName: { fontSize: scaleFontSize(20), fontWeight: "bold", color: "#1C86FF", marginBottom: moderateScale(4) },
-  petInfo: { fontSize: scaleFontSize(14), color: "#666", marginBottom: moderateScale(8) },
-  phoneButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: moderateScale(6),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(20),
-    backgroundColor: "#E3F2FD",
-  },
-  phoneText: {
-    fontSize: scaleFontSize(13),
-    color: "#1C86FF",
-    fontWeight: "500",
-  },
-  section: {
+  // Section Card Styles
+  sectionCard: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
     marginBottom: moderateScale(16),
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  infoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: moderateScale(12),
-    marginHorizontal: moderateScale(-6),
-  },
-  infoItem: {
-    width: '50%',
-    paddingHorizontal: moderateScale(6),
-    marginBottom: moderateScale(16),
-  },
-  infoItemFull: {
-    width: '100%',
-    paddingHorizontal: moderateScale(6),
-    marginBottom: moderateScale(16),
-  },
-  infoLabel: {
-    fontSize: scaleFontSize(12),
-    color: '#8E8E93',
-    marginBottom: moderateScale(4),
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: scaleFontSize(15),
-    color: '#1C1C1E',
-    fontWeight: '600',
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: moderateScale(10),
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  detailLabel: { fontSize: scaleFontSize(14), fontWeight: "500", color: "#333", flex: 1 },
-  detailValue: { fontSize: scaleFontSize(14), color: "#555", flex: 1, textAlign: 'right', fontWeight: '600' },
-  paymentSection: {
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(15),
-    marginBottom: moderateScale(20),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: moderateScale(15),
+    marginBottom: moderateScale(16),
+    paddingBottom: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
     gap: moderateScale(10),
   },
   sectionTitle: {
-    fontSize: scaleFontSize(18),
+    fontSize: scaleFontSize(17),
     fontWeight: 'bold',
     color: '#1C86FF',
   },
-  paymentDetails: {
-    gap: moderateScale(0),
+  // Data Row Styles
+  dataRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: moderateScale(10),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
   },
-  paymentProofContainer: {
-    marginTop: moderateScale(15),
-    paddingTop: moderateScale(15),
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+  dataRowLast: {
+    borderBottomWidth: 0,
   },
-  paymentProofLabel: {
-    fontSize: scaleFontSize(15),
+  dataLabel: {
+    fontSize: scaleFontSize(13),
+    color: '#8E8E93',
+    fontWeight: '500',
+    flex: 1,
+  },
+  dataValue: {
+    fontSize: scaleFontSize(14),
+    color: '#1C1C1E',
     fontWeight: '600',
-    color: '#333',
-    marginBottom: moderateScale(10),
+    flex: 1.5,
+    textAlign: 'right',
   },
+  dataValueMultiline: {
+    textAlign: 'left',
+  },
+  bookingIdText: {
+    fontFamily: 'monospace',
+    fontSize: scaleFontSize(13),
+  },
+  // Status Badge Inline
+  statusBadgeInline: {
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
+    alignSelf: 'flex-end',
+  },
+  statusBadgeText: {
+    color: '#fff',
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+  },
+  // Call Button
+  callButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(4),
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(6),
+    alignSelf: 'flex-end',
+  },
+  callButtonText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '500',
+  },
+  // Payment Proof Styles
   paymentProofImage: {
     width: '100%',
     height: hp(30),
     borderRadius: moderateScale(8),
     backgroundColor: '#F8F9FA',
     marginBottom: moderateScale(15),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#FFF3F3',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(15),
+    borderWidth: 1,
+    borderColor: '#FFD6D6',
+  },
+  rejectionReasonLabel: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: moderateScale(6),
+  },
+  rejectionReasonText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
   },
   paymentProofActions: {
     flexDirection: 'row',
@@ -1156,24 +1051,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: moderateScale(15),
-  },
-  dateTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(15),
-    paddingVertical: moderateScale(15),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginBottom: moderateScale(15),
-    gap: moderateScale(10),
-  },
-  dateTimeButtonText: {
-    flex: 1,
-    fontSize: scaleFontSize(15),
-    color: '#333',
-    fontWeight: '500',
   },
   modalButtonsRow: {
     flexDirection: 'row',
