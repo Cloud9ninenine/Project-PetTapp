@@ -22,6 +22,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BusinessProfileScreen() {
   const router = useRouter();
@@ -63,6 +64,9 @@ export default function BusinessProfileScreen() {
         const business = response.data.data[0];
         setBusinessId(business._id);
         setBusinessData(business);
+
+        // Store businessId in AsyncStorage for other screens
+        await AsyncStorage.setItem('businessId', business._id);
 
         // Load business hours if available
         if (business.businessHours) {

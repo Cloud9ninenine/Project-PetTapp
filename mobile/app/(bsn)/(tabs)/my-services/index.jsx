@@ -12,8 +12,12 @@ import {
   TextInput,
   RefreshControl,
   Image,
+  Modal,
+  Pressable,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import Header from "@components/Header";
 import AddServiceModal from './AddServiceModal';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
@@ -21,6 +25,7 @@ import apiClient from '@config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MyServicesScreen() {
+  const router = useRouter();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,6 +34,9 @@ export default function MyServicesScreen() {
   const [editingService, setEditingService] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [showPriceFilter, setShowPriceFilter] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -36,22 +44,24 @@ export default function MyServicesScreen() {
     pages: 0,
   });
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
-  // Category filters matching backend enum
-  const categoryFilters = [
-    { value: 'all', label: 'All', icon: 'list-outline' },
-    { value: 'veterinary', label: 'Veterinary', icon: 'medical-outline' },
-    { value: 'grooming', label: 'Grooming', icon: 'cut-outline' },
-    { value: 'boarding', label: 'Boarding', icon: 'home-outline' },
-    { value: 'daycare', label: 'Daycare', icon: 'sunny-outline' },
-    { value: 'training', label: 'Training', icon: 'school-outline' },
-    { value: 'emergency', label: 'Emergency', icon: 'alert-circle-outline' },
-    { value: 'consultation', label: 'Consultation', icon: 'chatbubbles-outline' },
-    { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
-  ];
+  // Category filters with icons (will be populated from API)
+  const categoryIcons = {
+    veterinary: 'medical-outline',
+    grooming: 'cut-outline',
+    boarding: 'home-outline',
+    daycare: 'sunny-outline',
+    training: 'school-outline',
+    emergency: 'alert-circle-outline',
+    consultation: 'chatbubbles-outline',
+    other: 'ellipsis-horizontal-outline',
+  };
 
   useEffect(() => {
     fetchBusinessId();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -60,16 +70,83 @@ export default function MyServicesScreen() {
     }
   }, [businessId, selectedCategory]);
 
+  const fetchCategories = async () => {
+    try {
+      const response = await apiClient.get('/services/categories');
+      if (response.data.success && response.data.data) {
+        const cats = [
+          { value: 'all', label: 'All', icon: 'list-outline' },
+          ...response.data.data.map(cat => ({
+            value: cat,
+            label: cat.charAt(0).toUpperCase() + cat.slice(1),
+            icon: categoryIcons[cat] || 'ellipsis-horizontal-outline'
+          }))
+        ];
+        setCategories(cats);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Fallback to hardcoded categories
+      setCategories([
+        { value: 'all', label: 'All', icon: 'list-outline' },
+        { value: 'veterinary', label: 'Veterinary', icon: 'medical-outline' },
+        { value: 'grooming', label: 'Grooming', icon: 'cut-outline' },
+        { value: 'boarding', label: 'Boarding', icon: 'home-outline' },
+        { value: 'daycare', label: 'Daycare', icon: 'sunny-outline' },
+        { value: 'training', label: 'Training', icon: 'school-outline' },
+        { value: 'emergency', label: 'Emergency', icon: 'alert-circle-outline' },
+        { value: 'consultation', label: 'Consultation', icon: 'chatbubbles-outline' },
+        { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
+      ]);
+    }
+  };
+
   const fetchBusinessId = async () => {
     try {
       const storedBusinessId = await AsyncStorage.getItem('businessId');
       if (storedBusinessId) {
         setBusinessId(storedBusinessId);
       } else {
-        Alert.alert('Error', 'Business ID not found. Please complete your business profile.');
+        // Try to fetch from API
+        try {
+          const response = await apiClient.get('/businesses');
+          if (response.data && response.data.data && response.data.data.length > 0) {
+            const business = response.data.data[0];
+            await AsyncStorage.setItem('businessId', business._id);
+            setBusinessId(business._id);
+          } else {
+            setLoading(false);
+            Alert.alert(
+              'Business Profile Required',
+              'Please complete your business profile to manage services.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Go to Profile',
+                  onPress: () => router.push('/(bsn)/(tabs)/profile')
+                }
+              ]
+            );
+          }
+        } catch (apiError) {
+          console.error('Error fetching business from API:', apiError);
+          setLoading(false);
+          Alert.alert(
+            'Business Profile Required',
+            'Please complete your business profile to manage services.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Go to Profile',
+                onPress: () => router.push('/(bsn)/(tabs)/profile')
+              }
+            ]
+          );
+        }
       }
     } catch (error) {
       console.error('Error fetching business ID:', error);
+      setLoading(false);
       Alert.alert('Error', 'Failed to load business information');
     }
   };
@@ -138,6 +215,11 @@ export default function MyServicesScreen() {
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
+    setShowCategoryDropdown(false);
+  };
+
+  const getSelectedCategoryData = () => {
+    return categories.find(c => c.value === selectedCategory);
   };
 
   const handleSearch = () => {
@@ -235,7 +317,7 @@ export default function MyServicesScreen() {
   };
 
   const getCategoryIcon = (category) => {
-    const cat = categoryFilters.find(c => c.value === category?.toLowerCase());
+    const cat = categories.find(c => c.value === category?.toLowerCase());
     return cat?.icon || 'star-outline';
   };
 
@@ -259,38 +341,61 @@ export default function MyServicesScreen() {
     </View>
   );
 
-  const renderCategoryFilter = () => (
-    <View style={styles.filterContainer}>
-      <FlatList
-        horizontal
-        data={categoryFilters}
-        keyExtractor={(item) => item.value}
-        showsHorizontalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              selectedCategory === item.value && styles.filterChipActive
-            ]}
-            onPress={() => handleCategoryChange(item.value)}
-          >
-            <Ionicons
-              name={item.icon}
-              size={moderateScale(16)}
-              color={selectedCategory === item.value ? '#fff' : '#1C86FF'}
-              style={styles.filterChipIcon}
-            />
-            <Text style={[
-              styles.filterChipText,
-              selectedCategory === item.value && styles.filterChipTextActive
-            ]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={styles.filterList}
-      />
-    </View>
+  const renderCategoryDropdown = () => (
+    <Modal
+      visible={showCategoryDropdown}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowCategoryDropdown(false)}
+    >
+      <Pressable
+        style={styles.modalOverlay}
+        onPress={() => setShowCategoryDropdown(false)}
+      >
+        <View style={styles.dropdownModal}>
+          <View style={styles.dropdownHeader}>
+            <Text style={styles.dropdownTitle}>Filter by Category</Text>
+            <TouchableOpacity onPress={() => setShowCategoryDropdown(false)}>
+              <Ionicons name="close" size={moderateScale(24)} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.dropdownList}>
+            {categories.map((item) => (
+              <Pressable
+                key={item.value}
+                style={({ pressed }) => [
+                  styles.dropdownItem,
+                  selectedCategory === item.value && styles.dropdownItemSelected,
+                  pressed && styles.dropdownItemPressed,
+                ]}
+                onPress={() => handleCategoryChange(item.value)}
+              >
+                <View style={[
+                  styles.categoryIconContainer,
+                  { backgroundColor: getCategoryColor(item.value) }
+                ]}>
+                  <Ionicons
+                    name={item.icon}
+                    size={moderateScale(20)}
+                    color="#fff"
+                  />
+                </View>
+                <Text style={[
+                  styles.dropdownItemText,
+                  selectedCategory === item.value && styles.dropdownItemTextSelected
+                ]}>
+                  {item.label}
+                </Text>
+                {selectedCategory === item.value && (
+                  <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#1C86FF" />
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Pressable>
+    </Modal>
   );
 
   const renderServiceItem = ({ item }) => (
@@ -427,6 +532,40 @@ export default function MyServicesScreen() {
     );
   }
 
+  // Show message if no business profile
+  if (!businessId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={false}
+        />
+        <View style={styles.emptyContainer}>
+          <Ionicons name="business-outline" size={moderateScale(80)} color="#ccc" />
+          <Text style={styles.emptyTitle}>Business Profile Required</Text>
+          <Text style={styles.emptySubtitle}>
+            Please complete your business profile to start managing your services
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyAddButton}
+            onPress={() => router.push('/(bsn)/(tabs)/profile')}
+          >
+            <Ionicons name="storefront" size={moderateScale(24)} color="#1C86FF" />
+            <Text style={styles.emptyAddButtonText}>Go to Business Profile</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground
@@ -454,30 +593,74 @@ export default function MyServicesScreen() {
         </View>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search services..."
-          placeholderTextColor="#C7C7CC"
-          value={searchText}
-          onChangeText={setSearchText}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-        {searchText !== '' && (
-          <TouchableOpacity onPress={() => {
-            setSearchText('');
-            fetchServices(1, selectedCategory);
-          }}>
-            <Ionicons name="close-circle" size={moderateScale(20)} color="#C7C7CC" />
-          </TouchableOpacity>
-        )}
+      {/* Search Bar and Filter */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search services..."
+            placeholderTextColor="#C7C7CC"
+            value={searchText}
+            onChangeText={setSearchText}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          {searchText !== '' && (
+            <TouchableOpacity onPress={() => {
+              setSearchText('');
+              fetchServices(1, selectedCategory);
+            }}>
+              <Ionicons name="close-circle" size={moderateScale(20)} color="#C7C7CC" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter Button */}
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            selectedCategory !== 'all' && styles.filterButtonActive
+          ]}
+          onPress={() => setShowCategoryDropdown(true)}
+        >
+          <Ionicons
+            name="filter"
+            size={moderateScale(20)}
+            color={selectedCategory !== 'all' ? '#fff' : '#1C86FF'}
+          />
+          {selectedCategory !== 'all' && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>1</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Category Filter */}
-      {renderCategoryFilter()}
+      {/* Active Filter Tag */}
+      {selectedCategory !== 'all' && (
+        <View style={styles.activeFilterContainer}>
+          <View style={styles.activeFilterTag}>
+            <Ionicons
+              name={getSelectedCategoryData()?.icon || 'pricetag'}
+              size={moderateScale(14)}
+              color="#1C86FF"
+            />
+            <Text style={styles.activeFilterText}>
+              {getSelectedCategoryData()?.label || selectedCategory}
+            </Text>
+            <TouchableOpacity
+              onPress={() => handleCategoryChange('all')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={moderateScale(16)} color="#1C86FF" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Category Dropdown Modal */}
+      {renderCategoryDropdown()}
 
       {/* Services List */}
       <FlatList
@@ -579,11 +762,17 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: '#666',
   },
-  searchContainer: {
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: wp(5),
     marginBottom: moderateScale(12),
+    gap: moderateScale(10),
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: moderateScale(15),
     borderRadius: moderateScale(10),
     backgroundColor: '#FFFFFF',
@@ -600,37 +789,123 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(10),
     color: '#333',
   },
-  filterContainer: {
-    marginBottom: moderateScale(15),
-    paddingLeft: wp(5),
-  },
-  filterList: {
-    paddingRight: wp(5),
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#fff',
+  filterButton: {
+    width: hp(6),
+    height: hp(6),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#1C86FF',
-    marginRight: moderateScale(8),
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
-  filterChipActive: {
+  filterButtonActive: {
     backgroundColor: '#1C86FF',
   },
-  filterChipIcon: {
-    marginRight: moderateScale(4),
+  filterBadge: {
+    position: 'absolute',
+    top: moderateScale(-4),
+    right: moderateScale(-4),
+    backgroundColor: '#FF6B6B',
+    borderRadius: moderateScale(10),
+    width: moderateScale(18),
+    height: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
-  filterChipText: {
+  filterBadgeText: {
+    fontSize: scaleFontSize(10),
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  activeFilterContainer: {
+    marginHorizontal: wp(5),
+    marginBottom: moderateScale(12),
+  },
+  activeFilterTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(20),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    gap: moderateScale(6),
+  },
+  activeFilterText: {
     fontSize: scaleFontSize(13),
     color: '#1C86FF',
     fontWeight: '600',
   },
-  filterChipTextActive: {
-    color: '#fff',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(5),
+  },
+  dropdownModal: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    width: '100%',
+    maxWidth: moderateScale(400),
+    maxHeight: hp(70),
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+  },
+  dropdownList: {
+    maxHeight: hp(50),
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+    gap: moderateScale(12),
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#E3F2FD',
+  },
+  dropdownItemPressed: {
+    backgroundColor: '#F5F5F5',
+  },
+  categoryIconContainer: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownItemTextSelected: {
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   listContent: {
     paddingHorizontal: wp(5),

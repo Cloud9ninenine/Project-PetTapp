@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function AddServiceModal({ visible, onClose, onAddService, editingService, businessId }) {
@@ -23,6 +24,8 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
   const [showDaysDropdown, setShowDaysDropdown] = useState(false);
   const [showPetTypesDropdown, setShowPetTypesDropdown] = useState(false);
   const [imageUri, setImageUri] = useState(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [currentTimePicker, setCurrentTimePicker] = useState(null); // { field: 'start' | 'end' }
 
   // Form state matching backend schema
   const [formData, setFormData] = useState({
@@ -292,6 +295,45 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     return categories.find(c => c.value === formData.category);
   };
 
+  const openTimePicker = (field) => {
+    setCurrentTimePicker(field);
+    setShowTimePicker(true);
+  };
+
+  const handleTimeChange = (event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+
+    if (event.type === 'set' && selectedDate && currentTimePicker) {
+      const hours = selectedDate.getHours().toString().padStart(2, '0');
+      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
+
+      setFormData(prev => ({
+        ...prev,
+        [currentTimePicker === 'start' ? 'timeSlotStart' : 'timeSlotEnd']: timeString
+      }));
+
+      if (Platform.OS === 'ios') {
+        // On iOS, keep picker open until they tap outside or Done
+      } else {
+        setCurrentTimePicker(null);
+      }
+    } else if (event.type === 'dismissed') {
+      setShowTimePicker(false);
+      setCurrentTimePicker(null);
+    }
+  };
+
+  const getTimeForPicker = (timeString) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours);
+    date.setMinutes(minutes);
+    return date;
+  };
+
   return (
     <Modal
       visible={visible}
@@ -482,22 +524,24 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
             <View style={styles.inputRow}>
               <View style={styles.inputGroupHalf}>
                 <Text style={styles.inputLabel}>Start Time</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="09:00"
-                  value={formData.timeSlotStart}
-                  onChangeText={(text) => setFormData({ ...formData, timeSlotStart: text })}
-                />
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => openTimePicker('start')}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerText}>{formData.timeSlotStart}</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroupHalf}>
                 <Text style={styles.inputLabel}>End Time</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="17:00"
-                  value={formData.timeSlotEnd}
-                  onChangeText={(text) => setFormData({ ...formData, timeSlotEnd: text })}
-                />
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => openTimePicker('end')}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerText}>{formData.timeSlotEnd}</Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -617,6 +661,59 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
           </ScrollView>
         </View>
       </View>
+
+      {/* Time Picker Modal */}
+      {showTimePicker && currentTimePicker && (
+        Platform.OS === 'ios' ? (
+          <Modal
+            visible={showTimePicker}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => {
+              setShowTimePicker(false);
+              setCurrentTimePicker(null);
+            }}
+          >
+            <View style={styles.timePickerModalOverlay}>
+              <View style={styles.timePickerModalContent}>
+                <View style={styles.timePickerHeader}>
+                  <Text style={styles.timePickerTitle}>
+                    Select {currentTimePicker === 'start' ? 'Start' : 'End'} Time
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowTimePicker(false);
+                      setCurrentTimePicker(null);
+                    }}
+                  >
+                    <Text style={styles.timePickerDoneButton}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={getTimeForPicker(
+                    currentTimePicker === 'start' ? formData.timeSlotStart : formData.timeSlotEnd
+                  )}
+                  mode="time"
+                  is24Hour={true}
+                  display="spinner"
+                  onChange={handleTimeChange}
+                  style={styles.timePicker}
+                />
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          <DateTimePicker
+            value={getTimeForPicker(
+              currentTimePicker === 'start' ? formData.timeSlotStart : formData.timeSlotEnd
+            )}
+            mode="time"
+            is24Hour={true}
+            display="default"
+            onChange={handleTimeChange}
+          />
+        )
+      )}
     </Modal>
   );
 }
@@ -839,6 +936,57 @@ const styles = StyleSheet.create({
   },
   petTypeChipTextActive: {
     color: '#fff',
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(12),
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    gap: moderateScale(10),
+  },
+  timePickerText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    fontWeight: '600',
+    flex: 1,
+  },
+  timePickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  timePickerModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    paddingBottom: moderateScale(20),
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(15),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  timePickerTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+  },
+  timePickerDoneButton: {
+    fontSize: scaleFontSize(16),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  timePicker: {
+    width: '100%',
+    height: moderateScale(200),
   },
   submitButton: {
     backgroundColor: '#1C86FF',
