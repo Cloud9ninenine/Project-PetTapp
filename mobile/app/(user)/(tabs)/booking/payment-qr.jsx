@@ -18,50 +18,76 @@ const PaymentQRScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
-  const [qrCodeUrl, setQrCodeUrl] = useState(null);
+  const [qrCodes, setQrCodes] = useState([]);
+  const [selectedQrIndex, setSelectedQrIndex] = useState(0);
   const [qrNotAvailable, setQrNotAvailable] = useState(false);
+  const [businessId, setBusinessId] = useState(null);
 
   const { bookingId, businessName, amount } = params;
 
   useEffect(() => {
-    // Fetch QR code from business
-    fetchQRCode();
+    fetchQRCodes();
   }, [bookingId]);
 
-  const fetchQRCode = async () => {
+  const fetchQRCodes = async () => {
     try {
       setLoading(true);
       setQrNotAvailable(false);
 
-      // Fetch the booking details to get business QR code
-      const response = await apiClient.get(`/bookings/${bookingId}`);
+      // Step 1: Fetch the booking details to get businessId
+      const bookingResponse = await apiClient.get(`/bookings/${bookingId}`);
+      console.log('Booking API Response:', JSON.stringify(bookingResponse.data, null, 2));
 
-      if (response.data && response.data.businessId) {
-        const business = response.data.businessId;
+      if (!bookingResponse.data?.data) {
+        throw new Error('Booking information not found');
+      }
 
-        // Check if business has uploaded QR code
-        if (business.paymentQRCode) {
-          // If it's a full URL, use it directly
-          if (business.paymentQRCode.startsWith('http')) {
-            setQrCodeUrl(business.paymentQRCode);
-          } else {
-            // Otherwise, construct the URL (adjust base URL as needed)
-            setQrCodeUrl(`${apiClient.defaults.baseURL}/uploads/${business.paymentQRCode}`);
-          }
+      const booking = bookingResponse.data.data;
+      const fetchedBusinessId = booking.businessId?._id || booking.businessId;
+
+      if (!fetchedBusinessId) {
+        throw new Error('Business ID not found in booking');
+      }
+
+      setBusinessId(fetchedBusinessId);
+      console.log('Fetched Business ID:', fetchedBusinessId);
+
+      // Step 2: Fetch payment QR codes from the business endpoint
+      const qrResponse = await apiClient.get(`/businesses/${fetchedBusinessId}/payment-qr`);
+      console.log('QR Codes API Response:', JSON.stringify(qrResponse.data, null, 2));
+
+      if (qrResponse.data?.success && qrResponse.data?.data?.qrCodes) {
+        const fetchedQrCodes = qrResponse.data.data.qrCodes;
+
+        if (fetchedQrCodes.length > 0) {
+          // Process QR codes to ensure full URLs
+          const processedQrCodes = fetchedQrCodes.map(qr => ({
+            ...qr,
+            imageUrl: qr.imageUrl.startsWith('http')
+              ? qr.imageUrl
+              : `${apiClient.defaults.baseURL}${qr.imageUrl.startsWith('/') ? '' : '/'}${qr.imageUrl}`
+          }));
+
+          setQrCodes(processedQrCodes);
+          setSelectedQrIndex(0);
+          console.log('Processed QR Codes:', processedQrCodes);
         } else {
-          // Business hasn't uploaded QR code yet
+          // No QR codes available
           setQrNotAvailable(true);
-          setQrCodeUrl(null);
+          setQrCodes([]);
         }
       } else {
-        throw new Error('Business information not found');
+        // Business hasn't uploaded QR codes yet
+        setQrNotAvailable(true);
+        setQrCodes([]);
       }
     } catch (error) {
-      console.error('Error fetching QR code:', error);
+      console.error('Error fetching QR codes:', error);
       setQrNotAvailable(true);
+      setQrCodes([]);
       Alert.alert(
         'Error',
-        'Failed to load payment QR code. Please try again or contact the business.'
+        'Failed to load payment QR codes. Please try again or contact the business.'
       );
     } finally {
       setLoading(false);
@@ -81,6 +107,96 @@ const PaymentQRScreen = () => {
     if (!amt) return '₱0.00';
     const numAmount = typeof amt === 'string' ? parseFloat(amt) : amt;
     return `₱${numAmount.toFixed(2)}`;
+  };
+
+  const getPaymentTypeLabel = (type) => {
+    const labels = {
+      gcash: 'GCash',
+      paymaya: 'PayMaya',
+      bank: 'Bank Transfer',
+      other: 'Other'
+    };
+    return labels[type] || type;
+  };
+
+  const getPaymentTypeColor = (type) => {
+    const colors = {
+      gcash: '#007DFF',
+      paymaya: '#00B140',
+      bank: '#FF6B35',
+      other: '#6C757D'
+    };
+    return colors[type] || '#6C757D';
+  };
+
+  const renderQrCodeTabs = () => {
+    if (qrCodes.length <= 1) return null;
+
+    return (
+      <View style={styles.tabsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsScrollContent}
+        >
+          {qrCodes.map((qr, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.tab,
+                selectedQrIndex === index && styles.tabActive
+              ]}
+              onPress={() => setSelectedQrIndex(index)}
+            >
+              <Text style={[
+                styles.tabText,
+                selectedQrIndex === index && styles.tabTextActive
+              ]}>
+                {getPaymentTypeLabel(qr.type)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
+
+  const renderQrCodeDetails = () => {
+    if (qrCodes.length === 0) return null;
+
+    const currentQr = qrCodes[selectedQrIndex];
+
+    return (
+      <View style={styles.qrDetailsContainer}>
+        <View style={[
+          styles.paymentTypeBadge,
+          { backgroundColor: getPaymentTypeColor(currentQr.type) + '20' }
+        ]}>
+          <Text style={[
+            styles.paymentTypeText,
+            { color: getPaymentTypeColor(currentQr.type) }
+          ]}>
+            {getPaymentTypeLabel(currentQr.type)}
+          </Text>
+        </View>
+
+        {currentQr.accountName && (
+          <View style={styles.qrDetailRow}>
+            <Ionicons name="person-outline" size={moderateScale(16)} color="#666" />
+            <Text style={styles.qrDetailLabel}>Account Name:</Text>
+            <Text style={styles.qrDetailValue}>{currentQr.accountName}</Text>
+          </View>
+        )}
+
+        {currentQr.accountNumber && (
+          <View style={styles.qrDetailRow}>
+            <Ionicons name="card-outline" size={moderateScale(16)} color="#666" />
+            <Text style={styles.qrDetailLabel}>Account Number:</Text>
+            <Text style={styles.qrDetailValue}>{currentQr.accountNumber}</Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -117,24 +233,30 @@ const PaymentQRScreen = () => {
           </View>
         </View>
 
+        {/* QR Code Tabs */}
+        {renderQrCodeTabs()}
+
         {/* QR Code Display */}
         <View style={styles.qrContainer}>
           <Text style={styles.qrTitle}>Scan to Pay</Text>
-          <Text style={styles.qrSubtitle}>Use GCash, PayMaya, or any QR payment app</Text>
+          <Text style={styles.qrSubtitle}>Use your preferred payment app to scan the QR code</Text>
 
           {loading ? (
             <View style={styles.qrPlaceholder}>
               <ActivityIndicator size="large" color="#1C86FF" />
               <Text style={styles.loadingText}>Loading QR Code...</Text>
             </View>
-          ) : qrCodeUrl ? (
-            <View style={styles.qrCodeWrapper}>
-              <Image
-                source={{ uri: qrCodeUrl }}
-                style={styles.qrCode}
-                resizeMode="contain"
-              />
-            </View>
+          ) : qrCodes.length > 0 ? (
+            <>
+              <View style={styles.qrCodeWrapper}>
+                <Image
+                  source={{ uri: qrCodes[selectedQrIndex].imageUrl }}
+                  style={styles.qrCode}
+                  resizeMode="contain"
+                />
+              </View>
+              {renderQrCodeDetails()}
+            </>
           ) : qrNotAvailable ? (
             <View style={styles.qrPlaceholder}>
               <Ionicons name="alert-circle-outline" size={moderateScale(80)} color="#FF9B79" />
@@ -142,7 +264,7 @@ const PaymentQRScreen = () => {
               <Text style={styles.notAvailableSubtext}>
                 The business hasn't uploaded their payment QR code yet. Please contact them or try again later.
               </Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchQRCode}>
+              <TouchableOpacity style={styles.retryButton} onPress={fetchQRCodes}>
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -150,7 +272,7 @@ const PaymentQRScreen = () => {
             <View style={styles.qrPlaceholder}>
               <Ionicons name="qr-code-outline" size={moderateScale(80)} color="#ccc" />
               <Text style={styles.errorText}>Failed to load QR code</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={fetchQRCode}>
+              <TouchableOpacity style={styles.retryButton} onPress={fetchQRCodes}>
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
             </View>
@@ -159,53 +281,60 @@ const PaymentQRScreen = () => {
 
         {/* Instructions */}
         <View style={styles.instructionsCard}>
-          <View style={styles.instructionHeader}>
-            <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
-            <Text style={styles.instructionsTitle}>How to Pay</Text>
-          </View>
+              <View style={styles.instructionHeader}>
+                <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
+                <Text style={styles.instructionsTitle}>How to Pay</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={styles.stepText}>Open your GCash, PayMaya, or bank app</Text>
-          </View>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>1</Text>
+                </View>
+                <Text style={styles.stepText}>Open your payment app (GCash, PayMaya, or bank app)</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <Text style={styles.stepText}>Select "Scan QR" or "QR Payment"</Text>
-          </View>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>2</Text>
+                </View>
+                <Text style={styles.stepText}>Select "Scan QR" or "QR Payment"</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <Text style={styles.stepText}>Scan the QR code above</Text>
-          </View>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>3</Text>
+                </View>
+                <Text style={styles.stepText}>Scan the QR code above</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>4</Text>
-            </View>
-            <Text style={styles.stepText}>Confirm the payment in your app</Text>
-          </View>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>4</Text>
+                </View>
+                <Text style={styles.stepText}>Confirm the payment amount matches: {formatAmount(amount)}</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>5</Text>
-            </View>
-            <Text style={styles.stepText}>Take a screenshot of the payment confirmation</Text>
-          </View>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>5</Text>
+                </View>
+                <Text style={styles.stepText}>Complete the payment in your app</Text>
+              </View>
 
-          <View style={styles.instructionStep}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>6</Text>
-            </View>
-            <Text style={styles.stepText}>Upload the screenshot as payment proof</Text>
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>6</Text>
+                </View>
+                <Text style={styles.stepText}>Take a screenshot of the payment confirmation</Text>
+              </View>
+
+              <View style={styles.instructionStep}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>7</Text>
+                </View>
+                <Text style={styles.stepText}>Upload the screenshot as payment proof below</Text>
+              </View>
           </View>
-        </View>
 
         {/* Note */}
         <View style={styles.noteCard}>
@@ -301,6 +430,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     marginVertical: moderateScale(4),
   },
+  tabsContainer: {
+    marginBottom: hp(2),
+  },
+  tabsScrollContent: {
+    paddingHorizontal: wp(2),
+  },
+  tab: {
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(10),
+    marginHorizontal: moderateScale(4),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  tabActive: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+  },
+  tabText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
   qrContainer: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
@@ -331,10 +487,47 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     borderWidth: 2,
     borderColor: '#1C86FF',
+    marginBottom: moderateScale(16),
   },
   qrCode: {
     width: moderateScale(250),
     height: moderateScale(250),
+  },
+  qrDetailsContainer: {
+    width: '100%',
+    backgroundColor: '#f8f9fa',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+  },
+  paymentTypeBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(20),
+    marginBottom: moderateScale(12),
+  },
+  paymentTypeText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  qrDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
+  },
+  qrDetailLabel: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    fontWeight: '500',
+    marginLeft: moderateScale(8),
+  },
+  qrDetailValue: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    fontWeight: '600',
+    marginLeft: moderateScale(8),
+    flex: 1,
   },
   qrPlaceholder: {
     width: moderateScale(250),

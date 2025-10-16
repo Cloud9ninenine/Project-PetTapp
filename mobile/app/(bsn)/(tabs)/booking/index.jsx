@@ -27,8 +27,9 @@ const CustomerBookings = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('active');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -55,15 +56,22 @@ const CustomerBookings = () => {
     try {
       if (pageNum === 1) {
         setLoading(true);
+      } else {
+        setIsLoadingMore(true);
       }
 
       const params = {
         page: pageNum,
         limit: 20,
+        sort: '-appointmentDateTime', // Sort by appointment date descending (most recent/upcoming first)
       };
 
-      // Add status filter if not 'all'
-      if (selectedStatus !== 'all') {
+      // Handle special filter statuses
+      if (selectedStatus === 'active') {
+        // Active bookings: pending, confirmed, in-progress
+        params.status = 'pending,confirmed,in-progress';
+      } else if (selectedStatus !== 'all') {
+        // Specific status
         params.status = selectedStatus;
       }
 
@@ -88,6 +96,7 @@ const CustomerBookings = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -271,13 +280,14 @@ const CustomerBookings = () => {
   };
 
   const statusFilters = [
-    { label: 'All', value: 'all' },
-    { label: 'Pending', value: 'pending' },
-    { label: 'Confirmed', value: 'confirmed' },
-    { label: 'In Progress', value: 'in-progress' },
-    { label: 'Completed', value: 'completed' },
-    { label: 'Cancelled', value: 'cancelled' },
-    { label: 'No Show', value: 'no-show' },
+    { label: 'Active', value: 'active', icon: 'time-outline' },
+    { label: 'All', value: 'all', icon: 'list-outline' },
+    { label: 'Pending', value: 'pending', icon: 'hourglass-outline' },
+    { label: 'Confirmed', value: 'confirmed', icon: 'checkmark-circle-outline' },
+    { label: 'In Progress', value: 'in-progress', icon: 'play-circle-outline' },
+    { label: 'Completed', value: 'completed', icon: 'checkmark-done-outline' },
+    { label: 'Cancelled', value: 'cancelled', icon: 'close-circle-outline' },
+    { label: 'No Show', value: 'no-show', icon: 'ban-outline' },
   ];
 
   const renderTitle = () => (
@@ -291,6 +301,11 @@ const CustomerBookings = () => {
 
   const getStatusCount = (status) => {
     if (status === 'all') return allBookings.length;
+    if (status === 'active') {
+      return allBookings.filter(b =>
+        b.status === 'pending' || b.status === 'confirmed' || b.status === 'in-progress'
+      ).length;
+    }
     const statusMap = {
       'pending': 'pending',
       'confirmed': 'confirmed',
@@ -333,6 +348,13 @@ const CustomerBookings = () => {
                 }}
               >
                 <View style={styles.filterOptionContent}>
+                  {filter.icon && (
+                    <Ionicons
+                      name={filter.icon}
+                      size={moderateScale(18)}
+                      color={isSelected ? '#1C86FF' : '#666'}
+                    />
+                  )}
                   <Text style={[
                     styles.filterOptionText,
                     isSelected && styles.filterOptionTextSelected
@@ -364,6 +386,29 @@ const CustomerBookings = () => {
     </Modal>
   );
 
+  const renderLoadMoreButton = () => {
+    if (!hasMore) return null;
+
+    return (
+      <View style={styles.loadMoreContainer}>
+        <TouchableOpacity
+          style={styles.loadMoreButton}
+          onPress={loadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? (
+            <ActivityIndicator size="small" color="#1C86FF" />
+          ) : (
+            <>
+              <Ionicons name="arrow-down-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.loadMoreText}>Load More</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderFooter = () => {
     if (!loading || page === 1) return null;
     return (
@@ -375,13 +420,26 @@ const CustomerBookings = () => {
 
   const renderEmpty = () => {
     if (loading) return null;
+
+    let message = 'Bookings from customers will appear here';
+
+    if (searchText) {
+      message = 'Try adjusting your search terms';
+    } else if (selectedStatus === 'active') {
+      message = 'No active bookings at the moment';
+    } else if (selectedStatus === 'cancelled') {
+      message = 'No cancelled bookings';
+    } else if (selectedStatus === 'completed') {
+      message = 'No completed bookings';
+    } else if (selectedStatus !== 'all') {
+      message = `No ${selectedStatus} bookings`;
+    }
+
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="calendar-outline" size={moderateScale(80)} color="#ccc" />
         <Text style={styles.emptyText}>No bookings found</Text>
-        <Text style={styles.emptySubtext}>
-          Bookings from customers will appear here
-        </Text>
+        <Text style={styles.emptySubtext}>{message}</Text>
       </View>
     );
   };
@@ -464,9 +522,7 @@ const CustomerBookings = () => {
             tintColor="#1C86FF"
           />
         }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
+        ListFooterComponent={renderLoadMoreButton}
         ListEmptyComponent={renderEmpty}
       />
     </SafeAreaView>
@@ -696,6 +752,26 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(12),
     fontSize: scaleFontSize(14),
     color: '#666',
+  },
+  loadMoreContainer: {
+    paddingVertical: moderateScale(20),
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    gap: moderateScale(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFontSize(14),
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   footerLoader: {
     paddingVertical: moderateScale(20),

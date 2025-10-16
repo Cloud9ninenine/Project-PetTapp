@@ -260,6 +260,7 @@ const ScheduleDetail = () => {
 
     const status = booking.status?.toLowerCase();
     const paymentStatus = booking.paymentStatus?.toLowerCase();
+    const paymentMethod = booking.paymentMethod?.toLowerCase();
 
     // Show rate button for completed bookings without rating
     if (status === "completed" && !booking.rating) {
@@ -275,6 +276,50 @@ const ScheduleDetail = () => {
 
     // Show payment buttons for pending/confirmed bookings with pending payment
     if ((status === "pending" || status === "confirmed") && paymentStatus === "pending") {
+      // For cash payment, show only cancel button with cash payment info
+      if (paymentMethod === "cash") {
+        return (
+          <View style={styles.actionButtonsContainer}>
+            {/* Cash Payment Info Card */}
+            <View style={styles.cashPaymentInfoCard}>
+              <View style={styles.cashIconContainer}>
+                <Ionicons name="cash" size={moderateScale(50)} color="#00B140" />
+              </View>
+              <Text style={styles.cashPaymentTitle}>Cash Payment Selected</Text>
+              <Text style={styles.cashPaymentDescription}>
+                You have selected to pay with cash at the business location
+              </Text>
+
+              <View style={styles.cashInstructionsBox}>
+                <View style={styles.cashInstructionRow}>
+                  <Ionicons name="information-circle" size={moderateScale(18)} color="#1C86FF" />
+                  <Text style={styles.cashInstructionTitle}>Payment Instructions</Text>
+                </View>
+                <Text style={styles.cashInstructionText}>
+                  • Bring exact amount or sufficient cash{'\n'}
+                  • Payment will be made at business location{'\n'}
+                  • Amount to pay: {formatPrice(booking.totalAmount)}{'\n'}
+                  • Present your booking ID when you arrive
+                </Text>
+              </View>
+
+              <View style={styles.cashReminderBox}>
+                <Ionicons name="time-outline" size={moderateScale(20)} color="#FF9B79" />
+                <Text style={styles.cashReminderText}>
+                  Please arrive on time. Late arrivals may result in service delays or cancellation.
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
+              <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
+              <Text style={styles.fullButtonText}>Cancel Booking</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // For other payment methods, show QR and upload buttons
       return (
         <View style={styles.actionButtonsContainer}>
           <View style={styles.actionButtonsRow}>
@@ -803,6 +848,80 @@ const styles = StyleSheet.create({
   },
   modalButtonDisabled: {
     backgroundColor: "#FFB3B3",
+  },
+  // Cash payment styles
+  cashPaymentInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(20),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  cashIconContainer: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(16),
+  },
+  cashPaymentTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#00B140',
+    marginBottom: moderateScale(8),
+    textAlign: 'center',
+  },
+  cashPaymentDescription: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: moderateScale(20),
+    lineHeight: scaleFontSize(20),
+  },
+  cashInstructionsBox: {
+    width: '100%',
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginBottom: moderateScale(12),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#1C86FF',
+  },
+  cashInstructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(10),
+  },
+  cashInstructionTitle: {
+    fontSize: scaleFontSize(15),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginLeft: moderateScale(8),
+  },
+  cashInstructionText: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    lineHeight: scaleFontSize(20),
+  },
+  cashReminderBox: {
+    width: '100%',
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#FF9B79',
+  },
+  cashReminderText: {
+    flex: 1,
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    lineHeight: scaleFontSize(19),
+    marginLeft: moderateScale(10),
   },
 });
 

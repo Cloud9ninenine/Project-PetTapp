@@ -39,13 +39,16 @@ const Bookings = () => {
     total: 0,
     pages: 0,
   });
-  const [selectedStatus, setSelectedStatus] = useState('all'); // all, pending, confirmed, in-progress, completed, cancelled, no-show
+  const [selectedStatus, setSelectedStatus] = useState('active'); // active, all, pending, confirmed, in-progress, completed, cancelled
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // Fetch bookings from API
-  const fetchBookings = useCallback(async (page = 1, status = selectedStatus, isRefresh = false) => {
+  const fetchBookings = useCallback(async (page = 1, status = selectedStatus, isRefresh = false, isLoadMore = false) => {
     try {
       if (isRefresh) {
         setIsRefreshing(true);
+      } else if (isLoadMore) {
+        setIsLoadingMore(true);
       } else {
         setIsLoading(true);
       }
@@ -53,17 +56,30 @@ const Bookings = () => {
       const params = {
         page,
         limit: pagination.limit,
+        sort: '-appointmentDateTime', // Sort by appointment date descending (most recent/upcoming first)
       };
 
-      // Add status filter if not 'all'
-      if (status && status !== 'all') {
+      // Handle special filter statuses
+      if (status === 'active') {
+        // Active bookings: pending, confirmed, in-progress
+        params.status = 'pending,confirmed,in-progress';
+      } else if (status && status !== 'all') {
+        // Specific status
         params.status = status;
       }
 
       const response = await apiClient.get('/bookings', { params });
 
       if (response.data.success) {
-        setBookings(response.data.data || []);
+        const newBookings = response.data.data || [];
+
+        // If loading more, append to existing bookings
+        if (isLoadMore && page > 1) {
+          setBookings(prev => [...prev, ...newBookings]);
+        } else {
+          setBookings(newBookings);
+        }
+
         if (response.data.pagination) {
           setPagination(response.data.pagination);
         }
@@ -75,6 +91,7 @@ const Bookings = () => {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      setIsLoadingMore(false);
     }
   }, [selectedStatus, pagination.limit]);
 
@@ -113,6 +130,14 @@ const Bookings = () => {
   const handleStatusChange = (status) => {
     setSelectedStatus(status);
     fetchBookings(1, status);
+  };
+
+  // Handle load more
+  const handleLoadMore = () => {
+    if (!isLoadingMore && pagination.page < pagination.pages) {
+      const nextPage = pagination.page + 1;
+      fetchBookings(nextPage, selectedStatus, false, true);
+    }
   };
 
   // Format date from ISO to readable format
@@ -243,12 +268,13 @@ const Bookings = () => {
 
   // Status filter chips
   const statusFilters = [
-    { value: 'all', label: 'All' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'confirmed', label: 'Confirmed' },
-    { value: 'in-progress', label: 'In Progress' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'active', label: 'Active', icon: 'time-outline' },
+    { value: 'all', label: 'All', icon: 'list-outline' },
+    { value: 'pending', label: 'Pending', icon: 'hourglass-outline' },
+    { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
+    { value: 'in-progress', label: 'In Progress', icon: 'play-circle-outline' },
+    { value: 'completed', label: 'Completed', icon: 'checkmark-done-outline' },
+    { value: 'cancelled', label: 'Cancelled', icon: 'close-circle-outline' },
   ];
 
   const renderStatusFilter = () => (
@@ -266,6 +292,14 @@ const Bookings = () => {
             ]}
             onPress={() => handleStatusChange(item.value)}
           >
+            {item.icon && (
+              <Ionicons
+                name={item.icon}
+                size={moderateScale(16)}
+                color={selectedStatus === item.value ? '#fff' : '#1C86FF'}
+                style={styles.filterChipIcon}
+              />
+            )}
             <Text style={[
               styles.filterChipText,
               selectedStatus === item.value && styles.filterChipTextActive
@@ -279,20 +313,56 @@ const Bookings = () => {
     </View>
   );
 
+  // Load More button
+  const renderLoadMoreButton = () => {
+    if (pagination.page >= pagination.pages) return null;
+
+    return (
+      <View style={styles.loadMoreContainer}>
+        <TouchableOpacity
+          style={styles.loadMoreButton}
+          onPress={handleLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? (
+            <ActivityIndicator size="small" color="#1C86FF" />
+          ) : (
+            <>
+              <Ionicons name="arrow-down-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.loadMoreText}>
+                Load More ({pagination.page} of {pagination.pages})
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   // Empty state
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="calendar-outline" size={moderateScale(64)} color="#ccc" />
-      <Text style={styles.emptyTitle}>No bookings found</Text>
-      <Text style={styles.emptySubtitle}>
-        {searchText
-          ? 'Try adjusting your search terms'
-          : selectedStatus !== 'all'
-          ? `You don't have any ${selectedStatus} bookings`
-          : 'Start booking services for your pets'}
-      </Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    let message = 'Start booking services for your pets';
+
+    if (searchText) {
+      message = 'Try adjusting your search terms';
+    } else if (selectedStatus === 'active') {
+      message = 'You have no active bookings at the moment';
+    } else if (selectedStatus === 'cancelled') {
+      message = 'You have no cancelled bookings';
+    } else if (selectedStatus === 'completed') {
+      message = 'You have no completed bookings';
+    } else if (selectedStatus !== 'all') {
+      message = `You don't have any ${selectedStatus} bookings`;
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="calendar-outline" size={moderateScale(64)} color="#ccc" />
+        <Text style={styles.emptyTitle}>No bookings found</Text>
+        <Text style={styles.emptySubtitle}>{message}</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -340,6 +410,7 @@ const Bookings = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={renderEmptyState}
+          ListFooterComponent={renderLoadMoreButton}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -473,6 +544,8 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(5),
   },
   filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: moderateScale(16),
     paddingVertical: moderateScale(8),
     borderRadius: moderateScale(20),
@@ -484,6 +557,9 @@ const styles = StyleSheet.create({
   filterChipActive: {
     backgroundColor: '#1C86FF',
   },
+  filterChipIcon: {
+    marginRight: moderateScale(4),
+  },
   filterChipText: {
     fontSize: scaleFontSize(13),
     color: '#1C86FF',
@@ -491,6 +567,26 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: '#fff',
+  },
+  loadMoreContainer: {
+    paddingVertical: moderateScale(20),
+    alignItems: 'center',
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    gap: moderateScale(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFontSize(14),
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,

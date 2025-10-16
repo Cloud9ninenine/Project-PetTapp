@@ -302,9 +302,9 @@ export default function BookingConfirmationModal({
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.handleBar} />
 
-            <Text style={styles.modalTitle}>Book Confirmation</Text>
+            <Text style={styles.modalTitle}>Book Appointment</Text>
             <Text style={styles.modalSubtitle}>
-              This service will be booked to {'\n'}the selected schedule.
+              Fill in the details to submit your booking request.
             </Text>
 
             <View style={styles.serviceCard}>
@@ -331,6 +331,17 @@ export default function BookingConfirmationModal({
             </View>
 
             <View style={styles.divider} />
+
+            {/* Status Information Notice */}
+            <View style={styles.statusInfoBox}>
+              <View style={styles.statusInfoHeader}>
+                <Ionicons name="information-circle" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.statusInfoTitle}>Booking Status</Text>
+              </View>
+              <Text style={styles.statusInfoText}>
+                Your booking will be created with <Text style={styles.statusBadge}>PENDING</Text> status. .
+              </Text>
+            </View>
 
             {/* Pet Selection - REQUIRED */}
             <View style={styles.inputContainer}>
@@ -465,7 +476,7 @@ export default function BookingConfirmationModal({
               {isSubmitting ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <Text style={styles.bookButtonText}>Confirm Booking</Text>
+                <Text style={styles.bookButtonText}>Submit Booking Request</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -704,5 +715,34 @@ const styles = StyleSheet.create({
     color: '#333',
     minHeight: moderateScale(60),
     maxHeight: moderateScale(100),
+  },
+  // Status info box styles
+  statusInfoBox: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginBottom: moderateScale(16),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#1C86FF',
+  },
+  statusInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
+  },
+  statusInfoTitle: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '700',
+    color: '#1C86FF',
+    marginLeft: moderateScale(8),
+  },
+  statusInfoText: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    lineHeight: scaleFontSize(20),
+  },
+  statusBadge: {
+    fontWeight: '700',
+    color: '#FF9B79',
   },
 });

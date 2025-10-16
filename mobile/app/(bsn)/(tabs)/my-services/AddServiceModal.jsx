@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,53 +8,288 @@ import {
   TextInput,
   Modal,
   Pressable,
+  ActivityIndicator,
+  Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
-export default function AddServiceModal({ visible, onClose, onAddService, editingService }) {
-  const [newService, setNewService] = useState(editingService || {
+export default function AddServiceModal({ visible, onClose, onAddService, editingService, businessId }) {
+  const [loading, setLoading] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showDaysDropdown, setShowDaysDropdown] = useState(false);
+  const [showPetTypesDropdown, setShowPetTypesDropdown] = useState(false);
+  const [imageUri, setImageUri] = useState(null);
+
+  // Form state matching backend schema
+  const [formData, setFormData] = useState({
     name: '',
     category: '',
-    price: '',
-    duration: '',
     description: '',
-    icon: 'star',
-    color: '#1C86FF',
+    duration: '',
+    priceAmount: '',
+    priceCurrency: 'PHP',
+    availabilityDays: [],
+    timeSlotStart: '09:00',
+    timeSlotEnd: '17:00',
+    petTypes: [],
+    minAge: '',
+    maxAge: '',
+    healthRequirements: '',
+    specialNotes: '',
   });
 
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [errors, setErrors] = useState({});
 
+  // Backend categories
   const categories = [
-    { name: 'Veterinary', icon: 'medical', color: '#4CAF50' },
-    { name: 'Grooming', icon: 'cut', color: '#2196F3' },
-    { name: 'Boarding', icon: 'home', color: '#FF9B79' },
-    { name: 'Training', icon: 'school', color: '#9C27B0' },
-    { name: 'Delivery', icon: 'car', color: '#FF6B6B' },
-    { name: 'Daycare', icon: 'sunny', color: '#FFD700' },
-    { name: 'Photography', icon: 'camera', color: '#00BCD4' },
-    { name: 'Other', icon: 'ellipsis-horizontal', color: '#607D8B' },
+    { value: 'veterinary', label: 'Veterinary', icon: 'medical-outline', color: '#4CAF50' },
+    { value: 'grooming', label: 'Grooming', icon: 'cut-outline', color: '#2196F3' },
+    { value: 'boarding', label: 'Boarding', icon: 'home-outline', color: '#FF9B79' },
+    { value: 'daycare', label: 'Daycare', icon: 'sunny-outline', color: '#FFD700' },
+    { value: 'training', label: 'Training', icon: 'school-outline', color: '#9C27B0' },
+    { value: 'emergency', label: 'Emergency', icon: 'alert-circle-outline', color: '#FF6B6B' },
+    { value: 'consultation', label: 'Consultation', icon: 'chatbubbles-outline', color: '#00BCD4' },
+    { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline', color: '#607D8B' },
   ];
 
-  React.useEffect(() => {
-    if (editingService) {
-      setNewService(editingService);
-    }
-  }, [editingService]);
+  // Backend days enum
+  const daysOfWeek = [
+    { value: 'monday', label: 'Monday' },
+    { value: 'tuesday', label: 'Tuesday' },
+    { value: 'wednesday', label: 'Wednesday' },
+    { value: 'thursday', label: 'Thursday' },
+    { value: 'friday', label: 'Friday' },
+    { value: 'saturday', label: 'Saturday' },
+    { value: 'sunday', label: 'Sunday' },
+  ];
 
-  const handleAdd = () => {
-    if (newService.name && newService.category && newService.price) {
-      onAddService(newService);
-      setNewService({
-        name: '',
-        category: '',
-        price: '',
-        duration: '',
-        description: '',
-        icon: 'star',
-        color: '#1C86FF',
+  // Backend pet types enum
+  const petTypes = [
+    { value: 'dog', label: 'Dog', icon: 'paw' },
+    { value: 'cat', label: 'Cat', icon: 'paw' },
+    { value: 'bird', label: 'Bird', icon: 'fitness' },
+    { value: 'fish', label: 'Fish', icon: 'water' },
+    { value: 'rabbit', label: 'Rabbit', icon: 'paw' },
+    { value: 'hamster', label: 'Hamster', icon: 'paw' },
+    { value: 'guinea-pig', label: 'Guinea Pig', icon: 'paw' },
+    { value: 'reptile', label: 'Reptile', icon: 'bug' },
+    { value: 'other', label: 'Other', icon: 'ellipsis-horizontal' },
+  ];
+
+  useEffect(() => {
+    if (editingService && visible) {
+      // Populate form with editing service data
+      setFormData({
+        name: editingService.name || '',
+        category: editingService.category || '',
+        description: editingService.description || '',
+        duration: editingService.duration?.toString() || '',
+        priceAmount: editingService.price?.amount?.toString() || '',
+        priceCurrency: editingService.price?.currency || 'PHP',
+        availabilityDays: editingService.availability?.days || [],
+        timeSlotStart: editingService.availability?.timeSlots?.[0]?.start || '09:00',
+        timeSlotEnd: editingService.availability?.timeSlots?.[0]?.end || '17:00',
+        petTypes: editingService.requirements?.petTypes || [],
+        minAge: editingService.requirements?.ageRestrictions?.minAge?.toString() || '',
+        maxAge: editingService.requirements?.ageRestrictions?.maxAge?.toString() || '',
+        healthRequirements: editingService.requirements?.healthRequirements?.join(', ') || '',
+        specialNotes: editingService.requirements?.specialNotes || '',
       });
+      setImageUri(editingService.imageUrl || null);
+    } else if (!visible) {
+      // Reset form when modal closes
+      resetForm();
     }
+  }, [editingService, visible]);
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      category: '',
+      description: '',
+      duration: '',
+      priceAmount: '',
+      priceCurrency: 'PHP',
+      availabilityDays: [],
+      timeSlotStart: '09:00',
+      timeSlotEnd: '17:00',
+      petTypes: [],
+      minAge: '',
+      maxAge: '',
+      healthRequirements: '',
+      specialNotes: '',
+    });
+    setImageUri(null);
+    setErrors({});
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+
+    if (!formData.name.trim()) newErrors.name = 'Service name is required';
+    if (!formData.category) newErrors.category = 'Category is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+
+    const duration = parseInt(formData.duration);
+    if (!formData.duration || isNaN(duration) || duration < 15 || duration > 1440) {
+      newErrors.duration = 'Duration must be between 15 and 1440 minutes';
+    }
+
+    const price = parseFloat(formData.priceAmount);
+    if (!formData.priceAmount || isNaN(price) || price < 0) {
+      newErrors.priceAmount = 'Valid price is required';
+    }
+
+    if (formData.availabilityDays.length === 0) {
+      newErrors.availabilityDays = 'Select at least one day';
+    }
+
+    if (formData.petTypes.length === 0) {
+      newErrors.petTypes = 'Select at least one pet type';
+    }
+
+    if (formData.minAge && formData.maxAge) {
+      const min = parseFloat(formData.minAge);
+      const max = parseFloat(formData.maxAge);
+      if (min > max) {
+        newErrors.maxAge = 'Max age must be greater than min age';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const pickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Sorry, we need camera roll permissions to upload images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      Alert.alert('Validation Error', 'Please fix the errors before submitting');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const formDataToSend = new FormData();
+
+      // Required fields
+      formDataToSend.append('businessId', businessId);
+      formDataToSend.append('name', formData.name.trim());
+      formDataToSend.append('category', formData.category);
+      formDataToSend.append('description', formData.description.trim());
+      formDataToSend.append('duration', formData.duration);
+
+      // Price as JSON string
+      formDataToSend.append('price', JSON.stringify({
+        amount: parseFloat(formData.priceAmount),
+        currency: formData.priceCurrency,
+      }));
+
+      // Availability as JSON string
+      formDataToSend.append('availability', JSON.stringify({
+        days: formData.availabilityDays,
+        timeSlots: [{
+          start: formData.timeSlotStart,
+          end: formData.timeSlotEnd,
+        }],
+      }));
+
+      // Requirements as JSON string
+      const requirements = {
+        petTypes: formData.petTypes,
+      };
+
+      if (formData.minAge || formData.maxAge) {
+        requirements.ageRestrictions = {};
+        if (formData.minAge) requirements.ageRestrictions.minAge = parseFloat(formData.minAge);
+        if (formData.maxAge) requirements.ageRestrictions.maxAge = parseFloat(formData.maxAge);
+      }
+
+      if (formData.healthRequirements.trim()) {
+        requirements.healthRequirements = formData.healthRequirements
+          .split(',')
+          .map(r => r.trim())
+          .filter(r => r);
+      }
+
+      if (formData.specialNotes.trim()) {
+        requirements.specialNotes = formData.specialNotes.trim();
+      }
+
+      formDataToSend.append('requirements', JSON.stringify(requirements));
+
+      // Image file
+      if (imageUri && !imageUri.startsWith('http')) {
+        const filename = imageUri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        formDataToSend.append('image', {
+          uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+          name: filename,
+          type,
+        });
+      }
+
+      await onAddService(formDataToSend);
+      resetForm();
+    } catch (error) {
+      console.error('Error submitting service:', error);
+      // Error is handled by parent component
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleDay = (day) => {
+    setFormData(prev => ({
+      ...prev,
+      availabilityDays: prev.availabilityDays.includes(day)
+        ? prev.availabilityDays.filter(d => d !== day)
+        : [...prev.availabilityDays, day],
+    }));
+    setErrors(prev => ({ ...prev, availabilityDays: null }));
+  };
+
+  const togglePetType = (type) => {
+    setFormData(prev => ({
+      ...prev,
+      petTypes: prev.petTypes.includes(type)
+        ? prev.petTypes.filter(t => t !== type)
+        : [...prev.petTypes, type],
+    }));
+    setErrors(prev => ({ ...prev, petTypes: null }));
+  };
+
+  const getCategoryData = () => {
+    return categories.find(c => c.value === formData.category);
   };
 
   return (
@@ -67,37 +302,61 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add New Service</Text>
-            <TouchableOpacity onPress={onClose}>
+            <Text style={styles.modalTitle}>
+              {editingService ? 'Edit Service' : 'Add New Service'}
+            </Text>
+            <TouchableOpacity onPress={onClose} disabled={loading}>
               <Ionicons name="close-circle" size={moderateScale(28)} color="#666" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
+            {/* Service Image */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Service Image (Optional)</Text>
+              <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.selectedImage} />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Ionicons name="camera-outline" size={moderateScale(40)} color="#999" />
+                    <Text style={styles.imagePlaceholderText}>Tap to add image</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Service Name */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Service Name *</Text>
               <TextInput
-                style={styles.input}
-                placeholder="e.g., Pet Training"
-                value={newService.name}
-                onChangeText={(text) => setNewService({ ...newService, name: text })}
+                style={[styles.input, errors.name && styles.inputError]}
+                placeholder="e.g., Pet Vaccination"
+                value={formData.name}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, name: text });
+                  setErrors({ ...errors, name: null });
+                }}
+                maxLength={100}
               />
+              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
 
+            {/* Category */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Category *</Text>
               <TouchableOpacity
-                style={styles.dropdownContainer}
+                style={[styles.dropdownContainer, errors.category && styles.inputError]}
                 onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
               >
                 <View style={styles.dropdownContent}>
-                  {newService.category && newService.icon && (
-                    <View style={[styles.categoryIconSmall, { backgroundColor: newService.color }]}>
-                      <Ionicons name={newService.icon} size={moderateScale(16)} color="#fff" />
+                  {getCategoryData() && (
+                    <View style={[styles.categoryIconSmall, { backgroundColor: getCategoryData().color }]}>
+                      <Ionicons name={getCategoryData().icon} size={moderateScale(16)} color="#fff" />
                     </View>
                   )}
-                  <Text style={[styles.dropdownText, !newService.category && styles.dropdownPlaceholder]}>
-                    {newService.category || 'Select category'}
+                  <Text style={[styles.dropdownText, !formData.category && styles.dropdownPlaceholder]}>
+                    {getCategoryData()?.label || 'Select category'}
                   </Text>
                 </View>
                 <Ionicons
@@ -108,23 +367,18 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
               </TouchableOpacity>
               {showCategoryDropdown && (
                 <ScrollView style={styles.dropdownList} nestedScrollEnabled={true}>
-                  {categories.map((cat, index) => (
+                  {categories.map((cat) => (
                     <Pressable
-                      key={index}
+                      key={cat.value}
                       style={({ pressed }) => [
                         styles.dropdownItem,
-                        newService.category === cat.name && styles.dropdownItemSelected,
+                        formData.category === cat.value && styles.dropdownItemSelected,
                         pressed && styles.dropdownItemPressed,
-                        index === categories.length - 1 && styles.dropdownItemLast,
                       ]}
                       onPress={() => {
-                        setNewService({
-                          ...newService,
-                          category: cat.name,
-                          icon: cat.icon,
-                          color: cat.color,
-                        });
+                        setFormData({ ...formData, category: cat.value });
                         setShowCategoryDropdown(false);
+                        setErrors({ ...errors, category: null });
                       }}
                     >
                       <View style={[styles.categoryIcon, { backgroundColor: cat.color }]}>
@@ -132,61 +386,233 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
                       </View>
                       <Text style={[
                         styles.dropdownItemText,
-                        newService.category === cat.name && styles.dropdownItemTextSelected
+                        formData.category === cat.value && styles.dropdownItemTextSelected
                       ]}>
-                        {cat.name}
+                        {cat.label}
                       </Text>
-                      {newService.category === cat.name && (
+                      {formData.category === cat.value && (
                         <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#1C86FF" />
                       )}
                     </Pressable>
                   ))}
                 </ScrollView>
               )}
+              {errors.category && <Text style={styles.errorText}>{errors.category}</Text>}
             </View>
 
+            {/* Description */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Description *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea, errors.description && styles.inputError]}
+                placeholder="Brief description of the service"
+                value={formData.description}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, description: text });
+                  setErrors({ ...errors, description: null });
+                }}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                maxLength={500}
+              />
+              {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
+            </View>
+
+            {/* Price and Duration */}
             <View style={styles.inputRow}>
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>Price *</Text>
+                <Text style={styles.inputLabel}>Price (PHP) *</Text>
+                <TextInput
+                  style={[styles.input, errors.priceAmount && styles.inputError]}
+                  placeholder="1500"
+                  value={formData.priceAmount}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, priceAmount: text });
+                    setErrors({ ...errors, priceAmount: null });
+                  }}
+                  keyboardType="numeric"
+                />
+                {errors.priceAmount && <Text style={styles.errorText}>{errors.priceAmount}</Text>}
+              </View>
+
+              <View style={styles.inputGroupHalf}>
+                <Text style={styles.inputLabel}>Duration (min) *</Text>
+                <TextInput
+                  style={[styles.input, errors.duration && styles.inputError]}
+                  placeholder="60"
+                  value={formData.duration}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, duration: text });
+                    setErrors({ ...errors, duration: null });
+                  }}
+                  keyboardType="numeric"
+                />
+                {errors.duration && <Text style={styles.errorText}>{errors.duration}</Text>}
+              </View>
+            </View>
+
+            {/* Availability Days */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Available Days *</Text>
+              <View style={styles.daysContainer}>
+                {daysOfWeek.map((day) => (
+                  <TouchableOpacity
+                    key={day.value}
+                    style={[
+                      styles.dayChip,
+                      formData.availabilityDays.includes(day.value) && styles.dayChipActive,
+                      errors.availabilityDays && styles.inputError
+                    ]}
+                    onPress={() => toggleDay(day.value)}
+                  >
+                    <Text style={[
+                      styles.dayChipText,
+                      formData.availabilityDays.includes(day.value) && styles.dayChipTextActive
+                    ]}>
+                      {day.label.substring(0, 3)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {errors.availabilityDays && <Text style={styles.errorText}>{errors.availabilityDays}</Text>}
+            </View>
+
+            {/* Time Slots */}
+            <View style={styles.inputRow}>
+              <View style={styles.inputGroupHalf}>
+                <Text style={styles.inputLabel}>Start Time</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="₱600"
-                  value={newService.price}
-                  onChangeText={(text) => setNewService({ ...newService, price: text })}
+                  placeholder="09:00"
+                  value={formData.timeSlotStart}
+                  onChangeText={(text) => setFormData({ ...formData, timeSlotStart: text })}
+                />
+              </View>
+
+              <View style={styles.inputGroupHalf}>
+                <Text style={styles.inputLabel}>End Time</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="17:00"
+                  value={formData.timeSlotEnd}
+                  onChangeText={(text) => setFormData({ ...formData, timeSlotEnd: text })}
+                />
+              </View>
+            </View>
+
+            {/* Pet Types */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Suitable for Pets *</Text>
+              <View style={styles.petTypesContainer}>
+                {petTypes.map((pet) => (
+                  <TouchableOpacity
+                    key={pet.value}
+                    style={[
+                      styles.petTypeChip,
+                      formData.petTypes.includes(pet.value) && styles.petTypeChipActive,
+                      errors.petTypes && styles.inputError
+                    ]}
+                    onPress={() => togglePetType(pet.value)}
+                  >
+                    <Ionicons
+                      name={pet.icon}
+                      size={moderateScale(16)}
+                      color={formData.petTypes.includes(pet.value) ? '#fff' : '#1C86FF'}
+                    />
+                    <Text style={[
+                      styles.petTypeChipText,
+                      formData.petTypes.includes(pet.value) && styles.petTypeChipTextActive
+                    ]}>
+                      {pet.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {errors.petTypes && <Text style={styles.errorText}>{errors.petTypes}</Text>}
+            </View>
+
+            {/* Age Restrictions */}
+            <View style={styles.inputRow}>
+              <View style={styles.inputGroupHalf}>
+                <Text style={styles.inputLabel}>Min Age (years)</Text>
+                <TextInput
+                  style={[styles.input, errors.minAge && styles.inputError]}
+                  placeholder="0"
+                  value={formData.minAge}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, minAge: text });
+                    setErrors({ ...errors, minAge: null, maxAge: null });
+                  }}
                   keyboardType="numeric"
                 />
               </View>
 
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>Duration</Text>
+                <Text style={styles.inputLabel}>Max Age (years)</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="45 mins"
-                  value={newService.duration}
-                  onChangeText={(text) => setNewService({ ...newService, duration: text })}
+                  style={[styles.input, errors.maxAge && styles.inputError]}
+                  placeholder="30"
+                  value={formData.maxAge}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, maxAge: text });
+                    setErrors({ ...errors, maxAge: null });
+                  }}
+                  keyboardType="numeric"
                 />
+                {errors.maxAge && <Text style={styles.errorText}>{errors.maxAge}</Text>}
               </View>
             </View>
 
+            {/* Health Requirements */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Description</Text>
+              <Text style={styles.inputLabel}>Health Requirements (comma-separated)</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Brief description of the service"
-                value={newService.description}
-                onChangeText={(text) => setNewService({ ...newService, description: text })}
+                placeholder="e.g., Current health certificate, No fever"
+                value={formData.healthRequirements}
+                onChangeText={(text) => setFormData({ ...formData, healthRequirements: text })}
                 multiline
-                numberOfLines={3}
+                numberOfLines={2}
                 textAlignVertical="top"
               />
             </View>
 
+            {/* Special Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Special Notes</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Any special instructions or notes"
+                value={formData.specialNotes}
+                onChangeText={(text) => setFormData({ ...formData, specialNotes: text })}
+                multiline
+                numberOfLines={2}
+                textAlignVertical="top"
+                maxLength={300}
+              />
+            </View>
+
+            {/* Submit Button */}
             <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleAdd}
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
             >
-              <Ionicons name={editingService ? "checkmark-circle" : "add-circle"} size={moderateScale(20)} color="#fff" />
-              <Text style={styles.submitButtonText}>{editingService ? 'Update Service' : 'Add Service'}</Text>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons
+                    name={editingService ? "checkmark-circle" : "add-circle"}
+                    size={moderateScale(20)}
+                    color="#fff"
+                  />
+                  <Text style={styles.submitButtonText}>
+                    {editingService ? 'Update Service' : 'Add Service'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -206,7 +632,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: moderateScale(20),
     borderTopRightRadius: moderateScale(20),
     padding: moderateScale(20),
-    maxHeight: hp(80),
+    maxHeight: hp(90),
   },
   modalHeader: {
     flexDirection: 'row',
@@ -228,6 +654,7 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     gap: moderateScale(12),
+    marginBottom: moderateScale(16),
   },
   inputGroupHalf: {
     flex: 1,
@@ -237,7 +664,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: moderateScale(8),
-    fontFamily: 'SFProSB',
   },
   input: {
     backgroundColor: '#fff',
@@ -247,27 +673,43 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    fontFamily: 'SFProReg',
+  },
+  inputError: {
+    borderColor: '#FF6B6B',
+  },
+  errorText: {
+    fontSize: scaleFontSize(12),
+    color: '#FF6B6B',
+    marginTop: moderateScale(4),
   },
   textArea: {
     minHeight: moderateScale(80),
     paddingTop: moderateScale(12),
   },
-  submitButton: {
-    backgroundColor: '#1C86FF',
+  imagePickerButton: {
+    width: '100%',
+    height: moderateScale(150),
     borderRadius: moderateScale(12),
-    paddingVertical: hp(1.8),
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: moderateScale(8),
-    marginTop: moderateScale(20),
-    marginBottom: moderateScale(10),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    borderStyle: 'dashed',
+    overflow: 'hidden',
   },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
+  selectedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  imagePlaceholderText: {
+    fontSize: scaleFontSize(13),
+    color: '#999',
+    marginTop: moderateScale(8),
   },
   dropdownContainer: {
     flexDirection: 'row',
@@ -290,7 +732,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#333',
     fontWeight: '500',
-    fontFamily: 'SFProReg',
   },
   dropdownPlaceholder: {
     color: '#999',
@@ -302,7 +743,7 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(8),
     borderWidth: 1.5,
     borderColor: '#1C86FF',
-    maxHeight: moderateScale(250),
+    maxHeight: moderateScale(200),
     elevation: 5,
     shadowColor: '#1C86FF',
     shadowOffset: { width: 0, height: 3 },
@@ -320,21 +761,15 @@ const styles = StyleSheet.create({
   },
   dropdownItemSelected: {
     backgroundColor: '#E3F2FD',
-    borderLeftWidth: moderateScale(4),
-    borderLeftColor: '#1C86FF',
   },
   dropdownItemPressed: {
     backgroundColor: '#F5F5F5',
-  },
-  dropdownItemLast: {
-    borderBottomWidth: 0,
   },
   dropdownItemText: {
     fontSize: scaleFontSize(14),
     color: '#333',
     flex: 1,
     fontWeight: '500',
-    fontFamily: 'SFProReg',
   },
   dropdownItemTextSelected: {
     color: '#1C86FF',
@@ -353,5 +788,75 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(14),
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(8),
+  },
+  dayChip: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+  },
+  dayChipActive: {
+    backgroundColor: '#1C86FF',
+  },
+  dayChipText: {
+    fontSize: scaleFontSize(12),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  dayChipTextActive: {
+    color: '#fff',
+  },
+  petTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(8),
+  },
+  petTypeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(4),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+  },
+  petTypeChipActive: {
+    backgroundColor: '#1C86FF',
+  },
+  petTypeChipText: {
+    fontSize: scaleFontSize(12),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  petTypeChipTextActive: {
+    color: '#fff',
+  },
+  submitButton: {
+    backgroundColor: '#1C86FF',
+    borderRadius: moderateScale(12),
+    paddingVertical: hp(1.8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: moderateScale(8),
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(10),
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#91C4FF',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
   },
 });
