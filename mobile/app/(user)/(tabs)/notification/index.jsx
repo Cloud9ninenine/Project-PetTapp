@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,92 +7,206 @@ import {
   ScrollView,
   FlatList,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '@components/Header';
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "../../../config/api";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
   const { isProfileComplete } = useProfileCompletion();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [userId, setUserId] = useState(null);
 
-  // Mock notifications data
-  const notifications = [
-    {
-      id: '1',
-      type: 'booking',
-      icon: 'calendar',
-      iconColor: '#4CAF50',
-      iconBg: '#E8F5E9',
-      title: 'Booking Confirmed',
-      message: 'Your appointment with Animed Veterinary Clinic has been confirmed for Dec 15, 2024 at 2:00 PM',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'reminder',
-      icon: 'alarm',
-      iconColor: '#FF9B79',
-      iconBg: '#FFF3E0',
-      title: 'Appointment Reminder',
-      message: 'Your pet grooming appointment is tomorrow at 10:00 AM',
-      time: '5 hours ago',
-      read: false,
-    },
-    {
-      id: '3',
-      type: 'message',
-      icon: 'chatbubble',
-      iconColor: '#1C86FF',
-      iconBg: '#E3F2FD',
-      title: 'New Message',
-      message: 'Vetfusion Animal Clinic sent you a message',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: '4',
-      type: 'promo',
-      icon: 'pricetag',
-      iconColor: '#9C27B0',
-      iconBg: '#F3E5F5',
-      title: 'Special Offer',
-      message: 'Get 20% off on your next grooming service. Valid until Dec 31.',
-      time: '2 days ago',
-      read: true,
-    },
-    {
-      id: '5',
-      type: 'booking',
-      icon: 'checkmark-circle',
-      iconColor: '#4CAF50',
-      iconBg: '#E8F5E9',
-      title: 'Service Completed',
-      message: 'Your pet boarding service has been completed. Rate your experience!',
-      time: '3 days ago',
-      read: true,
-    },
-    {
-      id: '6',
-      type: 'update',
-      icon: 'information-circle',
-      iconColor: '#FF5722',
-      iconBg: '#FBE9E7',
-      title: 'Profile Update',
-      message: 'Your profile information has been successfully updated',
-      time: '1 week ago',
-      read: true,
-    },
-  ];
+  // Fetch user ID
+  const fetchUserId = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      if (storedUserId) {
+        setUserId(storedUserId);
+        return storedUserId;
+      } else {
+        const response = await apiClient.get('/auth/me');
+        if (response.data && response.data.user) {
+          const user = response.data.user;
+          await AsyncStorage.setItem('userId', user._id);
+          setUserId(user._id);
+          return user._id;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user ID:', error);
+      return null;
+    }
+  };
+
+  // Convert bookings to notifications
+  const convertBookingsToNotifications = (bookings) => {
+    return bookings.map(booking => {
+      const business = booking.businessId || {};
+      const businessName = business.businessName || 'Service Provider';
+      const serviceName = booking.serviceId?.name || 'Service';
+      const petName = booking.petId?.name || 'Your pet';
+
+      let type = 'booking';
+      let icon = 'calendar';
+      let iconColor = '#4CAF50';
+      let iconBg = '#E8F5E9';
+      let title = 'Booking Update';
+      let message = '';
+
+      // Determine notification type and message based on booking status
+      if (booking.status === 'pending') {
+        type = 'booking';
+        icon = 'time-outline';
+        iconColor = '#FF9B79';
+        iconBg = '#FFF3E0';
+        title = 'Booking Pending';
+        message = `Your ${serviceName} appointment for ${petName} at ${businessName} is pending confirmation`;
+      } else if (booking.status === 'confirmed') {
+        type = 'booking';
+        icon = 'checkmark-circle';
+        iconColor = '#4CAF50';
+        iconBg = '#E8F5E9';
+        title = 'Booking Confirmed';
+        message = `Your ${serviceName} appointment for ${petName} at ${businessName} has been confirmed`;
+      } else if (booking.status === 'cancelled') {
+        type = 'booking';
+        icon = 'close-circle';
+        iconColor = '#FF6B6B';
+        iconBg = '#FFEBEE';
+        title = 'Booking Cancelled';
+        message = `Your ${serviceName} appointment for ${petName} has been cancelled`;
+      } else if (booking.status === 'in-progress') {
+        type = 'booking';
+        icon = 'play-circle';
+        iconColor = '#2196F3';
+        iconBg = '#E3F2FD';
+        title = 'Service In Progress';
+        message = `${serviceName} for ${petName} is currently in progress`;
+      } else if (booking.status === 'completed') {
+        type = 'booking';
+        icon = 'checkmark-done';
+        iconColor = '#4CAF50';
+        iconBg = '#E8F5E9';
+        title = 'Service Completed';
+        message = `Your ${serviceName} for ${petName} has been completed. Rate your experience!`;
+      } else if (booking.status === 'no-show') {
+        type = 'booking';
+        icon = 'alert-circle';
+        iconColor = '#999';
+        iconBg = '#F5F5F5';
+        title = 'Missed Appointment';
+        message = `You missed your ${serviceName} appointment for ${petName}`;
+      }
+
+      // Calculate time ago
+      const time = getTimeAgo(booking.createdAt || booking.appointmentDateTime);
+
+      // Mark recent bookings (last 24 hours) as unread
+      const isRecent = new Date() - new Date(booking.createdAt || booking.appointmentDateTime) < 24 * 60 * 60 * 1000;
+
+      return {
+        id: booking._id,
+        type,
+        icon,
+        iconColor,
+        iconBg,
+        title,
+        message,
+        time,
+        read: !isRecent,
+        bookingId: booking._id,
+        appointmentDate: booking.appointmentDateTime,
+      };
+    });
+  };
+
+  // Helper function to calculate time ago
+  const getTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Fetch bookings and convert to notifications
+  const fetchNotifications = async (uId) => {
+    try {
+      // Fetch user's bookings
+      const response = await apiClient.get('/bookings', {
+        params: {
+          page: 1,
+          limit: 50,
+          sort: '-createdAt',
+        }
+      });
+
+      if (response.data && response.data.success) {
+        const bookings = response.data.data || [];
+        const notificationsList = convertBookingsToNotifications(bookings);
+        setNotifications(notificationsList);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const uId = userId || await fetchUserId();
+
+      if (uId) {
+        await fetchNotifications(uId);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Load data on mount and when screen is focused
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) {
+        loadData();
+      }
+    }, [userId])
+  );
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -107,7 +221,16 @@ export default function NotificationsScreen() {
     }
   }, [isProfileComplete]);
 
-  
+  const handleNotificationPress = (notification) => {
+    if (notification.bookingId) {
+      router.push({
+        pathname: '/(user)/(tabs)/booking/ScheduleDetail',
+        params: { bookingId: notification.bookingId }
+      });
+    } else {
+      router.push('/(user)/(tabs)/booking');
+    }
+  };
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -124,6 +247,7 @@ export default function NotificationsScreen() {
     <TouchableOpacity
       style={[styles.notificationCard, !item.read && styles.unreadCard]}
       activeOpacity={0.7}
+      onPress={() => handleNotificationPress(item)}
     >
       <View style={[styles.iconContainer, { backgroundColor: item.iconBg }]}>
         <Ionicons name={item.icon} size={moderateScale(24)} color={item.iconColor} />
@@ -156,6 +280,23 @@ export default function NotificationsScreen() {
       </Text>
     </View>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -208,6 +349,9 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       ) : (
         renderEmptyState()
@@ -393,5 +537,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: moderateScale(20),
   },
-  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
 });

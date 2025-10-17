@@ -167,6 +167,9 @@ export default function LoginScreen() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!isPasswordVisible}
+                  textContentType="password"
+                  autoComplete="password"
+                  autoCapitalize="none"
                 />
                 <TouchableOpacity
                   style={styles.eyeButton}

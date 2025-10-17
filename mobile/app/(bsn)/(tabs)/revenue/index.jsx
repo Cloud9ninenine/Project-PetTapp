@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,127 @@ import {
   ScrollView,
   TouchableOpacity,
   ImageBackground,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "@config/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RevenueScreen() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [businessId, setBusinessId] = useState(null);
+  const [revenueData, setRevenueData] = useState(null);
+
+  // Fetch business ID from AsyncStorage
+  const fetchBusinessId = async () => {
+    try {
+      const storedBusinessId = await AsyncStorage.getItem('businessId');
+      if (storedBusinessId) {
+        setBusinessId(storedBusinessId);
+        return storedBusinessId;
+      } else {
+        // Try to fetch from API
+        const response = await apiClient.get('/businesses');
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const business = response.data.data[0];
+          await AsyncStorage.setItem('businessId', business._id);
+          setBusinessId(business._id);
+          return business._id;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching business ID:', error);
+      return null;
+    }
+  };
+
+  // Calculate date range based on selected period
+  const getDateRange = () => {
+    const endDate = new Date();
+    const startDate = new Date();
+
+    if (selectedPeriod === 'week') {
+      startDate.setDate(endDate.getDate() - 7);
+    } else if (selectedPeriod === 'month') {
+      startDate.setMonth(endDate.getMonth() - 1);
+    } else if (selectedPeriod === 'year') {
+      startDate.setFullYear(endDate.getFullYear() - 1);
+    }
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+  };
+
+  // Fetch revenue data from API
+  const fetchRevenueData = async (bId) => {
+    try {
+      const { startDate, endDate } = getDateRange();
+      const response = await apiClient.get('/revenue', {
+        params: {
+          businessId: bId,
+          startDate,
+          endDate
+        }
+      });
+
+      if (response.data && response.data.success) {
+        setRevenueData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching revenue data:', error);
+      Alert.alert('Error', 'Failed to load revenue data');
+    }
+  };
+
+  // Load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const bId = businessId || await fetchBusinessId();
+
+      if (bId) {
+        await fetchRevenueData(bId);
+      } else {
+        Alert.alert('Business Required', 'Please set up your business profile first.');
+      }
+    } catch (error) {
+      console.error('Error loading revenue data:', error);
+      Alert.alert('Error', 'Failed to load revenue data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Load data on mount and when screen is focused
+  useEffect(() => {
+    loadData();
+  }, [selectedPeriod]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (businessId) {
+        loadData();
+      }
+    }, [businessId, selectedPeriod])
+  );
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -23,40 +136,64 @@ export default function RevenueScreen() {
     </View>
   );
 
-  // Mock revenue data
-  const revenueData = {
-    total: "₱45,250",
-    thisMonth: "₱12,500",
-    lastMonth: "₱10,800",
-    growth: "+15.7%",
+  // Helper functions
+  const formatCurrency = (amount) => {
+    return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const recentTransactions = [
-    {
-      id: 1,
-      customerName: "John Doe",
-      service: "Veterinary Checkup",
-      amount: "₱500",
-      date: "Oct 08, 2025",
-      status: "completed",
-    },
-    {
-      id: 2,
-      customerName: "Jane Smith",
-      service: "Pet Grooming",
-      amount: "₱800",
-      date: "Oct 07, 2025",
-      status: "completed",
-    },
-    {
-      id: 3,
-      customerName: "Mike Johnson",
-      service: "Boarding",
-      amount: "₱1,200",
-      date: "Oct 06, 2025",
-      status: "completed",
-    },
-  ];
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getPaymentMethodIcon = (method) => {
+    const iconMap = {
+      cash: 'cash-outline',
+      gcash: 'phone-portrait-outline',
+      card: 'card-outline',
+      bank: 'business-outline',
+    };
+    return iconMap[method?.toLowerCase()] || 'wallet-outline';
+  };
+
+  const calculateGrowth = () => {
+    if (!revenueData?.monthlyData || revenueData.monthlyData.length < 2) return null;
+
+    const currentMonth = revenueData.monthlyData[revenueData.monthlyData.length - 1]?.revenue || 0;
+    const previousMonth = revenueData.monthlyData[revenueData.monthlyData.length - 2]?.revenue || 0;
+
+    if (previousMonth === 0) return null;
+
+    const growth = ((currentMonth - previousMonth) / previousMonth) * 100;
+    return growth;
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={false}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading revenue data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const growth = calculateGrowth();
+  const currentMonthRevenue = revenueData?.monthlyData?.[revenueData.monthlyData.length - 1]?.revenue || 0;
+  const previousMonthRevenue = revenueData?.monthlyData?.[revenueData.monthlyData.length - 2]?.revenue || 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -76,16 +213,10 @@ export default function RevenueScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {/* Coming Soon Banner */}
-        <View style={styles.comingSoonBanner}>
-          <Ionicons name="analytics-outline" size={moderateScale(64)} color="#B3D9FF" />
-          <Text style={styles.comingSoonTitle}>Revenue Analytics</Text>
-          <Text style={styles.comingSoonSubtitle}>Coming Soon</Text>
-          <Text style={styles.comingSoonText}>
-            Track your earnings, view detailed analytics, and manage your business finances all in one place
-          </Text>
-        </View>
 
         {/* Period Selector */}
         <View style={styles.periodSelector}>
@@ -143,61 +274,107 @@ export default function RevenueScreen() {
         <View style={styles.summaryCardsContainer}>
           <View style={[styles.summaryCard, styles.totalRevenueCard]}>
             <Ionicons name="cash-outline" size={moderateScale(32)} color="#fff" />
-            <Text style={styles.summaryCardLabel}>Total Revenue</Text>
-            <Text style={styles.summaryCardValue}>{revenueData.total}</Text>
+            <Text style={styles.summaryCardLabel}>Total Revenue (Paid)</Text>
+            <Text style={styles.summaryCardValue}>{formatCurrency(revenueData?.totalRevenue || 0)}</Text>
+            <Text style={styles.summaryCardSubtext}>
+              {revenueData?.paidBookings || 0} paid bookings
+            </Text>
           </View>
 
           <View style={styles.summaryCardsRow}>
             <View style={styles.summaryCardSmall}>
               <Ionicons name="trending-up-outline" size={moderateScale(24)} color="#4CAF50" />
-              <Text style={styles.summaryCardLabelSmall}>This Month</Text>
-              <Text style={styles.summaryCardValueSmall}>{revenueData.thisMonth}</Text>
-              <Text style={styles.growthBadge}>{revenueData.growth}</Text>
+              <Text style={styles.summaryCardLabelSmall}>Current Period</Text>
+              <Text style={styles.summaryCardValueSmall}>{formatCurrency(currentMonthRevenue)}</Text>
+              {growth !== null && (
+                <Text style={[
+                  styles.growthBadge,
+                  { color: growth >= 0 ? '#4CAF50' : '#FF6B6B' }
+                ]}>
+                  {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
+                </Text>
+              )}
             </View>
 
             <View style={styles.summaryCardSmall}>
-              <Ionicons name="calendar-outline" size={moderateScale(24)} color="#FF9B79" />
-              <Text style={styles.summaryCardLabelSmall}>Last Month</Text>
-              <Text style={styles.summaryCardValueSmall}>{revenueData.lastMonth}</Text>
+              <Ionicons name="hourglass-outline" size={moderateScale(24)} color="#FF9B79" />
+              <Text style={styles.summaryCardLabelSmall}>Pending Payment</Text>
+              <Text style={styles.summaryCardValueSmall}>{formatCurrency(revenueData?.pendingRevenue || 0)}</Text>
+              <Text style={styles.pendingBookingsText}>
+                {revenueData?.pendingBookings || 0} bookings
+              </Text>
             </View>
           </View>
         </View>
+
+        {/* Payment Method Breakdown */}
+        {revenueData?.paymentMethodBreakdown && Object.keys(revenueData.paymentMethodBreakdown).length > 0 && (
+          <View style={styles.paymentMethodSection}>
+            <Text style={styles.sectionTitle}>Payment Methods</Text>
+            <View style={styles.paymentMethodGrid}>
+              {Object.entries(revenueData.paymentMethodBreakdown).map(([method, data]) => (
+                <View key={method} style={styles.paymentMethodCard}>
+                  <Ionicons
+                    name={getPaymentMethodIcon(method)}
+                    size={moderateScale(24)}
+                    color="#1C86FF"
+                  />
+                  <Text style={styles.paymentMethodName}>
+                    {method.charAt(0).toUpperCase() + method.slice(1)}
+                  </Text>
+                  <Text style={styles.paymentMethodAmount}>{formatCurrency(data.total)}</Text>
+                  <Text style={styles.paymentMethodCount}>{data.count} transactions</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Recent Transactions */}
         <View style={styles.transactionsSection}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
-          {recentTransactions.map((transaction) => (
-            <View key={transaction.id} style={styles.transactionCard}>
-              <View style={styles.transactionIcon}>
-                <Ionicons name="person-circle-outline" size={moderateScale(32)} color="#1C86FF" />
-              </View>
-              <View style={styles.transactionInfo}>
-                <Text style={styles.transactionCustomer}>{transaction.customerName}</Text>
-                <Text style={styles.transactionService}>{transaction.service}</Text>
-                <Text style={styles.transactionDate}>{transaction.date}</Text>
-              </View>
-              <View style={styles.transactionRight}>
-                <Text style={styles.transactionAmount}>{transaction.amount}</Text>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Completed</Text>
+          {revenueData?.transactions && revenueData.transactions.length > 0 ? (
+            revenueData.transactions.slice(0, 10).map((transaction) => (
+              <View key={transaction._id} style={styles.transactionCard}>
+                <View style={styles.transactionIcon}>
+                  <Ionicons
+                    name={getPaymentMethodIcon(transaction.paymentDetails?.method)}
+                    size={moderateScale(28)}
+                    color="#1C86FF"
+                  />
+                </View>
+                <View style={styles.transactionInfo}>
+                  <Text style={styles.transactionCustomer} numberOfLines={1}>
+                    {transaction.userId?.firstName} {transaction.userId?.lastName}
+                  </Text>
+                  <Text style={styles.transactionService} numberOfLines={1}>
+                    {transaction.serviceId?.name || 'Service'}
+                  </Text>
+                  <Text style={styles.transactionDate}>
+                    {formatDate(transaction.appointmentDateTime)}
+                  </Text>
+                </View>
+                <View style={styles.transactionRight}>
+                  <Text style={styles.transactionAmount}>
+                    {formatCurrency(transaction.totalPrice)}
+                  </Text>
+                  <View style={[
+                    styles.statusBadge,
+                    transaction.paymentDetails?.status === 'paid' && styles.statusBadgePaid
+                  ]}>
+                    <Text style={styles.statusBadgeText}>
+                      {transaction.paymentDetails?.status === 'paid' ? 'Paid' : 'Pending'}
+                    </Text>
+                  </View>
                 </View>
               </View>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={moderateScale(48)} color="#C7C7CC" />
+              <Text style={styles.emptyStateText}>No transactions yet</Text>
             </View>
-          ))}
-        </View>
-
-        {/* Placeholder for future features */}
-        <View style={styles.featurePreviewContainer}>
-          <View style={styles.featurePreview}>
-            <Ionicons name="bar-chart-outline" size={moderateScale(32)} color="#1C86FF" />
-            <Text style={styles.featurePreviewTitle}>Revenue Charts</Text>
-            <Text style={styles.featurePreviewText}>Visual analytics coming soon</Text>
-          </View>
-          <View style={styles.featurePreview}>
-            <Ionicons name="download-outline" size={moderateScale(32)} color="#1C86FF" />
-            <Text style={styles.featurePreviewTitle}>Export Reports</Text>
-            <Text style={styles.featurePreviewText}>Download financial reports</Text>
-          </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -216,6 +393,18 @@ const styles = StyleSheet.create({
   backgroundImageStyle: {
     opacity: 0.1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontFamily: 'SFProReg',
+  },
   titleContainer: {
     flex: 1,
   },
@@ -228,34 +417,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-  },
-  comingSoonBanner: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: moderateScale(16),
-    padding: moderateScale(32),
-    alignItems: "center",
-    marginBottom: moderateScale(24),
-    borderWidth: 2,
-    borderColor: "#B3D9FF",
-  },
-  comingSoonTitle: {
-    fontSize: scaleFontSize(24),
-    fontWeight: "bold",
-    color: "#1C86FF",
-    marginTop: moderateScale(16),
-  },
-  comingSoonSubtitle: {
-    fontSize: scaleFontSize(16),
-    fontWeight: "600",
-    color: "#FF9B79",
-    marginTop: moderateScale(8),
-  },
-  comingSoonText: {
-    fontSize: scaleFontSize(14),
-    color: "#666",
-    textAlign: "center",
-    marginTop: moderateScale(12),
-    lineHeight: moderateScale(20),
   },
   periodSelector: {
     flexDirection: "row",
@@ -308,6 +469,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginTop: moderateScale(4),
   },
+  summaryCardSubtext: {
+    fontSize: scaleFontSize(12),
+    color: "rgba(255,255,255,0.8)",
+    marginTop: moderateScale(4),
+  },
   summaryCardsRow: {
     flexDirection: "row",
     gap: moderateScale(12),
@@ -335,8 +501,47 @@ const styles = StyleSheet.create({
   growthBadge: {
     fontSize: scaleFontSize(12),
     fontWeight: "600",
-    color: "#4CAF50",
     marginTop: moderateScale(4),
+  },
+  pendingBookingsText: {
+    fontSize: scaleFontSize(11),
+    color: "#999",
+    marginTop: moderateScale(2),
+  },
+  paymentMethodSection: {
+    marginBottom: moderateScale(24),
+  },
+  paymentMethodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: moderateScale(12),
+  },
+  paymentMethodCard: {
+    flex: 1,
+    minWidth: "30%",
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  paymentMethodName: {
+    fontSize: scaleFontSize(13),
+    fontWeight: "600",
+    color: "#333",
+    marginTop: moderateScale(8),
+  },
+  paymentMethodAmount: {
+    fontSize: scaleFontSize(16),
+    fontWeight: "bold",
+    color: "#1C86FF",
+    marginTop: moderateScale(4),
+  },
+  paymentMethodCount: {
+    fontSize: scaleFontSize(11),
+    color: "#999",
+    marginTop: moderateScale(2),
   },
   transactionsSection: {
     marginBottom: moderateScale(24),
@@ -388,40 +593,30 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(6),
   },
   statusBadge: {
-    backgroundColor: "#E8F5E9",
+    backgroundColor: "#FFF3E0",
     paddingHorizontal: moderateScale(10),
     paddingVertical: moderateScale(4),
     borderRadius: moderateScale(12),
   },
+  statusBadgePaid: {
+    backgroundColor: "#E8F5E9",
+  },
   statusBadgeText: {
     fontSize: scaleFontSize(11),
-    color: "#4CAF50",
+    color: "#FF9B79",
     fontWeight: "600",
   },
-  featurePreviewContainer: {
-    flexDirection: "row",
-    gap: moderateScale(12),
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(40),
+    paddingHorizontal: moderateScale(20),
   },
-  featurePreview: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-    borderRadius: moderateScale(12),
-    padding: moderateScale(20),
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  featurePreviewTitle: {
-    fontSize: scaleFontSize(14),
-    fontWeight: "600",
-    color: "#1C86FF",
+  emptyStateText: {
     marginTop: moderateScale(12),
-    textAlign: "center",
-  },
-  featurePreviewText: {
-    fontSize: scaleFontSize(12),
-    color: "#666",
-    marginTop: moderateScale(4),
-    textAlign: "center",
+    fontSize: scaleFontSize(14),
+    color: '#999',
+    textAlign: 'center',
+    fontFamily: 'SFProReg',
   },
 });

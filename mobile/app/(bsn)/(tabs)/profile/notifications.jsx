@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,111 +7,186 @@ import {
   ScrollView,
   TouchableOpacity,
   ImageBackground,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from '@config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [businessId, setBusinessId] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
-  const notifications = [
-    {
-      id: 1,
-      type: 'booking',
-      icon: 'calendar',
-      iconColor: '#4CAF50',
-      customerName: 'Sarah Johnson',
-      petName: 'Max',
-      service: 'Pet Grooming',
-      message: 'New booking request',
-      time: '5 minutes ago',
-      read: false,
-    },
-    {
-      id: 2,
-      type: 'message',
-      icon: 'chatbubble',
-      iconColor: '#2196F3',
-      customerName: 'Michael Chen',
-      petName: 'Luna',
-      message: 'Sent you a message about appointment time',
-      time: '15 minutes ago',
-      read: false,
-    },
-    {
-      id: 3,
-      type: 'cancelled',
-      icon: 'close-circle',
-      iconColor: '#FF6B6B',
-      customerName: 'Emma Garcia',
-      petName: 'Charlie',
-      service: 'Veterinary Check-up',
-      message: 'Cancelled booking',
-      time: '1 hour ago',
-      read: false,
-    },
-    {
-      id: 4,
-      type: 'booking',
-      icon: 'calendar',
-      iconColor: '#4CAF50',
-      customerName: 'David Martinez',
-      petName: 'Whiskers',
-      service: 'Pet Boarding',
-      message: 'New booking request',
-      time: '2 hours ago',
-      read: true,
-    },
-    {
-      id: 5,
-      type: 'message',
-      icon: 'chatbubble',
-      iconColor: '#2196F3',
-      customerName: 'Lisa Anderson',
-      petName: 'Rocky',
-      message: 'Asking about boarding availability',
-      time: '3 hours ago',
-      read: true,
-    },
-    {
-      id: 6,
-      type: 'booking',
-      icon: 'calendar',
-      iconColor: '#4CAF50',
-      customerName: 'James Wilson',
-      petName: 'Buddy',
-      service: 'Pet Delivery',
-      message: 'Confirmed booking',
-      time: '5 hours ago',
-      read: true,
-    },
-    {
-      id: 7,
-      type: 'cancelled',
-      icon: 'close-circle',
-      iconColor: '#FF6B6B',
-      customerName: 'Rachel Kim',
-      petName: 'Milo',
-      service: 'Pet Grooming',
-      message: 'Cancelled booking due to schedule conflict',
-      time: '1 day ago',
-      read: true,
-    },
-    {
-      id: 8,
-      type: 'message',
-      icon: 'chatbubble',
-      iconColor: '#2196F3',
-      customerName: 'Tom Brown',
-      petName: 'Bella',
-      message: 'Thanked you for the excellent service',
-      time: '1 day ago',
-      read: true,
-    },
-  ];
+  // Fetch business ID
+  const fetchBusinessId = async () => {
+    try {
+      const storedBusinessId = await AsyncStorage.getItem('businessId');
+      if (storedBusinessId) {
+        setBusinessId(storedBusinessId);
+        return storedBusinessId;
+      } else {
+        const response = await apiClient.get('/businesses');
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const business = response.data.data[0];
+          await AsyncStorage.setItem('businessId', business._id);
+          setBusinessId(business._id);
+          return business._id;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching business ID:', error);
+      return null;
+    }
+  };
+
+  // Convert bookings to notifications
+  const convertBookingsToNotifications = (bookings) => {
+    return bookings.map(booking => {
+      const petOwner = booking.petOwnerId || {};
+      const customerName = `${petOwner.firstName || ''} ${petOwner.lastName || ''}`.trim() || 'Customer';
+      const petName = booking.petId?.name || 'Pet';
+      const serviceName = booking.serviceId?.name || 'Service';
+
+      let type = 'booking';
+      let icon = 'calendar';
+      let iconColor = '#4CAF50';
+      let message = 'New booking request';
+
+      // Determine notification type and message based on booking status
+      if (booking.status === 'pending') {
+        type = 'booking';
+        icon = 'time-outline';
+        iconColor = '#FF9B79';
+        message = 'New booking request';
+      } else if (booking.status === 'confirmed') {
+        type = 'booking';
+        icon = 'checkmark-circle';
+        iconColor = '#4CAF50';
+        message = 'Booking confirmed';
+      } else if (booking.status === 'cancelled') {
+        type = 'cancelled';
+        icon = 'close-circle';
+        iconColor = '#FF6B6B';
+        message = 'Cancelled booking';
+      } else if (booking.status === 'in-progress') {
+        type = 'booking';
+        icon = 'play-circle';
+        iconColor = '#2196F3';
+        message = 'Service in progress';
+      } else if (booking.status === 'completed') {
+        type = 'booking';
+        icon = 'checkmark-done';
+        iconColor = '#4CAF50';
+        message = 'Service completed';
+      } else if (booking.status === 'no-show') {
+        type = 'cancelled';
+        icon = 'alert-circle';
+        iconColor = '#999';
+        message = 'Customer no-show';
+      }
+
+      // Calculate time ago
+      const timeAgo = getTimeAgo(booking.createdAt || booking.appointmentDateTime);
+
+      // Mark recent bookings (last 24 hours) as unread
+      const isRecent = new Date() - new Date(booking.createdAt || booking.appointmentDateTime) < 24 * 60 * 60 * 1000;
+
+      return {
+        id: booking._id,
+        type,
+        icon,
+        iconColor,
+        customerName,
+        petName,
+        service: serviceName,
+        message,
+        time: timeAgo,
+        read: !isRecent,
+        bookingId: booking._id,
+        appointmentDate: booking.appointmentDateTime,
+      };
+    });
+  };
+
+  // Helper function to calculate time ago
+  const getTimeAgo = (dateString) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Fetch bookings and convert to notifications
+  const fetchNotifications = async (bId) => {
+    try {
+      // Fetch recent bookings (last 30 days)
+      const response = await apiClient.get('/bookings', {
+        params: {
+          page: 1,
+          limit: 50,
+          sort: '-createdAt',
+        }
+      });
+
+      if (response.data && response.data.success) {
+        const bookings = response.data.data || [];
+        const notificationsList = convertBookingsToNotifications(bookings);
+        setNotifications(notificationsList);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const bId = businessId || await fetchBusinessId();
+
+      if (bId) {
+        await fetchNotifications(bId);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Load data on mount and when screen is focused
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (businessId) {
+        loadData();
+      }
+    }, [businessId])
+  );
 
   const filterNotifications = () => {
     if (selectedTab === 'all') return notifications;
@@ -127,9 +202,40 @@ export default function NotificationsScreen() {
     if (notification.type === 'message') {
       router.push('/(bsn)/(tabs)/messages');
     } else if (notification.type === 'booking' || notification.type === 'cancelled') {
-      router.push('/(bsn)/(tabs)/booking');
+      // Navigate to specific booking details
+      if (notification.bookingId) {
+        router.push({
+          pathname: '/(bsn)/(tabs)/booking/AppointmentDetails',
+          params: { bookingId: notification.bookingId }
+        });
+      } else {
+        router.push('/(bsn)/(tabs)/booking');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          title="Notifications"
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading notifications...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -182,7 +288,12 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {filterNotifications().map((notification) => (
           <TouchableOpacity
             key={notification.id}
@@ -365,5 +476,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: moderateScale(8),
     paddingHorizontal: wp(10),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
   },
 });

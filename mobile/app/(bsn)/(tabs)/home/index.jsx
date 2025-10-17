@@ -251,7 +251,7 @@ export default function BusinessDashboard() {
       value: formatCurrency(dashboardData.metrics.todaysRevenue),
       icon: "cash",
       color: "#2196F3",
-      route: "../profile/revenue",
+      route: "../revenue",
     },
     {
       id: 3,
@@ -266,7 +266,7 @@ export default function BusinessDashboard() {
       value: formatCurrency(dashboardData.metrics.monthlyRevenue),
       icon: "trending-up",
       color: "#FFD700",
-      route: "../profile/revenue",
+      route: "../revenue",
     },
   ];
 
@@ -435,7 +435,6 @@ export default function BusinessDashboard() {
 
             {services && services.length > 0 ? (
               services.map((service) => {
-                const serviceImage = service.images?.main || service.image || null;
                 return (
                   <TouchableOpacity
                     key={service._id}
@@ -445,9 +444,9 @@ export default function BusinessDashboard() {
                       params: { serviceId: service._id }
                     })}
                   >
-                    {serviceImage ? (
+                    {service.imageUrl ? (
                       <Image
-                        source={{ uri: serviceImage }}
+                        source={{ uri: service.imageUrl }}
                         style={styles.serviceImage}
                         resizeMode="cover"
                       />

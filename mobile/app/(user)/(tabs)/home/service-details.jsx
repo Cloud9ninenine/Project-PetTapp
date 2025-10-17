@@ -590,12 +590,6 @@ export default function ServiceDetailsScreen() {
           imageStyle={styles.backgroundImageStyle}
           resizeMode="repeat"
         />
-        <Header
-          backgroundColor="#1C86FF"
-          titleColor="#fff"
-          customTitle={renderTitle()}
-          showBack={true}
-        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
           <Text style={styles.loadingText}>Loading service details...</Text>
@@ -612,12 +606,6 @@ export default function ServiceDetailsScreen() {
           style={styles.backgroundimg}
           imageStyle={styles.backgroundImageStyle}
           resizeMode="repeat"
-        />
-        <Header
-          backgroundColor="#1C86FF"
-          titleColor="#fff"
-          customTitle={renderTitle()}
-          showBack={true}
         />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={moderateScale(60)} color="#FF6B6B" />

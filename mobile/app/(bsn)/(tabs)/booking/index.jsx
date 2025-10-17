@@ -27,7 +27,7 @@ const CustomerBookings = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [selectedStatus, setSelectedStatus] = useState('active');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const router = useRouter();
@@ -63,22 +63,48 @@ const CustomerBookings = () => {
       const params = {
         page: pageNum,
         limit: 20,
-        sort: '-appointmentDateTime', // Sort by appointment date descending (most recent/upcoming first)
       };
 
       // Handle special filter statuses
       if (selectedStatus === 'active') {
         // Active bookings: pending, confirmed, in-progress
         params.status = 'pending,confirmed,in-progress';
+        params.sort = '-appointmentDateTime';
       } else if (selectedStatus !== 'all') {
         // Specific status
         params.status = selectedStatus;
+        params.sort = '-appointmentDateTime';
       }
+      // For 'all' status, we'll sort on client-side after fetching
 
       const response = await apiClient.get('/bookings', { params });
 
       if (response.data && response.data.success) {
-        const newBookings = response.data.data || [];
+        let newBookings = response.data.data || [];
+
+        // Custom sort for 'all' status: Active first, then Pending, then rest
+        if (selectedStatus === 'all') {
+          newBookings = newBookings.sort((a, b) => {
+            const statusPriority = {
+              'confirmed': 1,
+              'in-progress': 2,
+              'pending': 3,
+              'completed': 4,
+              'cancelled': 5,
+              'no-show': 6,
+            };
+
+            const aPriority = statusPriority[a.status] || 999;
+            const bPriority = statusPriority[b.status] || 999;
+
+            if (aPriority !== bPriority) {
+              return aPriority - bPriority;
+            }
+
+            // If same priority, sort by appointment date (most recent first)
+            return new Date(b.appointmentDateTime) - new Date(a.appointmentDateTime);
+          });
+        }
 
         if (pageNum === 1) {
           setBookings(newBookings);
@@ -280,8 +306,8 @@ const CustomerBookings = () => {
   };
 
   const statusFilters = [
-    { label: 'Active', value: 'active', icon: 'time-outline' },
     { label: 'All', value: 'all', icon: 'list-outline' },
+    { label: 'Active', value: 'active', icon: 'time-outline' },
     { label: 'Pending', value: 'pending', icon: 'hourglass-outline' },
     { label: 'Confirmed', value: 'confirmed', icon: 'checkmark-circle-outline' },
     { label: 'In Progress', value: 'in-progress', icon: 'play-circle-outline' },

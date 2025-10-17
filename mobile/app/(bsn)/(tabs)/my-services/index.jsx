@@ -31,7 +31,6 @@ export default function MyServicesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [businessId, setBusinessId] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingService, setEditingService] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [minPrice, setMinPrice] = useState('');
@@ -228,26 +227,15 @@ export default function MyServicesScreen() {
 
   const handleAddService = async (serviceData) => {
     try {
-      if (editingService) {
-        // Update existing service
-        await apiClient.put(`/services/${editingService._id}`, serviceData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        Alert.alert('Success', 'Service updated successfully');
-      } else {
-        // Create new service
-        await apiClient.post('/services', serviceData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-        Alert.alert('Success', 'Service created successfully');
-      }
+      // Create new service
+      await apiClient.post('/services', serviceData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      Alert.alert('Success', 'Service created successfully');
 
       setShowAddModal(false);
-      setEditingService(null);
       fetchServices(1, selectedCategory);
     } catch (error) {
       console.error('Error saving service:', error);
@@ -256,33 +244,11 @@ export default function MyServicesScreen() {
     }
   };
 
-  const handleEditService = (service) => {
-    setEditingService(service);
-    setShowAddModal(true);
-  };
-
-  const handleDeleteService = (service) => {
-    Alert.alert(
-      'Delete Service',
-      `Are you sure you want to delete "${service.name}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await apiClient.delete(`/services/${service._id}`);
-              Alert.alert('Success', 'Service deleted successfully');
-              fetchServices(1, selectedCategory);
-            } catch (error) {
-              console.error('Error deleting service:', error);
-              Alert.alert('Error', error.response?.data?.message || 'Failed to delete service');
-            }
-          },
-        },
-      ]
-    );
+  const handleViewService = (service) => {
+    router.push({
+      pathname: '/my-services/ServiceDetails',
+      params: { serviceId: service._id }
+    });
   };
 
   const toggleAvailability = async (service) => {
@@ -308,7 +274,6 @@ export default function MyServicesScreen() {
 
   const handleCloseModal = () => {
     setShowAddModal(false);
-    setEditingService(null);
   };
 
   const formatPrice = (price) => {
@@ -399,7 +364,11 @@ export default function MyServicesScreen() {
   );
 
   const renderServiceItem = ({ item }) => (
-    <View style={styles.serviceCard}>
+    <TouchableOpacity
+      style={styles.serviceCard}
+      onPress={() => handleViewService(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.serviceHeader}>
         {item.imageUrl ? (
           <Image
@@ -408,7 +377,7 @@ export default function MyServicesScreen() {
           />
         ) : (
           <View style={[styles.serviceIconContainer, { backgroundColor: getCategoryColor(item.category) }]}>
-            <Ionicons name={getCategoryIcon(item.category)} size={moderateScale(28)} color="#fff" />
+            <Ionicons name={getCategoryIcon(item.category)} size={moderateScale(24)} color="#fff" />
           </View>
         )}
 
@@ -421,34 +390,20 @@ export default function MyServicesScreen() {
           </View>
         </View>
 
-        <View style={styles.serviceActions}>
-          <TouchableOpacity
-            style={[
-              styles.availabilityToggle,
-              item.isActive ? styles.availableToggle : styles.unavailableToggle
-            ]}
-            onPress={() => toggleAvailability(item)}
-          >
-            <Text style={styles.toggleText}>
-              {item.isActive ? 'Active' : 'Inactive'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => handleEditService(item)}
-            >
-              <Ionicons name="create-outline" size={moderateScale(20)} color="#1C86FF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteService(item)}
-            >
-              <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <TouchableOpacity
+          style={[
+            styles.availabilityToggle,
+            item.isActive ? styles.availableToggle : styles.unavailableToggle
+          ]}
+          onPress={(e) => {
+            e.stopPropagation();
+            toggleAvailability(item);
+          }}
+        >
+          <Text style={styles.toggleText}>
+            {item.isActive ? 'Active' : 'Inactive'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {item.description && (
@@ -456,7 +411,7 @@ export default function MyServicesScreen() {
           {item.description}
         </Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderLoadMoreButton = () => {
@@ -695,7 +650,7 @@ export default function MyServicesScreen() {
         visible={showAddModal}
         onClose={handleCloseModal}
         onAddService={handleAddService}
-        editingService={editingService}
+        editingService={null}
         businessId={businessId}
       />
     </SafeAreaView>
@@ -933,18 +888,19 @@ const styles = StyleSheet.create({
     marginRight: moderateScale(12),
   },
   serviceIconContainer: {
-    width: moderateScale(55),
-    height: moderateScale(55),
+    width: moderateScale(50),
+    height: moderateScale(50),
     borderRadius: moderateScale(10),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: moderateScale(12),
+    marginRight: moderateScale(10),
   },
   serviceInfo: {
     flex: 1,
+    marginRight: moderateScale(8),
   },
   serviceName: {
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(15),
     fontWeight: 'bold',
     color: '#333',
     marginBottom: moderateScale(4),
@@ -968,14 +924,11 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: '#999',
   },
-  serviceActions: {
-    alignItems: 'flex-end',
-    gap: moderateScale(8),
-  },
   availabilityToggle: {
-    paddingHorizontal: moderateScale(12),
+    paddingHorizontal: moderateScale(10),
     paddingVertical: moderateScale(6),
     borderRadius: moderateScale(12),
+    alignSelf: 'flex-start',
   },
   availableToggle: {
     backgroundColor: '#4CAF50',
@@ -984,35 +937,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B6B',
   },
   toggleText: {
-    fontSize: scaleFontSize(11),
+    fontSize: scaleFontSize(10),
     color: '#fff',
     fontWeight: '600',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: moderateScale(8),
-  },
-  editButton: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: '#FFEBEE',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   serviceDescription: {
     fontSize: scaleFontSize(13),
     color: '#666',
-    marginTop: moderateScale(10),
-    lineHeight: scaleFontSize(18),
+    marginTop: moderateScale(12),
+    lineHeight: scaleFontSize(19),
   },
   loadMoreContainer: {
     paddingVertical: moderateScale(20),
