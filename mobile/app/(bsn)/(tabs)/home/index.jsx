@@ -14,12 +14,15 @@ import {
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import apiClient from "@config/api";
+import BusinessHeader from "@components/BusinessHeader";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function BusinessDashboard() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [businessId, setBusinessId] = useState(null);
@@ -282,12 +285,36 @@ export default function BusinessDashboard() {
           imageStyle={styles.backgroundImageStyle}
           resizeMode="repeat"
         />
-        <Header
-          backgroundColor="#1C86FF"
-          titleColor="#fff"
-          customTitle={renderCustomTitle()}
-          showBack={false}
-        />
+
+        {/* Custom Header */}
+        <View style={[styles.customHeader, { paddingTop: insets.top + moderateScale(10) }]}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeftContent}>
+              <TouchableOpacity style={styles.profileImageContainer}>
+                <View style={styles.profilePlaceholder}>
+                  <Ionicons name="storefront" size={moderateScale(24)} color="#1C86FF" />
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.welcomeText}>Welcome Back!</Text>
+                <Text style={styles.businessNameHeader} numberOfLines={1}>{businessName}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => router.push("/(bsn)/(tabs)/profile/notifications")}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={moderateScale(26)}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
@@ -305,12 +332,13 @@ export default function BusinessDashboard() {
         resizeMode="repeat"
       />
 
-      <Header
-        backgroundColor="#1C86FF"
-        titleColor="#fff"
-        customTitle={renderCustomTitle()}
-        showBack={false}
-      />
+      {/* Custom Header */}
+        <BusinessHeader
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderCustomTitle()}
+          showBack={false}
+        />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -483,6 +511,13 @@ const styles = StyleSheet.create({
     color: '#666',
     fontFamily: 'SFProReg',
   },
+  customHeader: {
+    backgroundColor: "#1C86FF",
+    paddingHorizontal: wp(5),
+    paddingBottom: moderateScale(20),
+    borderBottomLeftRadius: moderateScale(20),
+    borderBottomRightRadius: moderateScale(20),
+  },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
@@ -515,13 +550,13 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: scaleFontSize(12),
-    color: "#fff",
+    color: "#FF0000",
     fontFamily: "SFProReg",
   },
   businessNameHeader: {
     fontSize: scaleFontSize(16),
     fontWeight: "bold",
-    color: "#fff",
+    color: "#FF0000",
     fontFamily: "SFProBold",
   },
   mainContent: {

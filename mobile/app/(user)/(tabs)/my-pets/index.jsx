@@ -17,7 +17,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import Header from '@components/Header';
 import CompleteProfileModal from '@components/CompleteProfileModal';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
-import { useProfileCompletion } from '../../../hooks/useProfileCompletion';
+import { useProfileCompletion } from '../../../_hooks/useProfileCompletion';
 import apiClient from '@config/api';
 
 export default function MyPetsScreen() {

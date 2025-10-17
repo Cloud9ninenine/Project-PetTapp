@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   Image,
   useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from '@utils/responsive';
@@ -32,7 +32,7 @@ export default function WelcomeScreen() {
       <View style={styles.content}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('./assets/images/PetTapp Logo.png')}
+            source={require('./assets/images/PetTapp-splash.png')}
             style={styles.logo}
             resizeMode="contain"
           />

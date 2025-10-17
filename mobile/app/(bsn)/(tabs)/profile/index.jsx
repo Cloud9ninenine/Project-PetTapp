@@ -95,7 +95,7 @@ export default function BusinessProfileScreen() {
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
-      <Text style={styles.titleText}>Business Profile</Text>
+      <Text style={styles.titleText} numberOfLines={1}>Business Profile</Text>
     </View>
   );
 

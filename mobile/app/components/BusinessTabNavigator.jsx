@@ -19,7 +19,7 @@ const businessTabs = [
   {
     name: "my-services",
     route: "/(bsn)/(tabs)/my-services",
-    label: "My Services",
+    label: "Services",
     icon: require("@assets/images/service_icon/Pet Icon.png"),
   },
   {

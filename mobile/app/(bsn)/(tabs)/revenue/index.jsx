@@ -218,7 +218,6 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     flex: 1,
-    paddingHorizontal: wp(2),
   },
   titleText: {
     color: '#fff',

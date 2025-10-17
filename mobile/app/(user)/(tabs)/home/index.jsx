@@ -22,7 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
-import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
+import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 import { fetchCarouselServices, searchServices as searchServicesAPI, fetchNearbyServices } from "@services/api/serviceService";
 import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";

@@ -9,7 +9,7 @@ import { wp, moderateScale, scaleFontSize } from "@utils/responsive";
 const Header = ({
   title = "",
   showBack = true,
-  backgroundColor = "#1C86FF ",
+  backgroundColor = "#1C86FF", 
   titleColor = "#FFFFFF",
   leftComponent = null,
   rightComponent = null,

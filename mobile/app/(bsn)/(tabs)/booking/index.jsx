@@ -293,7 +293,7 @@ const CustomerBookings = () => {
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        Customer Bookings
+        Appointments
       </Text>
     </View>
   );

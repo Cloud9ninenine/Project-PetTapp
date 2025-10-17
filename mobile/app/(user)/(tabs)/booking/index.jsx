@@ -20,7 +20,7 @@ import Header from "@components/Header";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
-import { useProfileCompletion } from "../../../hooks/useProfileCompletion";
+import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 
 const Bookings = () => {
   const [searchText, setSearchText] = useState('');

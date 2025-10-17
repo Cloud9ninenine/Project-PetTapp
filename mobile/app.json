@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
-    "icon": "./app/assets/images/icon.png",
+    "icon": "./app/assets/images/AppIcon.png",
     "scheme": "pettapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -46,7 +46,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./app/assets/images/splash-icon.png",
+          "image": "./app/assets/images/PetTapp-splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
