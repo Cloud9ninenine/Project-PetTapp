@@ -2,7 +2,7 @@
   "expo": {
     "name": "PetTapp",
     "slug": "mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./app/assets/images/AppIcon.png",
@@ -19,8 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./app/assets/images/PetTappLogoInverted.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./app/assets/images/PetTapp-splash.png",
+        "backgroundColor": "#1C86FF"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -46,10 +46,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./app/assets/images/PetTapp-splash.png",
+          "image": "./app/assets/images/PetTappLogoInverted.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [
