@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   ImageBackground,
+  Image,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -27,6 +28,7 @@ export default function BusinessDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [businessId, setBusinessId] = useState(null);
   const [businessName, setBusinessName] = useState("Business Dashboard");
+  const [businessLogo, setBusinessLogo] = useState(null);
 
   // State for API data
   const [dashboardData, setDashboardData] = useState({
@@ -41,12 +43,31 @@ export default function BusinessDashboard() {
   });
   const [services, setServices] = useState([]);
 
+  // Fetch business details
+  const fetchBusinessDetails = async () => {
+    try {
+      const response = await apiClient.get('/businesses');
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        const business = response.data.data[0];
+        setBusinessName(business.businessName || "Business Dashboard");
+        setBusinessLogo(business.images?.logo || business.logo || null);
+        return business;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching business details:', error);
+      return null;
+    }
+  };
+
   // Fetch business ID from AsyncStorage
   const fetchBusinessId = async () => {
     try {
       const storedBusinessId = await AsyncStorage.getItem('businessId');
       if (storedBusinessId) {
         setBusinessId(storedBusinessId);
+        // Fetch business details to get name and logo
+        await fetchBusinessDetails();
         return storedBusinessId;
       } else {
         // Try to fetch from API
@@ -56,6 +77,7 @@ export default function BusinessDashboard() {
           await AsyncStorage.setItem('businessId', business._id);
           setBusinessId(business._id);
           setBusinessName(business.businessName || "Business Dashboard");
+          setBusinessLogo(business.images?.logo || business.logo || null);
           return business._id;
         }
       }
@@ -248,81 +270,6 @@ export default function BusinessDashboard() {
     },
   ];
 
-  const renderCustomTitle = () => (
-    <View style={styles.headerContent}>
-      <View style={styles.headerLeftContent}>
-        <TouchableOpacity style={styles.profileImageContainer}>
-          <View style={styles.profilePlaceholder}>
-            <Ionicons name="storefront" size={moderateScale(24)} color="#1C86FF" />
-          </View>
-        </TouchableOpacity>
-
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.welcomeText}>Welcome Back!</Text>
-          <Text style={styles.businessNameHeader} numberOfLines={1}>{businessName}</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={styles.notificationButton}
-        onPress={() => router.push("/(bsn)/(tabs)/profile/notifications")}
-      >
-        <Ionicons
-          name="notifications-outline"
-          size={moderateScale(26)}
-          color="#fff"
-        />
-      </TouchableOpacity>
-    </View>
-  );
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ImageBackground
-          source={require("@assets/images/PetTapp pattern.png")}
-          style={styles.backgroundimg}
-          imageStyle={styles.backgroundImageStyle}
-          resizeMode="repeat"
-        />
-
-        {/* Custom Header */}
-        <View style={[styles.customHeader, { paddingTop: insets.top + moderateScale(10) }]}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeftContent}>
-              <TouchableOpacity style={styles.profileImageContainer}>
-                <View style={styles.profilePlaceholder}>
-                  <Ionicons name="storefront" size={moderateScale(24)} color="#1C86FF" />
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.headerTextContainer}>
-                <Text style={styles.welcomeText}>Welcome Back!</Text>
-                <Text style={styles.businessNameHeader} numberOfLines={1}>{businessName}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => router.push("/(bsn)/(tabs)/profile/notifications")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={moderateScale(26)}
-                color="#fff"
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <ImageBackground
@@ -332,21 +279,30 @@ export default function BusinessDashboard() {
         resizeMode="repeat"
       />
 
-      {/* Custom Header */}
-        <BusinessHeader
-          backgroundColor="#1C86FF"
-          titleColor="#fff"
-          customTitle={renderCustomTitle()}
-          showBack={false}
-        />
+      {loading ? (
+        <View style={styles.fullScreenLoading}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        </View>
+      ) : (
+        <>
+          {/* Business Header - Loads after data is ready */}
+          <BusinessHeader
+            businessName={businessName}
+            businessLogo={businessLogo}
+            backgroundColor="#1C86FF"
+            titleColor="#fff"
+            showBack={false}
+            onNotificationPress={() => router.push("/(bsn)/(tabs)/profile/notifications")}
+          />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View style={styles.mainContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <View style={styles.mainContent}>
 
           {/* Business Metrics Grid */}
           <View style={styles.metricsGrid}>
@@ -365,6 +321,55 @@ export default function BusinessDashboard() {
             ))}
           </View>
 
+          {/* Pending Bookings Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Pending Bookings</Text>
+            <TouchableOpacity onPress={() => router.push("../booking")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Pending Bookings List */}
+          <View style={styles.pendingBookingsList}>
+            {dashboardData.pendingBookings && dashboardData.pendingBookings.length > 0 ? (
+              dashboardData.pendingBookings.slice(0, 3).map((booking) => (
+                <TouchableOpacity
+                  key={booking._id}
+                  style={styles.pendingBookingCard}
+                  onPress={() => router.push({
+                    pathname: "../booking/AppointmentDetails",
+                    params: { bookingId: booking._id }
+                  })}
+                >
+                  <View style={styles.pendingBookingIconContainer}>
+                    <Ionicons
+                      name="time-outline"
+                      size={moderateScale(28)}
+                      color="#FF9B79"
+                    />
+                  </View>
+                  <View style={styles.pendingBookingInfo}>
+                    <Text style={styles.pendingBookingCustomer} numberOfLines={1}>
+                      {booking.name || 'Customer'}
+                    </Text>
+                    <Text style={styles.pendingBookingService} numberOfLines={1}>
+                      {booking.service || 'Service'}
+                    </Text>
+                    <Text style={styles.pendingBookingTime}>⏰ {formatTime(booking.time)}</Text>
+                  </View>
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>Pending</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-done-outline" size={moderateScale(48)} color="#C7C7CC" />
+                <Text style={styles.emptyStateText}>No pending bookings</Text>
+              </View>
+            )}
+          </View>
+
           {/* Today's Schedule Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
@@ -375,12 +380,15 @@ export default function BusinessDashboard() {
 
           {/* Appointments List */}
           <View style={styles.appointmentsList}>
-            {dashboardData.todaysSchedule && dashboardData.todaysSchedule.length > 0 ? (
-              dashboardData.todaysSchedule.map((appointment) => (
+            {dashboardData.todaysSchedule && dashboardData.todaysSchedule.filter(apt => apt.status !== 'cancelled' && apt.status !== 'pending').length > 0 ? (
+              dashboardData.todaysSchedule.filter(apt => apt.status !== 'cancelled' && apt.status !== 'pending').map((appointment) => (
                 <TouchableOpacity
                   key={appointment._id}
                   style={styles.appointmentCard}
-                  onPress={() => router.push("../booking")}
+                  onPress={() => router.push({
+                    pathname: "../booking/AppointmentDetails",
+                    params: { bookingId: appointment._id }
+                  })}
                 >
                   <View style={styles.appointmentIconContainer}>
                     <Ionicons
@@ -426,48 +434,62 @@ export default function BusinessDashboard() {
             </View>
 
             {services && services.length > 0 ? (
-              services.map((service) => (
-                <TouchableOpacity
-                  key={service._id}
-                  style={styles.serviceCard}
-                  onPress={() => router.push("../my-services")}
-                >
-                  <View style={[
-                    styles.serviceIconContainer,
-                    { backgroundColor: getCategoryColor(service.category) }
-                  ]}>
-                    <Ionicons
-                      name={getCategoryIcon(service.category)}
-                      size={moderateScale(28)}
-                      color="#fff"
-                    />
-                  </View>
+              services.map((service) => {
+                const serviceImage = service.images?.main || service.image || null;
+                return (
+                  <TouchableOpacity
+                    key={service._id}
+                    style={styles.serviceCard}
+                    onPress={() => router.push({
+                      pathname: "../my-services/ServiceDetails",
+                      params: { serviceId: service._id }
+                    })}
+                  >
+                    {serviceImage ? (
+                      <Image
+                        source={{ uri: serviceImage }}
+                        style={styles.serviceImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[
+                        styles.serviceIconContainer,
+                        { backgroundColor: getCategoryColor(service.category) }
+                      ]}>
+                        <Ionicons
+                          name={getCategoryIcon(service.category)}
+                          size={moderateScale(28)}
+                          color="#fff"
+                        />
+                      </View>
+                    )}
 
-                  <View style={styles.serviceInfo}>
-                    <Text style={styles.serviceName} numberOfLines={1}>{service.name}</Text>
-                    <Text style={styles.serviceCategory}>
-                      {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
-                    </Text>
-                    <View style={styles.serviceDetails}>
-                      <Text style={styles.servicePrice}>
-                        {formatCurrency(service.price?.amount || 0)}
+                    <View style={styles.serviceInfo}>
+                      <Text style={styles.serviceName} numberOfLines={1}>{service.name}</Text>
+                      <Text style={styles.serviceCategory}>
+                        {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
                       </Text>
-                      <Text style={styles.serviceDuration}>
-                        {' • '}{formatDuration(service.duration)}
+                      <View style={styles.serviceDetails}>
+                        <Text style={styles.servicePrice}>
+                          {formatCurrency(service.price?.amount || 0)}
+                        </Text>
+                        <Text style={styles.serviceDuration}>
+                          {' • '}{formatDuration(service.duration)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={[
+                      styles.availabilityBadge,
+                      service.isActive ? styles.availableBadge : styles.unavailableBadge
+                    ]}>
+                      <Text style={styles.availabilityText}>
+                        {service.isActive ? 'Available' : 'Unavailable'}
                       </Text>
                     </View>
-                  </View>
-
-                  <View style={[
-                    styles.availabilityBadge,
-                    service.isActive ? styles.availableBadge : styles.unavailableBadge
-                  ]}>
-                    <Text style={styles.availabilityText}>
-                      {service.isActive ? 'Available' : 'Unavailable'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
+                  </TouchableOpacity>
+                );
+              })
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="briefcase-outline" size={moderateScale(48)} color="#C7C7CC" />
@@ -481,8 +503,10 @@ export default function BusinessDashboard() {
               </View>
             )}
           </View>
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -499,6 +523,11 @@ const styles = StyleSheet.create({
   backgroundImageStyle: {
     opacity: 0.05,
   },
+  fullScreenLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -510,54 +539,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#666',
     fontFamily: 'SFProReg',
-  },
-  customHeader: {
-    backgroundColor: "#1C86FF",
-    paddingHorizontal: wp(5),
-    paddingBottom: moderateScale(20),
-    borderBottomLeftRadius: moderateScale(20),
-    borderBottomRightRadius: moderateScale(20),
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flex: 1,
-  },
-  headerLeftContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: moderateScale(16),
-    flex: 1,
-  },
-  profileImageContainer: {
-    marginRight: moderateScale(12),
-  },
-  profilePlaceholder: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
-    backgroundColor: "#E3F2FD",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTextContainer: {
-    justifyContent: "center",
-    flex: 1,
-  },
-  notificationButton: {
-    padding: moderateScale(8),
-  },
-  welcomeText: {
-    fontSize: scaleFontSize(12),
-    color: "#FF0000",
-    fontFamily: "SFProReg",
-  },
-  businessNameHeader: {
-    fontSize: scaleFontSize(16),
-    fontWeight: "bold",
-    color: "#FF0000",
-    fontFamily: "SFProBold",
   },
   mainContent: {
     paddingHorizontal: wp(5),
@@ -621,6 +602,62 @@ const styles = StyleSheet.create({
   },
   appointmentsList: {
     marginBottom: moderateScale(30),
+  },
+  pendingBookingsList: {
+    marginBottom: moderateScale(30),
+  },
+  pendingBookingCard: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(12),
+    alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: "#FF9B79",
+  },
+  pendingBookingIconContainer: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: "#FFF3E0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: moderateScale(12),
+  },
+  pendingBookingInfo: {
+    flex: 1,
+  },
+  pendingBookingCustomer: {
+    fontSize: scaleFontSize(15),
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: moderateScale(4),
+  },
+  pendingBookingService: {
+    fontSize: scaleFontSize(13),
+    color: "#666",
+    marginBottom: moderateScale(4),
+  },
+  pendingBookingTime: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+  },
+  pendingBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    backgroundColor: "#FF9B79",
+  },
+  pendingBadgeText: {
+    fontSize: scaleFontSize(11),
+    color: "#fff",
+    fontWeight: "600",
   },
   appointmentCard: {
     flexDirection: "row",
@@ -695,6 +732,12 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(28),
     justifyContent: "center",
     alignItems: "center",
+    marginRight: moderateScale(12),
+  },
+  serviceImage: {
+    width: moderateScale(55),
+    height: moderateScale(55),
+    borderRadius: moderateScale(28),
     marginRight: moderateScale(12),
   },
   serviceInfo: {
