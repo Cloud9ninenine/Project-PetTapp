@@ -34,84 +34,44 @@ export default function LoginScreen() {
 
     setIsLoading(true);
 
-    try {
-      // Step 1: Login to verify credentials
-      const loginResponse = await apiClient.post('/auth/login', {
-        email: email.trim(),
-        password: password,
-      });
+  try {
+    // Step 1: Login to verify credentials
+    const loginResponse = await apiClient.post('/auth/login', {
+      email: email.trim(),
+      password: password,
+    });
 
-      // 200 - Login successful
-      if (loginResponse.status === 200) {
-        // Step 2: Get refresh token with error handling
-        let refreshResponse;
-        try {
-          refreshResponse = await apiClient.post('/auth/refresh');
-        } catch (refreshError) {
-          console.error('Refresh token error:', refreshError);
-          Alert.alert(
-            "Authentication Error",
-            "Failed to refresh authentication token. Please try logging in again.",
-            [{ text: "OK" }]
-          );
-          return;
-        }
+    if (loginResponse.status === 200 && loginResponse.data?.tokens) {
+      const { user, tokens } = loginResponse.data;
+      const { accessToken, refreshToken } = tokens;
 
-        if (refreshResponse.status === 200 && refreshResponse.data?.token) {
-          const { token } = refreshResponse.data;
-
-          // Store access token in AsyncStorage
-          try {
-            await AsyncStorage.setItem('accessToken', token);
-            console.log('Access token stored successfully');
-          } catch (storageError) {
-            console.error('AsyncStorage error:', storageError);
-            Alert.alert("Warning", "Token saved but storage issue detected.");
-          }
-
-          // Step 3: Get user data and role with error handling
-          let meResponse;
-          try {
-            meResponse = await apiClient.get('/auth/me');
-          } catch (meError) {
-            console.error('Get user data error:', meError);
-            Alert.alert(
-              "Error",
-              "Failed to retrieve user information. Please try again.",
-              [{ text: "OK" }]
-            );
-            return;
-          }
-
-          if (meResponse.status === 200 && meResponse.data) {
-            console.log('User data from /auth/me:', meResponse.data);
-
-            // Try to get role from different possible locations in the response
-            const role = meResponse.data?.user?.role;
-
-            if (!role) {
-              console.log('Full response data:', JSON.stringify(meResponse.data, null, 2));
-              Alert.alert("Error", "Unable to determine user role. Please contact support.");
-              return;
-            }
-
-            // Navigate based on role
-            if (role === "business-owner") {
-              router.replace("/(bsn)/(tabs)/home");
-            } else if (role === "pet-owner") {
-              router.replace("/(user)/(tabs)/home");
-            } else {
-              // Fallback for any other roles
-              console.log('Full response data:', JSON.stringify(meResponse.data, null, 2));
-              Alert.alert("Error", `Unknown user role: ${role}. Please contact support.`);
-            }
-          } else {
-            Alert.alert("Error", "Failed to retrieve user information.");
-          }
-        } else {
-          Alert.alert("Error", "Failed to refresh authentication token.");
-        }
+      // Store tokens
+      try {
+        await AsyncStorage.multiSet([
+          ['accessToken', accessToken],
+          ['refreshToken', refreshToken],
+        ]);
+        console.log('Access and refresh tokens stored successfully');
+      } catch (storageError) {
+        console.error('AsyncStorage error:', storageError);
+        Alert.alert("Warning", "Token saved but storage issue detected.");
       }
+
+      // Step 2: Get user info (optional since you already have user data)
+      console.log('User data:', user);
+
+      // Navigate based on role
+      const role = user.role;
+      if (role === "business-owner") {
+        router.replace("/(bsn)/(tabs)/home");
+      } else if (role === "pet-owner") {
+        router.replace("/(user)/(tabs)/home");
+      } else {
+        Alert.alert("Error", `Unknown user role: ${role}. Please contact support.`);
+      }
+    } else {
+      Alert.alert("Error", "Invalid login response from server.");
+    }
     } catch (error) {
       console.error('Login error:', error);
 
@@ -119,24 +79,16 @@ export default function LoginScreen() {
         const status = error.response.status;
         const data = error.response.data;
 
-        // 401 - Invalid credentials
         if (status === 401) {
           Alert.alert("Login Failed", data?.message || "Invalid email or password.");
-        }
-        // 404 - User not found
-        else if (status === 404) {
+        } else if (status === 404) {
           Alert.alert("Login Failed", "User not found. Please check your email or sign up.");
-        }
-        // 422 - Validation errors
-        else if (status === 422) {
+        } else if (status === 422) {
           Alert.alert("Validation Error", data?.message || "Please check your input and try again.");
-        }
-        // Other errors
-        else {
+        } else {
           Alert.alert("Login Failed", data?.message || "An error occurred during login.");
         }
       } else if (error.request) {
-        // Request made but no response
         Alert.alert("Network Error", "Please check your connection and try again.");
       } else {
         Alert.alert("Error", "An unexpected error occurred.");
