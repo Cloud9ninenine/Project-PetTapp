@@ -23,25 +23,18 @@ import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
-import { fetchCarouselServices, searchServices as searchServicesAPI, fetchNearbyServices } from "@services/api/serviceService";
+import { fetchCarouselServices, fetchNearbyServices } from "@services/api/serviceService";
 import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";
 import { getServiceCategoryIcon, renderStars, getDefaultCarouselImages } from "@utils/serviceHelpers";
 
 export default function HomeScreen() {
-  const [searchQuery, setSearchQuery] = useState("");
   // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
   const [nearbyServices, setNearbyServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [location, setLocation] = useState(null);
-
-  // Search states
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const searchTimeoutRef = useRef(null);
 
   // Carousel states
   const [carouselImages, setCarouselImages] = useState([]);
@@ -153,7 +146,14 @@ export default function HomeScreen() {
     setInternalIndex(1);
     syncActiveSlide(1);
     startAutoPlay(5000);
-    return () => stopAutoPlay();
+
+    // Proper cleanup: clear interval when component unmounts
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -257,55 +257,6 @@ export default function HomeScreen() {
     loadCarouselServices();
   }, [location]);
 
-  // Search services function
-  const searchServices = async (query) => {
-    if (!query || query.trim().length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      setShowSearchResults(true);
-
-      const results = await searchServicesAPI(query, 20);
-      setSearchResults(results);
-    } catch (error) {
-      console.error('Error searching services:', error);
-      Alert.alert('Search Error', 'Failed to search services. Please try again.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  // Debounced search effect
-  useEffect(() => {
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // If search query is empty, hide results
-    if (!searchQuery || searchQuery.trim().length === 0) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
-
-    // Set new timeout for debounced search (500ms delay)
-    searchTimeoutRef.current = setTimeout(() => {
-      searchServices(searchQuery);
-    }, 500);
-
-    // Cleanup timeout on unmount
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [searchQuery]);
-
   // Fetch nearby services from API
   useEffect(() => {
     const loadNearbyServices = async () => {
@@ -374,116 +325,11 @@ export default function HomeScreen() {
     });
   };
 
-  const handleSearchResultPress = (service) => {
-    // Check if profile is complete before allowing access
-    if (!isProfileComplete) {
-      setShowProfileIncompleteModal(true);
-      return;
-    }
-
-    // Clear search and hide results
-    setSearchQuery('');
-    setShowSearchResults(false);
-
-    // Navigate to service details
-    router.push({
-      pathname: 'home/service-details',
-      params: {
-        id: service._id,
-        name: service.name,
-        serviceType: service.category,
-      },
-    });
-  };
-
-
   return (
     <SafeAreaView style={styles.container}>
       <SearchHeader
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
         onNotifPress={() => router.push("/(user)/(tabs)/notification")}
       />
-
-      {/* Search Results Overlay */}
-      {showSearchResults && (
-        <>
-          {/* Overlay backdrop */}
-          <TouchableOpacity
-            style={styles.searchOverlay}
-            activeOpacity={1}
-            onPress={() => {
-              setShowSearchResults(false);
-              setSearchQuery('');
-            }}
-          />
-
-          {/* Search Results Container */}
-          <View style={styles.searchResultsContainer}>
-            {isSearching ? (
-              <View style={styles.searchLoadingContainer}>
-                <ActivityIndicator size="large" color="#1C86FF" />
-                <Text style={styles.searchLoadingText}>Searching...</Text>
-              </View>
-            ) : searchResults.length === 0 ? (
-              <View style={styles.searchEmptyContainer}>
-                <Ionicons name="search-outline" size={moderateScale(48)} color="#ccc" />
-                <Text style={styles.searchEmptyText}>No services found</Text>
-                <Text style={styles.searchEmptySubtext}>
-                  Try searching with different keywords
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={searchResults}
-                keyExtractor={(item) => item._id}
-                showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.searchResultItem}
-                    onPress={() => handleSearchResultPress(item)}
-                  >
-                    <View style={styles.searchResultIcon}>
-                      <Ionicons
-                        name={getServiceCategoryIcon(item.category)}
-                        size={moderateScale(24)}
-                        color="#1C86FF"
-                      />
-                    </View>
-                    <View style={styles.searchResultDetails}>
-                      <Text style={styles.searchResultName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text style={styles.searchResultBusiness} numberOfLines={1}>
-                        {item.businessId?.businessName || 'Business'}
-                      </Text>
-                      <View style={styles.searchResultMeta}>
-                        <Text style={styles.searchResultCategory}>
-                          {item.category?.charAt(0).toUpperCase() + item.category?.slice(1)}
-                        </Text>
-                        {item.pricing && (
-                          <>
-                            <Text style={styles.searchResultDot}> • </Text>
-                            <Text style={styles.searchResultPrice}>
-                              {formatPrice(item.pricing)}
-                            </Text>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                    <Ionicons
-                      name="chevron-forward-outline"
-                      size={moderateScale(20)}
-                      color="#999"
-                    />
-                  </TouchableOpacity>
-                )}
-                contentContainerStyle={styles.searchResultsList}
-              />
-            )}
-          </View>
-        </>
-      )}
 
       <ImageBackground
         source={require("@assets/images/PetTapp pattern.png")}

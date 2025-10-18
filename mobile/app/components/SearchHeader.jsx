@@ -1,133 +1,488 @@
-// app/components/SearchHeader.jsx
-import React, { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet, TouchableOpacity, Platform, Text } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { hp, wp, moderateScale, scaleFontSize } from "@utils/responsive";
-import apiClient from "@config/api";
+  // app/components/SearchHeader.jsx
+  import React, { useState, useEffect, useRef } from "react";
+  import { View, TextInput, StyleSheet, TouchableOpacity, Platform, Text, FlatList, Image,
+  ActivityIndicator } from "react-native";
+  import { Ionicons } from "@expo/vector-icons";
+  import { useSafeAreaInsets } from 'react-native-safe-area-context';
+  import { useRouter } from "expo-router";
+  import { hp, wp, moderateScale, scaleFontSize } from "@utils/responsive";
+  import apiClient from "@config/api";
 
-export default function SearchHeader({ searchQuery, setSearchQuery, onNotifPress, showNotificationBadge = true }) {
-  const insets = useSafeAreaInsets();
-  const [unreadCount, setUnreadCount] = useState(0);
+  export default function SearchHeader({ onNotifPress,
+  showNotificationBadge = true }) {
+    const insets = useSafeAreaInsets();
+    const router = useRouter();
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState(""); // Internal state
+    const [searchResults, setSearchResults] = useState([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchTimeoutRef = useRef(null);
+    const abortControllerRef = useRef(null);
 
-  // Fetch unread notification count
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        // Fetch recent bookings from last 24 hours
-        const response = await apiClient.get('/bookings', {
-          params: {
-            page: 1,
-            limit: 50,
-            sort: '-createdAt',
-          }
-        });
-
-        if (response.data && response.data.success) {
-          const bookings = response.data.data || [];
-          // Count bookings created in the last 24 hours
-          const recent = bookings.filter(booking => {
-            const createdAt = new Date(booking.createdAt || booking.appointmentDateTime);
-            const now = new Date();
-            return (now - createdAt) < 24 * 60 * 60 * 1000;
+    // Fetch unread notification count
+    useEffect(() => {
+      const fetchUnreadCount = async () => {
+        try {
+          // Fetch recent bookings from last 24 hours
+          const response = await apiClient.get('/bookings', {
+            params: {
+              page: 1,
+              limit: 50,
+              sort: '-createdAt',
+            }
           });
-          setUnreadCount(recent.length);
+
+          if (response.data && response.data.success) {
+            const bookings = response.data.data || [];
+            // Count bookings created in the last 24 hours with null safety
+            const recent = bookings.filter(booking => {
+              if (!booking) return false;
+
+              const dateString = booking.createdAt || booking.appointmentDateTime;
+              if (!dateString) return false;
+
+              const createdAt = new Date(dateString);
+              // Check if date is valid
+              if (isNaN(createdAt.getTime())) {
+                console.warn('Invalid date in booking:', booking);
+                return false;
+              }
+
+              const now = new Date();
+              return (now - createdAt) < 24 * 60 * 60 * 1000;
+            });
+            setUnreadCount(recent.length);
+          }
+        } catch (error) {
+          console.error('Error fetching unread count:', error);
         }
-      } catch (error) {
-        console.error('Error fetching unread count:', error);
+      };
+
+      if (showNotificationBadge) {
+        fetchUnreadCount();
+        // Refresh count every 5 minutes
+        const interval = setInterval(fetchUnreadCount, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+      }
+    }, [showNotificationBadge]);
+
+    // Search both businesses and services with debounce
+    useEffect(() => {
+      console.log('🔄 Search query changed:', searchQuery);
+
+      // Cancel previous request if it exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      if (searchQuery.trim().length >= 2) {
+        setIsSearching(true);
+        setShowDropdown(true); // Show dropdown immediately
+        searchTimeoutRef.current = setTimeout(async () => {
+          try {
+            console.log('🔍 Searching for:', searchQuery.trim());
+
+            // Create new AbortController for this request
+            abortControllerRef.current = new AbortController();
+
+            // Search both businesses and services in parallel
+            const [businessResponse, serviceResponse] = await Promise.all([
+              apiClient.get('/businesses', {
+                params: {
+                  search: searchQuery.trim(),
+                  page: 1,
+                  limit: 5
+                },
+                signal: abortControllerRef.current.signal
+              }).catch((err) => {
+                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+                  console.log('🚫 Business search cancelled');
+                  return null;
+                }
+                console.log('❌ Business search error:', err.response?.data || err.message);
+                return { data: { success: false, data: [] } };
+              }),
+              apiClient.get('/services', {
+                params: {
+                  search: searchQuery.trim(),
+                  page: 1,
+                  limit: 5
+                },
+                signal: abortControllerRef.current.signal
+              }).catch((err) => {
+                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+                  console.log('🚫 Service search cancelled');
+                  return null;
+                }
+                console.log('❌ Service search error:', err.response?.data || err.message);
+                return { data: { success: false, data: [] } };
+              })
+            ]);
+
+            // If request was cancelled, don't update state
+            if (!businessResponse || !serviceResponse) {
+              return;
+            }
+
+            console.log('📊 Business response:', businessResponse.data);
+            console.log('📊 Service response:', serviceResponse.data);
+
+            const businesses = businessResponse.data?.success ? businessResponse.data.data || [] : [];
+            const services = serviceResponse.data?.success ? serviceResponse.data.data || [] : [];
+
+            console.log('✅ Businesses found:', businesses.length);
+            console.log('✅ Services found:', services.length);
+
+            // Log first business to see available fields
+            if (businesses.length > 0) {
+              console.log('📸 First business data:', {
+                logo: businesses[0].logo,
+                imageUrl: businesses[0].imageUrl,
+                images: businesses[0].images,
+                businessName: businesses[0].businessName
+              });
+            }
+
+            // Format results with type indicator
+            const formattedBusinesses = businesses.map(b => ({
+              ...b,
+              type: 'business',
+              displayName: b.businessName,
+              // Business logo comes from images.logo (attached by imageService)
+              image: b.images?.logo || b.logo || null
+            }));
+
+            const formattedServices = services.map(s => ({
+              ...s,
+              type: 'service',
+              displayName: s.name,
+              image: s.imageUrl
+            }));
+
+            // Combine and limit total results
+            const combinedResults = [...formattedServices, ...formattedBusinesses].slice(0, 10);
+
+            console.log('🎯 Combined results:', combinedResults.length);
+
+            setSearchResults(combinedResults);
+            // Keep dropdown visible (will show results or "no results" message)
+          } catch (error) {
+            console.error('💥 Error searching:', error);
+            setSearchResults([]);
+            setShowDropdown(true); // Show empty state
+          } finally {
+            setIsSearching(false);
+          }
+        }, 300);
+      } else {
+        setSearchResults([]);
+        setShowDropdown(false);
+        setIsSearching(false);
+      }
+
+      return () => {
+        // Cleanup: cancel pending requests and clear timeout
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
+      };
+    }, [searchQuery]);
+
+    const handleResultPress = (item) => {
+      setShowDropdown(false);
+      setSearchQuery('');
+
+      if (item.type === 'business') {
+        router.push({
+          pathname: '/(user)/(tabs)/home/business-details',
+          params: { id: item._id }
+        });
+      } else if (item.type === 'service') {
+        router.push({
+          pathname: '/(user)/(tabs)/home/service-details',
+          params: { id: item._id }
+        });
       }
     };
 
-    if (showNotificationBadge) {
-      fetchUnreadCount();
-      // Refresh count every 5 minutes
-      const interval = setInterval(fetchUnreadCount, 5 * 60 * 1000);
-      return () => clearInterval(interval);
-    }
-  }, [showNotificationBadge]);
+    const renderSearchItem = ({ item }) => {
+      const isService = item.type === 'service';
+      const iconName = isService ? 'briefcase-outline' : 'business-outline';
+      const iconColor = isService ? '#FF6B6B' : '#1E90FF';
+      const placeholderBg = isService ? '#FFE8E8' : '#E3F2FD';
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top + moderateScale(15) }]}>
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={moderateScale(20)} color="#A0AEC0" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search"
-          placeholderTextColor="#A0AEC0"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+      return (
+        <TouchableOpacity
+          style={styles.dropdownItem}
+          onPress={() => handleResultPress(item)}
+          activeOpacity={0.7}
+        >
+          {/* Left Icon/Image */}
+          <View style={styles.iconContainer}>
+            {item.image ? (
+              <View style={styles.imageWrapper}>
+                <Image
+                  source={{ uri: item.image }}
+                  style={styles.itemImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : (
+              <View style={[styles.iconPlaceholder, { backgroundColor: placeholderBg }]}>
+                <Ionicons name={iconName} size={moderateScale(24)} color={iconColor} />
+              </View>
+            )}
+          </View>
 
-      {/* Notification bell */}
-      <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
-        <Ionicons name="notifications-outline" size={moderateScale(22)} color="#1E90FF" />
-        {showNotificationBadge && unreadCount > 0 && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>
-              {unreadCount > 99 ? '99+' : unreadCount}
+          {/* Content */}
+          <View style={styles.contentContainer}>
+            <Text style={styles.itemName} numberOfLines={1}>
+              {item.displayName}
+            </Text>
+            <Text style={styles.itemType}>
+              {isService ? 'Service' : 'Business'}
             </Text>
           </View>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-}
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#1E90FF", // Blue background
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: wp(5),
-    paddingBottom: moderateScale(15),
-    borderBottomRightRadius: moderateScale(10),
-    borderBottomLeftRadius: moderateScale(10),
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(15),
-    marginRight: moderateScale(10),
-    height: moderateScale(50),
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: moderateScale(8),
-    fontSize: scaleFontSize(16),
-    color: "#000",
-  },
-  bellContainer: {
-    backgroundColor: "#fff",
-    borderRadius: moderateScale(20),
-    padding: moderateScale(8),
-    justifyContent: "center",
-    alignItems: "center",
-    position: 'relative',
-  },
-  badgeContainer: {
-    position: 'absolute',
-    top: moderateScale(4),
-    right: moderateScale(4),
-    backgroundColor: '#FF6B6B',
-    borderRadius: moderateScale(10),
-    minWidth: moderateScale(18),
-    height: moderateScale(18),
-    paddingHorizontal: moderateScale(4),
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: scaleFontSize(10),
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-});
+          {/* Right Icon */}
+          <View style={styles.rightIconContainer}>
+            <Ionicons
+              name={isService ? 'briefcase-outline' : 'business-outline'}
+              size={moderateScale(20)}
+              color="#BDBDBD"
+            />
+          </View>
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <View style={styles.wrapper}>
+        <View style={[styles.container, { paddingTop: insets.top + moderateScale(15) }]}>
+          {/* Search bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={moderateScale(20)} color="#A0AEC0" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              placeholderTextColor="#A0AEC0"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {isSearching && (
+              <ActivityIndicator size="small" color="#1E90FF" style={styles.searchLoader} />
+            )}
+            {searchQuery.length > 0 && !isSearching && (
+              <TouchableOpacity onPress={() => {
+                setSearchQuery('');
+                setShowDropdown(false);
+              }}>
+                <Ionicons name="close-circle" size={moderateScale(20)} color="#A0AEC0" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Notification bell */}
+          <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
+            <Ionicons name="notifications-outline" size={moderateScale(22)} color="#1E90FF" />
+            {showNotificationBadge && unreadCount > 0 && (
+              <View style={styles.badgeContainer}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Results Dropdown */}
+        {showDropdown && (
+          <View style={styles.dropdownContainer}>
+            {searchResults.length > 0 ? (
+              <FlatList
+                data={searchResults}
+                renderItem={renderSearchItem}
+                keyExtractor={(item) => `${item.type}-${item._id}`}
+                style={styles.dropdown}
+                contentContainerStyle={styles.dropdownContent}
+                showsVerticalScrollIndicator={false}
+              />
+            ) : (
+              <View style={styles.noResultsContainer}>
+                <Ionicons name="search-outline" size={moderateScale(40)} color="#ccc" />
+                <Text style={styles.noResultsText}>No results found</Text>
+                <Text style={styles.noResultsSubtext}>Try different keywords</Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  const styles = StyleSheet.create({
+    wrapper: {
+      position: 'relative',
+      zIndex: 1000,
+      elevation: 10, // Required for Android zIndex support
+    },
+    container: {
+      backgroundColor: "#1E90FF",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: wp(5),
+      paddingBottom: moderateScale(15),
+      borderBottomRightRadius: moderateScale(10),
+      borderBottomLeftRadius: moderateScale(10),
+    },
+    searchContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#fff",
+      borderRadius: moderateScale(10),
+      paddingHorizontal: moderateScale(15),
+      marginRight: moderateScale(10),
+      height: moderateScale(50),
+    },
+    searchInput: {
+      flex: 1,
+      marginLeft: moderateScale(8),
+      fontSize: scaleFontSize(16),
+      color: "#000",
+    },
+    searchLoader: {
+      marginRight: moderateScale(8),
+    },
+    bellContainer: {
+      backgroundColor: "#fff",
+      borderRadius: moderateScale(20),
+      padding: moderateScale(8),
+      justifyContent: "center",
+      alignItems: "center",
+      position: 'relative',
+    },
+    badgeContainer: {
+      position: 'absolute',
+      top: moderateScale(4),
+      right: moderateScale(4),
+      backgroundColor: '#FF6B6B',
+      borderRadius: moderateScale(10),
+      minWidth: moderateScale(18),
+      height: moderateScale(18),
+      paddingHorizontal: moderateScale(4),
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#fff',
+    },
+    badgeText: {
+      color: '#fff',
+      fontSize: scaleFontSize(10),
+      fontWeight: 'bold',
+      textAlign: 'center',
+    },
+    dropdownContainer: {
+      position: 'absolute',
+      top: moderateScale(85), // Fixed pixel value instead of percentage for Android compatibility
+      left: wp(5),
+      right: wp(5),
+      backgroundColor: '#fff',
+      borderRadius: moderateScale(12),
+      marginTop: moderateScale(5),
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+      maxHeight: hp(50),
+      zIndex: 999,
+      overflow: 'hidden',
+    },
+    dropdown: {
+      maxHeight: hp(50),
+    },
+    dropdownContent: {
+      paddingVertical: moderateScale(8),
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: moderateScale(12),
+      paddingHorizontal: moderateScale(16),
+      backgroundColor: '#fff',
+      borderBottomWidth: 1,
+      borderBottomColor: '#F5F5F5',
+    },
+    iconContainer: {
+      marginRight: moderateScale(14),
+    },
+    imageWrapper: {
+      width: moderateScale(50),
+      height: moderateScale(50),
+      borderRadius: moderateScale(25),
+      overflow: 'hidden',
+      backgroundColor: '#F5F5F5',
+    },
+    itemImage: {
+      width: '100%',
+      height: '100%',
+    },
+    iconPlaceholder: {
+      width: moderateScale(50),
+      height: moderateScale(50),
+      borderRadius: moderateScale(25),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    contentContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingRight: moderateScale(8),
+    },
+    itemName: {
+      fontSize: scaleFontSize(15),
+      fontWeight: '600',
+      color: '#212121',
+      marginBottom: moderateScale(3),
+      letterSpacing: 0.2,
+    },
+    itemType: {
+      fontSize: scaleFontSize(12),
+      color: '#757575',
+      fontWeight: '400',
+    },
+    rightIconContainer: {
+      marginLeft: moderateScale(8),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    noResultsContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: moderateScale(40),
+      paddingHorizontal: moderateScale(16),
+      backgroundColor: '#fff',
+    },
+    noResultsText: {
+      fontSize: scaleFontSize(15),
+      fontWeight: '600',
+      color: '#666',
+      marginTop: moderateScale(12),
+    },
+    noResultsSubtext: {
+      fontSize: scaleFontSize(13),
+      color: '#999',
+      marginTop: moderateScale(6),
+      textAlign: 'center',
+    },
+  });

@@ -10,6 +10,8 @@ import {
   useWindowDimensions,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -627,7 +629,12 @@ export default function ServiceDetailsScreen() {
         resizeMode="repeat"
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Hero Image Section with Overlay */}
         <View style={styles.heroSection}>
           <Image source={getServiceImage()} style={styles.heroImage} />
@@ -736,6 +743,7 @@ export default function ServiceDetailsScreen() {
         {/* Bottom Spacing for Fixed Button */}
         <View style={{ height: hp(10) }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Floating Book Button */}
       <View style={styles.floatingButtonContainer}>

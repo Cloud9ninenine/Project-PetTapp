@@ -12,6 +12,7 @@ import {
   Image,
   Platform,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -513,11 +514,16 @@ export default function AddPetScreen() {
         showBack={true}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
         <View style={styles.content}>
       {currentPage === 1 ? (
         // PAGE 1: Profile Image + Basic Information
@@ -827,6 +833,7 @@ export default function AddPetScreen() {
       )}
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Species Modal */}
       <Modal

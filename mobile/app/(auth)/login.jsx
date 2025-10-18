@@ -16,6 +16,7 @@ import {
 import { Link, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 import apiClient from "../config/api";
 
@@ -42,23 +43,57 @@ export default function LoginScreen() {
 
       // 200 - Login successful
       if (loginResponse.status === 200) {
-        // Step 2: Get refresh token
-        const refreshResponse = await apiClient.post('/auth/refresh');
+        // Step 2: Get refresh token with error handling
+        let refreshResponse;
+        try {
+          refreshResponse = await apiClient.post('/auth/refresh');
+        } catch (refreshError) {
+          console.error('Refresh token error:', refreshError);
+          Alert.alert(
+            "Authentication Error",
+            "Failed to refresh authentication token. Please try logging in again.",
+            [{ text: "OK" }]
+          );
+          return;
+        }
 
-        if (refreshResponse.status === 200) {
+        if (refreshResponse.status === 200 && refreshResponse.data?.token) {
           const { token } = refreshResponse.data;
 
-          // Store token if needed (you can use AsyncStorage or secure storage)
-          // await AsyncStorage.setItem('authToken', token);
+          // Store access token in AsyncStorage
+          try {
+            await AsyncStorage.setItem('accessToken', token);
+            console.log('Access token stored successfully');
+          } catch (storageError) {
+            console.error('AsyncStorage error:', storageError);
+            Alert.alert("Warning", "Token saved but storage issue detected.");
+          }
 
-          // Step 3: Get user data and role
-          const meResponse = await apiClient.get('/auth/me');
+          // Step 3: Get user data and role with error handling
+          let meResponse;
+          try {
+            meResponse = await apiClient.get('/auth/me');
+          } catch (meError) {
+            console.error('Get user data error:', meError);
+            Alert.alert(
+              "Error",
+              "Failed to retrieve user information. Please try again.",
+              [{ text: "OK" }]
+            );
+            return;
+          }
 
-          if (meResponse.status === 200) {
+          if (meResponse.status === 200 && meResponse.data) {
             console.log('User data from /auth/me:', meResponse.data);
 
             // Try to get role from different possible locations in the response
-            const role = meResponse.data.user.role
+            const role = meResponse.data?.user?.role;
+
+            if (!role) {
+              console.log('Full response data:', JSON.stringify(meResponse.data, null, 2));
+              Alert.alert("Error", "Unable to determine user role. Please contact support.");
+              return;
+            }
 
             // Navigate based on role
             if (role === "business-owner") {
@@ -70,7 +105,11 @@ export default function LoginScreen() {
               console.log('Full response data:', JSON.stringify(meResponse.data, null, 2));
               Alert.alert("Error", `Unknown user role: ${role}. Please contact support.`);
             }
+          } else {
+            Alert.alert("Error", "Failed to retrieve user information.");
           }
+        } else {
+          Alert.alert("Error", "Failed to refresh authentication token.");
         }
       }
     } catch (error) {
@@ -167,11 +206,9 @@ export default function LoginScreen() {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!isPasswordVisible}
-                  textContentType="password"
-                  autoComplete="password"
-                  autoCapitalize="none"
                 />
                 <TouchableOpacity
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   style={styles.eyeButton}
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                 >

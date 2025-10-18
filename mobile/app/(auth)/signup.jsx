@@ -203,9 +203,6 @@ export default function SignUpScreen() {
                 }}
                 placeholder="Enter your password"
                 secureTextEntry={!showPassword}
-                textContentType="password"
-                autoComplete="password"
-                autoCapitalize="none"
                 style={styles.passwordInput}
               />
               <TouchableOpacity style={styles.eyeWrap} onPress={() => setShowPassword((s) => !s)}>
@@ -225,9 +222,6 @@ export default function SignUpScreen() {
                 }}
                 placeholder="Re-enter your password"
                 secureTextEntry={!showConfirm}
-                textContentType="password"
-                autoComplete="password"
-                autoCapitalize="none"
                 style={styles.passwordInput}
               />
               <TouchableOpacity style={styles.eyeWrap} onPress={() => setShowConfirm((s) => !s)}>
