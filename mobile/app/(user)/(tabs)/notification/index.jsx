@@ -34,25 +34,38 @@ export default function NotificationsScreen() {
   // Fetch user ID
   const fetchUserId = async () => {
     try {
+      // 1. Try from AsyncStorage first
       const storedUserId = await AsyncStorage.getItem('userId');
       if (storedUserId) {
         setUserId(storedUserId);
         return storedUserId;
-      } else {
-        const response = await apiClient.get('/auth/me');
-        if (response.data && response.data.user) {
-          const user = response.data.user;
-          await AsyncStorage.setItem('userId', user._id);
-          setUserId(user._id);
-          return user._id;
-        }
       }
+
+      // 2. Try from /auth/me API
+      const response = await apiClient.get('/auth/me');
+      const user = response.data?.user || response.data;
+
+      if (user) {
+        const resolvedId = user._id || user.id || user.userId;
+
+        if (resolvedId) {
+          await AsyncStorage.setItem('userId', resolvedId);
+          setUserId(resolvedId);
+          return resolvedId;
+        } else {
+          console.error('⚠️ User ID missing from /auth/me response:', user);
+        }
+      } else {
+        console.error('⚠️ No user object found in /auth/me response:', response.data);
+      }
+
       return null;
     } catch (error) {
       console.error('Error fetching user ID:', error);
       return null;
     }
   };
+
 
   // Convert bookings to notifications
   const convertBookingsToNotifications = (bookings) => {
@@ -153,16 +166,16 @@ export default function NotificationsScreen() {
   // Fetch bookings and convert to notifications
   const fetchNotifications = async (uId) => {
     try {
-      // Fetch user's bookings
       const response = await apiClient.get('/bookings', {
         params: {
+          userId: uId, // include if required by backend
           page: 1,
           limit: 50,
           sort: '-createdAt',
-        }
+        },
       });
 
-      if (response.data && response.data.success) {
+      if (response.data?.success) {
         const bookings = response.data.data || [];
         const notificationsList = convertBookingsToNotifications(bookings);
         setNotifications(notificationsList);
@@ -171,6 +184,7 @@ export default function NotificationsScreen() {
       console.error('Error fetching notifications:', error);
     }
   };
+
 
   // Load data
   const loadData = async () => {
