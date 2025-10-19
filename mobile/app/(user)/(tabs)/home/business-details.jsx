@@ -650,6 +650,36 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: '600',
   },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    marginTop: moderateScale(8),
+    gap: moderateScale(6),
+  },
+  statusOpen: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusClosed: {
+    backgroundColor: '#FFEBEE',
+  },
+  statusDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+  },
+  dotOpen: {
+    backgroundColor: '#4CAF50',
+  },
+  dotClosed: {
+    backgroundColor: '#F44336',
+  },
+  statusText: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+  },
   tabContainer: {
     flexDirection: 'row',
     marginHorizontal: wp(5),

@@ -9,143 +9,282 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ImageBackground,
+  Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import {
+  subscribeToMessages,
+  sendMessage,
+  markMessagesAsRead,
+  getConversationDetails,
+} from '@utils/messageService';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const flatListRef = useRef(null);
 
-  const customerName = params.customerName || 'Customer';
-  const petName = params.petName || 'Pet';
-  const service = params.service || 'Service';
-  const appointmentDate = params.date || '';
-  const appointmentTime = params.time || '';
-  const fromAppointment = params.startConversation === 'true';
+  const conversationId = params.conversationId;
+  const receiverId = params.receiverId;
+  const receiverName = params.receiverName || 'User';
+  const receiverImage = params.receiverImage;
 
   const [messageText, setMessageText] = useState('');
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserName, setCurrentUserName] = useState('');
+  const [currentUserImage, setCurrentUserImage] = useState('');
 
   useEffect(() => {
-    // If coming from appointment, add initial message about the booking
-    if (fromAppointment && appointmentDate && appointmentTime) {
-      const initialMessage = {
-        id: Date.now().toString(),
-        text: `Hi ${customerName}! This is regarding your ${service} appointment for ${petName} scheduled on ${appointmentDate} at ${appointmentTime}. How can I help you?`,
-        sender: 'business',
-        timestamp: new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }),
-        isSystemMessage: true,
-      };
-      setMessages([initialMessage]);
-    }
+    initializeChat();
   }, []);
 
-  const sendMessage = () => {
-    if (messageText.trim() === '') return;
+  const initializeChat = async () => {
+    try {
+      const [userId, userData] = await AsyncStorage.multiGet([
+        'userId',
+        'userData',
+      ]);
 
-    const newMessage = {
-      id: Date.now().toString(),
-      text: messageText,
-      sender: 'business',
-      timestamp: new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      }),
-    };
+      const uid = userId[1];
+      setCurrentUserId(uid);
 
-    setMessages(prev => [...prev, newMessage]);
-    setMessageText('');
+      if (userData[1]) {
+        const user = JSON.parse(userData[1]);
+        setCurrentUserName(`${user.firstName || ''} ${user.lastName || ''}`.trim());
+        setCurrentUserImage(user.images?.profile || '');
+      }
 
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      // Mark messages as read
+      if (conversationId) {
+        await markMessagesAsRead(conversationId, uid);
+      }
 
-    // Simulate customer response after 2 seconds
-    setTimeout(() => {
-      const autoReply = {
-        id: (Date.now() + 1).toString(),
-        text: 'Thank you for reaching out! I appreciate your help.',
-        sender: 'customer',
-        timestamp: new Date().toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }),
+      // Subscribe to real-time messages
+      const unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
+        setMessages(newMessages);
+        setLoading(false);
+
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      });
+
+      return () => {
+        unsubscribe();
       };
-      setMessages(prev => [...prev, autoReply]);
+    } catch (error) {
+      console.error('Error initializing chat:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Could not load messages. Please try again.');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (messageText.trim() === '' || sendingMessage) return;
+
+    const textToSend = messageText.trim();
+    setMessageText('');
+    setSendingMessage(true);
+
+    try {
+      await sendMessage(conversationId, currentUserId, textToSend, {
+        name: currentUserName,
+        image: currentUserImage,
+      });
+
+      // Auto-scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
-    }, 2000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Could not send message. Please try again.');
+      // Restore message text if send failed
+      setMessageText(textToSend);
+    } finally {
+      setSendingMessage(false);
+    }
   };
 
-  const renderMessage = ({ item }) => {
-    const isBusinessMessage = item.sender === 'business';
-    const isSystemMessage = item.isSystemMessage;
+  const formatTimestamp = (date) => {
+    if (!date) return '';
+
+    const messageDate = date instanceof Date ? date : new Date(date);
+    const now = new Date();
+    const diff = now - messageDate;
+
+    // If today, show time
+    if (diff < 86400000) {
+      return messageDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+
+    // If yesterday
+    if (diff < 172800000) {
+      return 'Yesterday ' + messageDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+
+    // Otherwise show date and time
+    return messageDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }) + ' ' + messageDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const renderMessage = ({ item, index }) => {
+    const isUserMessage = item.senderId === currentUserId;
+    const showAvatar = !isUserMessage;
+
+    // Check if we should show date separator
+    const showDateSeparator = index === 0 || !isSameDay(
+      item.createdAt,
+      messages[index - 1]?.createdAt
+    );
 
     return (
-      <View style={[
-        styles.messageContainer,
-        isBusinessMessage ? styles.businessMessageContainer : styles.customerMessageContainer
-      ]}>
-        {isSystemMessage && (
-          <View style={styles.systemMessageBadge}>
-            <Ionicons name="calendar" size={moderateScale(12)} color="#1C86FF" />
-            <Text style={styles.systemMessageBadgeText}>Appointment Message</Text>
+      <>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <Text style={styles.dateSeparatorText}>
+              {formatDateSeparator(item.createdAt)}
+            </Text>
           </View>
         )}
-        <View style={[
-          styles.messageBubble,
-          isBusinessMessage ? styles.businessBubble : styles.customerBubble
-        ]}>
-          <Text style={[
-            styles.messageText,
-            isBusinessMessage ? styles.businessMessageText : styles.customerMessageText
-          ]}>
-            {item.text}
-          </Text>
-          <Text style={[
-            styles.timestamp,
-            isBusinessMessage ? styles.businessTimestamp : styles.customerTimestamp
-          ]}>
-            {item.timestamp}
-          </Text>
+        <View
+          style={[
+            styles.messageContainer,
+            isUserMessage ? styles.userMessageContainer : styles.otherMessageContainer,
+          ]}
+        >
+          {showAvatar && (
+            <View style={styles.messageAvatar}>
+              {receiverImage ? (
+                <Image source={{ uri: receiverImage }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={moderateScale(16)} color="#1C86FF" />
+                </View>
+              )}
+            </View>
+          )}
+          <View
+            style={[
+              styles.messageBubble,
+              isUserMessage ? styles.userBubble : styles.otherBubble,
+              !showAvatar && styles.noAvatarBubble,
+            ]}
+          >
+            <Text
+              style={[
+                styles.messageText,
+                isUserMessage ? styles.userMessageText : styles.otherMessageText,
+              ]}
+            >
+              {item.message}
+            </Text>
+            <Text
+              style={[
+                styles.timestamp,
+                isUserMessage ? styles.userTimestamp : styles.otherTimestamp,
+              ]}
+            >
+              {formatTimestamp(item.createdAt)}
+            </Text>
+          </View>
         </View>
-      </View>
+      </>
     );
+  };
+
+  const isSameDay = (date1, date2) => {
+    if (!date1 || !date2) return false;
+    const d1 = date1 instanceof Date ? date1 : new Date(date1);
+    const d2 = date2 instanceof Date ? date2 : new Date(date2);
+    return (
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
+    );
+  };
+
+  const formatDateSeparator = (date) => {
+    if (!date) return '';
+    const messageDate = date instanceof Date ? date : new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (isSameDay(messageDate, today)) {
+      return 'Today';
+    } else if (isSameDay(messageDate, yesterday)) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
   };
 
   const renderTitle = () => (
     <View style={styles.headerTitleContainer}>
-      <View style={styles.customerAvatar}>
-        <Ionicons name="person" size={moderateScale(20)} color="#fff" />
+      <View style={styles.headerAvatar}>
+        {receiverImage ? (
+          <Image source={{ uri: receiverImage }} style={styles.headerAvatarImage} />
+        ) : (
+          <View style={styles.headerAvatarPlaceholder}>
+            <Ionicons name="person" size={moderateScale(20)} color="#fff" />
+          </View>
+        )}
       </View>
       <View>
-        <Text style={styles.headerTitle}>{customerName}</Text>
-        <Text style={styles.headerSubtitle}>{petName}</Text>
+        <Text style={styles.headerTitle}>{receiverName}</Text>
+        <Text style={styles.headerSubtitle}>Online</Text>
       </View>
     </View>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={true}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ImageBackground
-        source={require("@assets/images/PetTapp pattern.png")}
-        style={styles.backgroundimg}
-        imageStyle={styles.backgroundImageStyle}
-        resizeMode="repeat"
-      />
       <Header
         backgroundColor="#1C86FF"
         titleColor="#fff"
@@ -165,7 +304,7 @@ export default function ChatScreen() {
             </View>
             <Text style={styles.emptyStateTitle}>Start Conversation</Text>
             <Text style={styles.emptyStateText}>
-              Send a message to {customerName} about {petName}'s appointment
+              Send a message to {receiverName}
             </Text>
           </View>
         ) : (
@@ -173,9 +312,9 @@ export default function ChatScreen() {
             ref={flatListRef}
             data={messages}
             renderItem={renderMessage}
-            keyExtractor={item => item.id}
+            keyExtractor={(item, index) => item.id || index.toString()}
             contentContainerStyle={styles.messagesList}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           />
         )}
 
@@ -191,15 +330,22 @@ export default function ChatScreen() {
             maxLength={500}
           />
           <TouchableOpacity
-            style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={!messageText.trim()}
+            style={[
+              styles.sendButton,
+              (!messageText.trim() || sendingMessage) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSendMessage}
+            disabled={!messageText.trim() || sendingMessage}
           >
-            <Ionicons
-              name="send"
-              size={moderateScale(20)}
-              color={messageText.trim() ? "#fff" : "#999"}
-            />
+            {sendingMessage ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name="send"
+                size={moderateScale(20)}
+                color={messageText.trim() ? '#fff' : '#999'}
+              />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -212,22 +358,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  backgroundimg: {
-    ...StyleSheet.absoluteFillObject,
-    transform: [{ scale: 1.5 }],
-  },
-  backgroundImageStyle: {
-    opacity: 0.05,
-  },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: moderateScale(10),
   },
-  customerAvatar: {
+  headerAvatar: {
     width: moderateScale(35),
     height: moderateScale(35),
     borderRadius: moderateScale(17.5),
+    overflow: 'hidden',
+  },
+  headerAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -241,6 +389,16 @@ const styles = StyleSheet.create({
     color: '#E3F2FD',
     fontSize: scaleFontSize(12),
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: moderateScale(15),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
   keyboardView: {
     flex: 1,
   },
@@ -249,42 +407,63 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(15),
     paddingBottom: moderateScale(20),
   },
+  dateSeparator: {
+    alignSelf: 'center',
+    backgroundColor: '#E0E0E0',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    marginVertical: moderateScale(15),
+  },
+  dateSeparatorText: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    fontWeight: '600',
+  },
   messageContainer: {
+    flexDirection: 'row',
     marginBottom: moderateScale(15),
     maxWidth: '80%',
   },
-  businessMessageContainer: {
+  userMessageContainer: {
     alignSelf: 'flex-end',
+    flexDirection: 'row-reverse',
   },
-  customerMessageContainer: {
+  otherMessageContainer: {
     alignSelf: 'flex-start',
   },
-  systemMessageBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(10),
-    marginBottom: moderateScale(6),
-    gap: moderateScale(4),
+  messageAvatar: {
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(15),
+    marginRight: moderateScale(8),
+    overflow: 'hidden',
   },
-  systemMessageBadgeText: {
-    fontSize: scaleFontSize(10),
-    color: '#1C86FF',
-    fontWeight: '600',
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   messageBubble: {
     paddingHorizontal: moderateScale(15),
     paddingVertical: moderateScale(10),
     borderRadius: moderateScale(16),
+    maxWidth: '100%',
   },
-  businessBubble: {
+  noAvatarBubble: {
+    marginLeft: moderateScale(38),
+  },
+  userBubble: {
     backgroundColor: '#1C86FF',
     borderBottomRightRadius: moderateScale(4),
   },
-  customerBubble: {
+  otherBubble: {
     backgroundColor: '#E0E0E0',
     borderBottomLeftRadius: moderateScale(4),
   },
@@ -293,20 +472,20 @@ const styles = StyleSheet.create({
     lineHeight: scaleFontSize(20),
     marginBottom: moderateScale(4),
   },
-  businessMessageText: {
+  userMessageText: {
     color: '#fff',
   },
-  customerMessageText: {
+  otherMessageText: {
     color: '#333',
   },
   timestamp: {
     fontSize: scaleFontSize(11),
     alignSelf: 'flex-end',
   },
-  businessTimestamp: {
+  userTimestamp: {
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  customerTimestamp: {
+  otherTimestamp: {
     color: '#666',
   },
   inputContainer: {

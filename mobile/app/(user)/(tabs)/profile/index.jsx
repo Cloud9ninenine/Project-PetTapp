@@ -19,6 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
 import apiClient from "../../../config/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { unregisterBackgroundFetchAsync } from '@utils/backgroundTasks';
+import { clearBadgeCount, cancelAllScheduledNotifications } from '@utils/notificationHelpers';
 import AddressManager from './address-manager';
 
 export default function ProfileScreen() {

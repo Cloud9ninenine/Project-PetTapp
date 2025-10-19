@@ -19,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
 import apiClient from "../config/api";
+import { registerForPushNotifications, getExpoPushToken, sendPushTokenToServer } from "@utils/notificationHelpers";
+import { registerBackgroundFetchAsync } from '@utils/backgroundTasks';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");

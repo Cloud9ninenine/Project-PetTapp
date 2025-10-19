@@ -23,6 +23,9 @@ import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { unregisterBackgroundFetchAsync } from '@utils/backgroundTasks';
+import { clearBadgeCount, cancelAllScheduledNotifications } from '@utils/notificationHelpers';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BusinessProfileScreen() {
   const router = useRouter();

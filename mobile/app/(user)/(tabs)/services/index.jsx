@@ -569,6 +569,25 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     fontWeight: '600',
   },
+  serviceStatusBadge: {
+    position: 'absolute',
+    top: moderateScale(10),
+    left: moderateScale(10),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+  },
+  serviceStatusOpen: {
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+  },
+  serviceStatusClosed: {
+    backgroundColor: 'rgba(244, 67, 54, 0.9)',
+  },
+  serviceStatusText: {
+    color: '#fff',
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+  },
   serviceInfo: {
     padding: moderateScale(16),
   },

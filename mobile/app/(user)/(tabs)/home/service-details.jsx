@@ -460,6 +460,15 @@ export default function ServiceDetailsScreen() {
                   <View style={styles.businessInfoTextContainer}>
                     <Text style={styles.businessInfoLabel}>Provider</Text>
                     <Text style={styles.businessName}>{String(businessData.name || 'Business Name')}</Text>
+                    {businessData.businessHours && (() => {
+                      const { isOpen, status } = isBusinessOpen(businessData.businessHours);
+                      return (
+                        <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
+                          <View style={[styles.statusDot, isOpen ? styles.dotOpen : styles.dotClosed]} />
+                          <Text style={styles.statusText}>{status}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </View>
                 {businessData.address && (
@@ -1171,6 +1180,38 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#4CAF50',
     fontWeight: '600',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+    marginTop: moderateScale(6),
+    gap: moderateScale(6),
+    alignSelf: 'flex-start',
+  },
+  statusOpen: {
+    backgroundColor: '#E8F5E9',
+  },
+  statusClosed: {
+    backgroundColor: '#FFEBEE',
+  },
+  statusDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+  },
+  dotOpen: {
+    backgroundColor: '#4CAF50',
+  },
+  dotClosed: {
+    backgroundColor: '#F44336',
+  },
+  statusText: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#333',
   },
 
   // Availability Section

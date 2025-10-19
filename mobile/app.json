@@ -14,7 +14,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show nearby pet services and provide directions.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "remote-notification",
+          "fetch"
+        ]
       }
     },
     "android": {
@@ -27,7 +31,10 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.WAKE_LOCK"
       ],
       "config": {
         "googleMaps": {
@@ -35,6 +42,13 @@
         }
       },
       "package": "com.leleoj.pettapp"
+    },
+    "notification": {
+      "icon": "./app/assets/images/AppIcon.png",
+      "color": "#1C86FF",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "{{unread_count}} new notifications"
     },
     "web": {
       "bundler": "metro",
@@ -56,6 +70,15 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow PetTapp to use your location to find nearby pet services."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./app/assets/images/AppIcon.png",
+          "color": "#1C86FF",
+          "sounds": [],
+          "mode": "production"
         }
       ]
     ],

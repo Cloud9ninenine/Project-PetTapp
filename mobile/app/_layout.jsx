@@ -1,12 +1,29 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
+import { AppState } from 'react-native';
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from 'expo-notifications';
+import { registerForPushNotifications, setupNotificationListeners, clearBadgeCount } from "@utils/notificationHelpers";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
+// Configure notification behavior when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
 export default function RootLayout() {
+  const notificationListener = useRef();
+  const responseListener = useRef();
+  const appState = useRef(AppState.currentState);
+  const [appStateVisible, setAppStateVisible] = useState(appState.current);
+
   const [loaded, error] = useFonts({
     'SFProBold': require("@assets/fonts/SF-Pro-Rounded-Bold.otf"),
     'SFProSB': require("@assets/fonts/SF-Pro-Rounded-Semibold.otf"),
@@ -26,6 +43,82 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Handle app state changes (background/foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        console.log('App has come to the foreground!');
+        // Clear badge count when app comes to foreground
+        clearBadgeCount();
+
+        // You can add additional logic here when app returns to foreground:
+        // - Refresh data
+        // - Sync with server
+        // - Check for updates
+      } else if (nextAppState.match(/inactive|background/)) {
+        console.log('App has gone to the background!');
+
+        // You can add cleanup logic here when app goes to background:
+        // - Save state
+        // - Cancel pending operations
+        // - Pause timers
+      }
+
+      appState.current = nextAppState;
+      setAppStateVisible(appState.current);
+      console.log('AppState:', appState.current);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Set up push notifications
+  useEffect(() => {
+    // Register for push notifications
+    registerForPushNotifications();
+
+    // Set up notification listeners
+    const listeners = setupNotificationListeners(
+      (notification) => {
+        console.log('Notification received in foreground:', notification);
+        // Handle notification received while app is open
+        // You can show an in-app alert or update UI here
+      },
+      (response) => {
+        console.log('Notification tapped:', response);
+        // Handle navigation based on notification data
+        // You can add custom navigation logic here based on response.notification.request.content.data
+
+        const data = response.notification.request.content.data;
+
+        // Example navigation based on notification type:
+        // if (data.type === 'booking') {
+        //   router.push(`/bookings/${data.bookingId}`);
+        // } else if (data.type === 'message') {
+        //   router.push(`/messages/${data.chatId}`);
+        // }
+      }
+    );
+
+    notificationListener.current = listeners.notificationListener;
+    responseListener.current = listeners.responseListener;
+
+    // Cleanup listeners on unmount
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
 
   if (!loaded) return null;
 
