@@ -22,15 +22,14 @@ import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "../../../config/api";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
-import { isBusinessOpen } from "@utils/businessHelpers";
 
-export default function ServicesScreen() {
+export default function BusinessesScreen() {
   const params = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
-  const [services, setServices] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(params.category || 'all');
+  const [selectedCategory, setSelectedCategory] = useState(params.businessType || 'all');
   const [location, setLocation] = useState(null);
   const [useLocation, setUseLocation] = useState(false);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
@@ -48,15 +47,14 @@ export default function ServicesScreen() {
     { id: 'boarding', name: 'Boarding', icon: 'home' },
     { id: 'daycare', name: 'Daycare', icon: 'sunny' },
     { id: 'training', name: 'Training', icon: 'school' },
-    { id: 'emergency', name: 'Emergency', icon: 'alert-circle' },
-    { id: 'consultation', name: 'Consultation', icon: 'chatbubble' },
+    { id: 'pet-shop', name: 'Pet Shop', icon: 'cart' },
     { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
   ];
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        Pet Services
+        Pet Businesses
       </Text>
     </View>
   );
@@ -88,13 +86,13 @@ export default function ServicesScreen() {
 
   // Handle category param from navigation
   useEffect(() => {
-    if (params.category && params.category !== selectedCategory) {
-      setSelectedCategory(params.category);
+    if (params.businessType && params.businessType !== selectedCategory) {
+      setSelectedCategory(params.businessType);
     }
-  }, [params.category]);
+  }, [params.businessType]);
 
-  // Fetch services
-  const fetchServices = async (pageNum = 1, append = false) => {
+  // Fetch businesses
+  const fetchBusinesses = async (pageNum = 1, append = false) => {
     try {
       if (!append) {
         setLoading(true);
@@ -105,6 +103,7 @@ export default function ServicesScreen() {
       const params = {
         page: pageNum,
         limit: 10,
+        sort: '-averageRating',
       };
 
       // Add search query
@@ -114,35 +113,35 @@ export default function ServicesScreen() {
 
       // Add category filter
       if (selectedCategory && selectedCategory !== 'all') {
-        params.category = selectedCategory;
+        params.businessType = selectedCategory;
       }
 
-      // Add location parameters
+      // Add location parameters for nearby businesses
       if (useLocation && location) {
         params.latitude = location.latitude;
         params.longitude = location.longitude;
         params.radius = 10; // 10km radius
       }
 
-      const response = await apiClient.get('/services', { params });
+      const response = await apiClient.get('/businesses', { params });
 
       if (response.data.success) {
-        const newServices = response.data.data || [];
+        const newBusinesses = response.data.data || [];
         if (append) {
-          setServices(prev => [...prev, ...newServices]);
+          setBusinesses(prev => [...prev, ...newBusinesses]);
         } else {
-          setServices(newServices);
+          setBusinesses(newBusinesses);
         }
 
         // Check if there are more pages
         const { pagination } = response.data;
         setHasMore(pagination && pageNum < pagination.pages);
       } else {
-        Alert.alert('Error', 'Failed to fetch services');
+        Alert.alert('Error', 'Failed to fetch businesses');
       }
     } catch (error) {
-      console.error('Error fetching services:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to fetch services');
+      console.error('Error fetching businesses:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to fetch businesses');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -152,7 +151,7 @@ export default function ServicesScreen() {
 
   // Initial fetch
   useEffect(() => {
-    fetchServices(1, false);
+    fetchBusinesses(1, false);
   }, [selectedCategory, useLocation]);
 
   // Debounced search
@@ -160,7 +159,7 @@ export default function ServicesScreen() {
     const timer = setTimeout(() => {
       if (searchQuery !== undefined) {
         setPage(1);
-        fetchServices(1, false);
+        fetchBusinesses(1, false);
       }
     }, 500);
 
@@ -170,14 +169,14 @@ export default function ServicesScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     setPage(1);
-    fetchServices(1, false);
+    fetchBusinesses(1, false);
   };
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchServices(nextPage, true);
+      fetchBusinesses(nextPage, true);
     }
   };
 
@@ -199,89 +198,130 @@ export default function ServicesScreen() {
     setPage(1);
   };
 
-  const handleServicePress = (service) => {
+  const handleBusinessPress = (business) => {
     // Check if profile is complete before allowing access
     if (!isProfileComplete) {
       setShowProfileIncompleteModal(true);
       return;
     }
-    
-    // Navigate to service details page
+
+    // Navigate to business details page
     router.push({
-      pathname: '/(user)/(tabs)/home/service-details',
+      pathname: '/(user)/(tabs)/home/business-details',
       params: {
-        id: service._id,
-        name: service.name,
-        category: service.category,
-        serviceType: service.category,
+        id: business._id,
       }
     });
   };
 
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating || 0);
+    const hasHalfStar = (rating || 0) % 1 >= 0.5;
 
-  const renderServiceCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.serviceCard}
-      activeOpacity={0.8}
-      onPress={() => handleServicePress(item)}
-    >
-      <View style={styles.serviceImageContainer}>
-        {item.imageUrl ? (
-          <Image
-            source={{ uri: item.imageUrl }}
-            style={styles.serviceImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.serviceImage, styles.placeholderImage]}>
-            <Ionicons name="paw" size={moderateScale(40)} color="#ccc" />
-          </View>
-        )}
-        <View style={styles.categoryBadge}>
-          <Text style={styles.categoryBadgeText}>
-            {item.category?.charAt(0).toUpperCase() + item.category?.slice(1)}
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(
+          <Ionicons key={i} name="star" size={moderateScale(14)} color="#FFD700" />
+        );
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(
+          <Ionicons key={i} name="star-half" size={moderateScale(14)} color="#FFD700" />
+        );
+      } else {
+        stars.push(
+          <Ionicons key={i} name="star-outline" size={moderateScale(14)} color="#FFD700" />
+        );
+      }
+    }
+    return stars;
+  };
+
+  // Check if business is currently open
+  const isBusinessOpen = (businessHours) => {
+    if (!businessHours) return null;
+
+    const now = new Date();
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = days[now.getDay()];
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Current time in minutes
+
+    const todayHours = businessHours[currentDay];
+    if (!todayHours || !todayHours.isOpen) {
+      return false;
+    }
+
+    // Parse open and close times
+    const [openHour, openMin] = todayHours.open.split(':').map(Number);
+    const [closeHour, closeMin] = todayHours.close.split(':').map(Number);
+
+    const openTime = openHour * 60 + openMin;
+    const closeTime = closeHour * 60 + closeMin;
+
+    return currentTime >= openTime && currentTime <= closeTime;
+  };
+
+  const renderBusinessCard = ({ item }) => {
+    const isOpen = isBusinessOpen(item.businessHours);
+
+    return (
+      <TouchableOpacity
+        style={styles.businessCard}
+        activeOpacity={0.8}
+        onPress={() => handleBusinessPress(item)}
+      >
+        <View style={styles.businessImageContainer}>
+          {item.images?.logo || item.logo ? (
+            <Image
+              source={{ uri: item.images?.logo || item.logo }}
+              style={styles.businessImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.businessImage, styles.placeholderImage]}>
+              <Ionicons name="business" size={moderateScale(40)} color="#ccc" />
+            </View>
+          )}
+          {item.isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+            </View>
+          )}
+          {isOpen !== null && (
+            <View style={[styles.statusBadge, isOpen ? styles.openBadge : styles.closedBadge]}>
+              <View style={[styles.statusDot, isOpen ? styles.openDot : styles.closedDot]} />
+              <Text style={styles.statusText}>{isOpen ? 'Open' : 'Closed'}</Text>
+            </View>
+          )}
+        </View>
+
+      <View style={styles.businessInfo}>
+        <Text style={styles.businessName} numberOfLines={1}>
+          {item.businessName}
+        </Text>
+
+        <View style={styles.businessType}>
+          <Ionicons name="pricetag" size={moderateScale(14)} color="#666" />
+          <Text style={styles.businessTypeText} numberOfLines={1}>
+            {item.businessType?.charAt(0).toUpperCase() + item.businessType?.slice(1)}
           </Text>
         </View>
-        {item.businessId?.businessHours && (() => {
-          const { isOpen, status } = isBusinessOpen(item.businessId.businessHours);
-          return (
-            <View style={[styles.serviceStatusBadge, isOpen ? styles.serviceStatusOpen : styles.serviceStatusClosed]}>
-              <Text style={styles.serviceStatusText}>{status}</Text>
-            </View>
-          );
-        })()}
-      </View>
 
-      <View style={styles.serviceInfo}>
-        <Text style={styles.serviceName} numberOfLines={1}>
-          {item.name}
-        </Text>
-
-        {item.businessId && (
-          <View style={styles.businessInfo}>
-            <Ionicons name="business" size={moderateScale(14)} color="#666" />
-            <Text style={styles.businessName} numberOfLines={1}>
-              {item.businessId.name || 'Business'}
-            </Text>
-          </View>
+        {item.description && (
+          <Text style={styles.businessDescription} numberOfLines={2}>
+            {item.description}
+          </Text>
         )}
 
-        <Text style={styles.serviceDescription} numberOfLines={2}>
-          {item.description}
-        </Text>
-
-        <View style={styles.serviceFooter}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>From </Text>
-            <Text style={styles.priceValue}>
-              ₱{typeof item.price === 'object' ? (item.price?.amount || 0) : (item.price || 0)}
-            </Text>
-          </View>
-
-          {item.duration && (
-            <View style={styles.durationContainer}>
-              <Ionicons name="time" size={moderateScale(14)} color="#666" />
-              <Text style={styles.durationText}>{item.duration} min</Text>
+        <View style={styles.businessFooter}>
+          {item.averageRating > 0 && (
+            <View style={styles.ratingContainer}>
+              <View style={styles.starsRow}>
+                {renderStars(item.averageRating)}
+              </View>
+              <Text style={styles.ratingText}>
+                {item.averageRating?.toFixed(1)} ({item.totalReviews || 0})
+              </Text>
             </View>
           )}
         </View>
@@ -293,8 +333,9 @@ export default function ServicesScreen() {
           </View>
         )}
       </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
@@ -335,7 +376,7 @@ export default function ServicesScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
       />
 
       {/* Search Bar with Location Toggle */}
@@ -344,7 +385,7 @@ export default function ServicesScreen() {
           <Ionicons name="search" size={moderateScale(20)} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search services..."
+            placeholder="Search businesses..."
             placeholderTextColor="#999"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -381,19 +422,19 @@ export default function ServicesScreen() {
         />
       </View>
 
-      {/* Services List */}
+      {/* Businesses List */}
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading services...</Text>
+          <Text style={styles.loadingText}>Loading businesses...</Text>
         </View>
-      ) : services.length > 0 ? (
+      ) : businesses.length > 0 ? (
         <FlatList
-          data={services}
-          renderItem={renderServiceCard}
+          data={businesses}
+          renderItem={renderBusinessCard}
           keyExtractor={item => item._id}
-          style={styles.servicesList}
-          contentContainerStyle={styles.servicesListContent}
+          style={styles.businessesList}
+          contentContainerStyle={styles.businessesListContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1C86FF']} />
@@ -415,12 +456,12 @@ export default function ServicesScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1C86FF']} />
           }
         >
-          <Ionicons name="paw-outline" size={moderateScale(64)} color="#ccc" />
-          <Text style={styles.emptyTitle}>No services found</Text>
+          <Ionicons name="business-outline" size={moderateScale(64)} color="#ccc" />
+          <Text style={styles.emptyTitle}>No businesses found</Text>
           <Text style={styles.emptySubtitle}>
             {searchQuery
               ? 'Try adjusting your search or filters'
-              : 'Check back later for available services'}
+              : 'Check back later for available businesses'}
           </Text>
         </ScrollView>
       )}
@@ -429,7 +470,7 @@ export default function ServicesScreen() {
       <CompleteProfileModal
         visible={showProfileIncompleteModal}
         onClose={() => setShowProfileIncompleteModal(false)}
-        message="Please complete your profile information before booking services. You need to provide your first name, last name, address, and contact number."
+        message="Please complete your profile information before viewing business details. You need to provide your first name, last name, address, and contact number."
       />
     </SafeAreaView>
   );
@@ -526,14 +567,14 @@ const styles = StyleSheet.create({
   categoryChipTextActive: {
     color: '#fff',
   },
-  servicesList: {
+  businessesList: {
     flex: 1,
   },
-  servicesListContent: {
+  businessesListContent: {
     paddingHorizontal: wp(4),
     paddingBottom: moderateScale(20),
   },
-  serviceCard: {
+  businessCard: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     borderWidth: 1,
@@ -541,12 +582,12 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(16),
     overflow: 'hidden',
   },
-  serviceImageContainer: {
+  businessImageContainer: {
     position: 'relative',
     width: '100%',
     height: hp(20),
   },
-  serviceImage: {
+  businessImage: {
     width: '100%',
     height: '100%',
   },
@@ -555,72 +596,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  categoryBadge: {
+  verifiedBadge: {
     position: 'absolute',
     top: moderateScale(10),
     right: moderateScale(10),
-    backgroundColor: 'rgba(28, 134, 255, 0.9)',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(12),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(15),
+    padding: moderateScale(4),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  categoryBadgeText: {
-    color: '#fff',
-    fontSize: scaleFontSize(12),
-    fontWeight: '600',
-  },
-  serviceInfo: {
+  businessInfo: {
     padding: moderateScale(16),
   },
-  serviceName: {
+  businessName: {
     fontSize: scaleFontSize(18),
     fontWeight: '700',
     color: '#333',
     marginBottom: moderateScale(6),
   },
-  businessInfo: {
+  businessType: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: moderateScale(8),
     gap: moderateScale(4),
   },
-  businessName: {
+  businessTypeText: {
     fontSize: scaleFontSize(14),
     color: '#666',
     flex: 1,
   },
-  serviceDescription: {
+  businessDescription: {
     fontSize: scaleFontSize(14),
     color: '#666',
     marginBottom: moderateScale(12),
     lineHeight: scaleFontSize(20),
   },
-  serviceFooter: {
+  businessFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  priceContainer: {
+  ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: moderateScale(6),
   },
-  priceLabel: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
-  },
-  priceValue: {
-    fontSize: scaleFontSize(18),
-    fontWeight: '700',
-    color: '#1C86FF',
-  },
-  durationContainer: {
+  starsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: moderateScale(4),
+    gap: moderateScale(2),
   },
-  durationText: {
+  ratingText: {
     fontSize: scaleFontSize(14),
     color: '#666',
+    fontWeight: '600',
   },
   distanceContainer: {
     flexDirection: 'row',

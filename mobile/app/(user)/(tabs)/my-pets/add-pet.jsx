@@ -515,14 +515,15 @@ export default function AddPetScreen() {
       />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
         >
         <View style={styles.content}>
       {currentPage === 1 ? (
@@ -552,6 +553,7 @@ export default function AddPetScreen() {
             value={petInfo.name}
             onChangeText={(value) => updatePetInfo('name', value)}
             placeholder="Enter pet name"
+            placeholderTextColor="#999"
             maxLength={50}
           />
         </View>
@@ -593,6 +595,7 @@ export default function AddPetScreen() {
             value={petInfo.age}
             onChangeText={(value) => updatePetInfo('age', value)}
             placeholder="Enter age in years"
+            placeholderTextColor="#999"
             keyboardType="numeric"
             maxLength={2}
           />
@@ -633,6 +636,7 @@ export default function AddPetScreen() {
               value={petInfo.weight}
               onChangeText={(value) => updatePetInfo('weight', value)}
               placeholder="Weight"
+              placeholderTextColor="#999"
               keyboardType="decimal-pad"
             />
           </View>
@@ -646,6 +650,7 @@ export default function AddPetScreen() {
             value={petInfo.color}
             onChangeText={(value) => updatePetInfo('color', value)}
             placeholder="Color, markings, etc."
+            placeholderTextColor="#999"
             multiline
             numberOfLines={3}
             textAlignVertical="top"
@@ -685,6 +690,7 @@ export default function AddPetScreen() {
                 value={entry.condition}
                 onChangeText={(value) => updateMedicalHistoryField(entry.id, 'condition', value)}
                 placeholder="Enter condition"
+                placeholderTextColor="#999"
               />
             </View>
 
@@ -707,6 +713,7 @@ export default function AddPetScreen() {
                 value={entry.treatment}
                 onChangeText={(value) => updateMedicalHistoryField(entry.id, 'treatment', value)}
                 placeholder="Enter treatment"
+                placeholderTextColor="#999"
               />
             </View>
 
@@ -717,6 +724,7 @@ export default function AddPetScreen() {
                 value={entry.notes}
                 onChangeText={(value) => updateMedicalHistoryField(entry.id, 'notes', value)}
                 placeholder="Additional notes"
+                placeholderTextColor="#999"
                 multiline
                 numberOfLines={2}
                 textAlignVertical="top"
@@ -754,6 +762,7 @@ export default function AddPetScreen() {
                 value={entry.vaccineName}
                 onChangeText={(value) => updateVaccinationField(entry.id, 'vaccineName', value)}
                 placeholder="Enter vaccine name"
+                placeholderTextColor="#999"
               />
             </View>
 
@@ -788,6 +797,7 @@ export default function AddPetScreen() {
                 value={entry.veterinarian}
                 onChangeText={(value) => updateVaccinationField(entry.id, 'veterinarian', value)}
                 placeholder="Enter veterinarian name"
+                placeholderTextColor="#999"
               />
             </View>
           </View>
@@ -813,6 +823,7 @@ export default function AddPetScreen() {
             value={petInfo.specialInstructions}
             onChangeText={(value) => updatePetInfo('specialInstructions', value)}
             placeholder="Feeding schedules, behavioral notes, special care requirements, etc."
+            placeholderTextColor="#999"
             multiline
             numberOfLines={5}
             textAlignVertical="top"
@@ -1105,6 +1116,7 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(12),
     fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
+    color: '#333',
   },
   dateInputContainer: {
     flexDirection: 'row',

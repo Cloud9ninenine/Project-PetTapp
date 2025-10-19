@@ -277,7 +277,7 @@ export default function AddressManager() {
   const renderAddressForm = (isEdit = false) => (
     <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Address Label *</Text>
+        <Text style={styles.label}>Set Address as:</Text>
         <TextInput
           style={styles.input}
           value={formData.label}
@@ -287,7 +287,7 @@ export default function AddressManager() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>Street Address *</Text>
+        <Text style={styles.label}>Street Address:</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={formData.street}
@@ -300,7 +300,7 @@ export default function AddressManager() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>City *</Text>
+        <Text style={styles.label}>City:</Text>
         <TextInput
           style={styles.input}
           value={formData.city}
@@ -310,7 +310,7 @@ export default function AddressManager() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.label}>State/Province *</Text>
+        <Text style={styles.label}>State/Province:</Text>
         <TextInput
           style={styles.input}
           value={formData.state}
@@ -321,7 +321,7 @@ export default function AddressManager() {
 
       <View style={styles.rowInputGroup}>
         <View style={styles.halfInput}>
-          <Text style={styles.label}>Zip Code *</Text>
+          <Text style={styles.label}>Zip Code:</Text>
           <TextInput
             style={styles.input}
             value={formData.zipCode}
@@ -332,7 +332,7 @@ export default function AddressManager() {
         </View>
 
         <View style={styles.halfInput}>
-          <Text style={styles.label}>Country *</Text>
+          <Text style={styles.label}>Country:</Text>
           <TextInput
             style={styles.input}
             value={formData.country}

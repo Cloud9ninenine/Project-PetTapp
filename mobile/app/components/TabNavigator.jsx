@@ -1,7 +1,8 @@
 // components/FooterTabs.jsx
-import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions } from "react-native";
+import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions, Keyboard, Platform } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { moderateScale, scaleFontSize } from "@utils/responsive";
+import { useState, useEffect } from "react";
 
 const userTabs = [
   {
@@ -11,10 +12,11 @@ const userTabs = [
     icon: require("@assets/images/service_icon/home icon.png"),
   },
   {
-    name: "services",
-    route: "/(user)/(tabs)/services",
-    label: "Services",
-    icon: require("@assets/images/service_icon/list icon.png"),
+    name: "messages",
+    route: "/(user)/(tabs)/messages",
+    label: "Messages",
+    icon: require("@assets/images/service_icon/message icon.png"),
+    badge: 0, // Unread message count
   },
   {
     name: "my-pets",
@@ -73,6 +75,7 @@ export default function FooterTabs() {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   // Determine if we're in business or user mode
   const isBusiness = pathname.includes("/(bsn)");
@@ -81,6 +84,30 @@ export default function FooterTabs() {
   // Determine if screen is very narrow (slim phone)
   const isVeryNarrow = width < 360;
   const isNarrow = width < 400;
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  if (isKeyboardVisible) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
@@ -98,14 +125,23 @@ export default function FooterTabs() {
             onPress={() => router.replace(tab.route)}
             activeOpacity={0.7}
           >
-            <Image
-              source={tab.icon}
-              style={[
-                styles.icon,
-                isVeryNarrow && styles.iconSmall,
-                { tintColor: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
-              ]}
-            />
+            <View style={styles.iconContainer}>
+              <Image
+                source={tab.icon}
+                style={[
+                  styles.icon,
+                  isVeryNarrow && styles.iconSmall,
+                  { tintColor: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
+                ]}
+              />
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {tab.badge > 99 ? '99+' : tab.badge}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text
               style={[
                 styles.label,
@@ -172,5 +208,27 @@ const styles = StyleSheet.create({
   labelNarrow: {
     fontSize: scaleFontSize(10),
     marginTop: moderateScale(2),
+  },
+  iconContainer: {
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -moderateScale(4),
+    right: -moderateScale(8),
+    backgroundColor: "#FF3B30",
+    borderRadius: moderateScale(10),
+    minWidth: moderateScale(18),
+    height: moderateScale(18),
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: moderateScale(4),
+    borderWidth: 2,
+    borderColor: "#1C86FF",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: scaleFontSize(10),
+    fontWeight: "bold",
   },
 });

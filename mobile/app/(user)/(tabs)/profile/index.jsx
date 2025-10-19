@@ -397,6 +397,7 @@ export default function ProfileScreen() {
                   value={accountInfo.firstName}
                   onChangeText={(value) => setAccountInfo(prev => ({ ...prev, firstName: value }))}
                   placeholder="Enter first name"
+                  placeholderTextColor="#999"
                   editable={editingAccount}
                 />
               </View>
@@ -408,6 +409,7 @@ export default function ProfileScreen() {
                   value={accountInfo.lastName}
                   onChangeText={(value) => setAccountInfo(prev => ({ ...prev, lastName: value }))}
                   placeholder="Enter last name"
+                  placeholderTextColor="#999"
                   editable={editingAccount}
                 />
               </View>
@@ -420,6 +422,7 @@ export default function ProfileScreen() {
                     value={accountInfo.middleName}
                     onChangeText={(value) => setAccountInfo(prev => ({ ...prev, middleName: value }))}
                     placeholder="Optional"
+                    placeholderTextColor="#999"
                     editable={editingAccount}
                   />
                 </View>
@@ -431,6 +434,7 @@ export default function ProfileScreen() {
                     value={accountInfo.suffix}
                     onChangeText={(value) => setAccountInfo(prev => ({ ...prev, suffix: value }))}
                     placeholder="Jr., Sr., III"
+                    placeholderTextColor="#999"
                     editable={editingAccount}
                   />
                 </View>
@@ -442,6 +446,7 @@ export default function ProfileScreen() {
                   style={[styles.input, styles.disabledInput]}
                   value={accountInfo.email}
                   placeholder="Enter email address"
+                  placeholderTextColor="#999"
                   keyboardType="email-address"
                   editable={false}
                 />
@@ -454,6 +459,7 @@ export default function ProfileScreen() {
                   value={accountInfo.phoneNumber}
                   onChangeText={(value) => setAccountInfo(prev => ({ ...prev, phoneNumber: value }))}
                   placeholder="Enter phone number"
+                  placeholderTextColor="#999"
                   keyboardType="phone-pad"
                   editable={editingAccount}
                 />
@@ -491,6 +497,7 @@ export default function ProfileScreen() {
                   value={passwordInfo.currentPassword}
                   onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, currentPassword: value }))}
                   placeholder="Enter current password"
+                  placeholderTextColor="#999"
                   secureTextEntry
                 />
               </View>
@@ -502,6 +509,7 @@ export default function ProfileScreen() {
                   value={passwordInfo.newPassword}
                   onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, newPassword: value }))}
                   placeholder="Enter new password"
+                  placeholderTextColor="#999"
                   secureTextEntry
                 />
               </View>
@@ -513,6 +521,7 @@ export default function ProfileScreen() {
                   value={passwordInfo.confirmPassword}
                   onChangeText={(value) => setPasswordInfo(prev => ({ ...prev, confirmPassword: value }))}
                   placeholder="Confirm new password"
+                  placeholderTextColor="#999"
                   secureTextEntry
                 />
               </View>
@@ -786,6 +795,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     fontFamily: 'SFProReg',
+    color: '#333',
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',

@@ -69,7 +69,7 @@ const Header = ({
   };
 
   return (
-    <View style={[styles.header, { backgroundColor, paddingTop: insets.top + moderateScale(10) }]}>
+    <View style={[styles.header, { backgroundColor, paddingTop: insets.top + moderateScale(20) }]}>
       {/* Left side: Back button or custom component */}
       <View style={styles.side}>
         {showBack ? (
@@ -125,8 +125,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: wp(5),
-    paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(20),
+    paddingVertical: moderateScale(25),
+    paddingBottom: moderateScale(25),
     gap: moderateScale(13),
     borderBottomLeftRadius: moderateScale(20),
     borderBottomRightRadius: moderateScale(20),
@@ -146,20 +146,31 @@ const styles = StyleSheet.create({
   notificationButton: {
     padding: moderateScale(8),
     position: 'relative',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: moderateScale(20),
+    width: moderateScale(44),
+    height: moderateScale(44),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   badgeContainer: {
     position: 'absolute',
-    top: moderateScale(4),
-    right: moderateScale(4),
-    backgroundColor: '#FF6B6B',
+    top: moderateScale(0),
+    right: moderateScale(0),
+    backgroundColor: '#FF3B30',
     borderRadius: moderateScale(10),
-    minWidth: moderateScale(18),
-    height: moderateScale(18),
-    paddingHorizontal: moderateScale(4),
+    minWidth: moderateScale(20),
+    height: moderateScale(20),
+    paddingHorizontal: moderateScale(5),
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#1C86FF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   badgeText: {
     color: '#fff',

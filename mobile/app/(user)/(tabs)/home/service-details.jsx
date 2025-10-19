@@ -21,6 +21,7 @@ import BookingConfirmationModal from '../home/BookingConfirmationModal';
 import Header from '@components/Header';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import { isBusinessOpen } from "@utils/businessHelpers";
 
 
 export default function ServiceDetailsScreen() {

@@ -155,6 +155,7 @@ export default function LoginScreen() {
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="Password"
+                  placeholderTextColor="#999"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!isPasswordVisible}
@@ -289,7 +290,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
-    fontFamily:"SFProReg"
+    fontFamily:"SFProReg",
+    color: "#333",
   },
   eyeButton: {
     padding: moderateScale(12),

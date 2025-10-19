@@ -24,9 +24,11 @@ import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 import { fetchCarouselServices, fetchNearbyServices } from "@services/api/serviceService";
+import apiClient from "@config/api";
 import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";
 import { getServiceCategoryIcon, renderStars, getDefaultCarouselImages } from "@utils/serviceHelpers";
+import { isBusinessOpen } from "@utils/businessHelpers";
 
 export default function HomeScreen() {
   // activeSlide shown to user: 0..n-1
@@ -35,6 +37,9 @@ export default function HomeScreen() {
   const [nearbyServices, setNearbyServices] = useState([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [location, setLocation] = useState(null);
+  const [featuredBusinesses, setFeaturedBusinesses] = useState([]);
+  const [loadingBusinesses, setLoadingBusinesses] = useState(true);
+  const [userName, setUserName] = useState('');
 
   // Carousel states
   const [carouselImages, setCarouselImages] = useState([]);
@@ -191,34 +196,62 @@ export default function HomeScreen() {
     })
   ).current;
 
-  // Services + nearby arrays (unchanged)
+  // Services categories array (expanded)
   const services = [
     {
       id: 1,
       title: "Veterinary",
       icon: require("@assets/images/service_icon/10.png"),
-      color: "#FF9B79",
+      color: "#FF6B6B",
       category: "veterinary",
     },
     {
       id: 2,
       title: "Grooming",
       icon: require("@assets/images/service_icon/11.png"),
-      color: "#FF9B79",
+      color: "#4ECDC4",
       category: "grooming",
     },
     {
       id: 3,
       title: "Boarding",
       icon: require("@assets/images/service_icon/12.png"),
-      color: "#FF9B79",
+      color: "#95E1D3",
       category: "boarding",
     },
     {
       id: 4,
-      title: "Delivery",
+      title: "Daycare",
       icon: require("@assets/images/service_icon/13.png"),
-      color: "#FF9B79",
+      color: "#FFD93D",
+      category: "daycare",
+    },
+    {
+      id: 5,
+      title: "Training",
+      icon: require("@assets/images/service_icon/10.png"),
+      color: "#6C5CE7",
+      category: "training",
+    },
+    {
+      id: 6,
+      title: "Emergency",
+      icon: require("@assets/images/service_icon/11.png"),
+      color: "#FF6348",
+      category: "emergency",
+    },
+    {
+      id: 7,
+      title: "Consultation",
+      icon: require("@assets/images/service_icon/12.png"),
+      color: "#74B9FF",
+      category: "consultation",
+    },
+    {
+      id: 8,
+      title: "Other",
+      icon: require("@assets/images/service_icon/13.png"),
+      color: "#A29BFE",
       category: "other",
     },
   ];
@@ -259,20 +292,98 @@ export default function HomeScreen() {
 
   // Fetch nearby services from API
   useEffect(() => {
+    let isMounted = true;
+
     const loadNearbyServices = async () => {
       try {
         setLoadingServices(true);
-        const services = await fetchNearbyServices(location, 10, 6);
-        setNearbyServices(services);
+        // First try to get nearby services with location
+        let services = await fetchNearbyServices(location, 10, 3);
+
+        // If we get less than 3 services, fetch more without strict location filter
+        if (services.length < 3) {
+          const response = await apiClient.get('/services', {
+            params: {
+              page: 1,
+              limit: 3,
+              sort: '-createdAt',
+            }
+          });
+
+          if (response.data && response.data.success) {
+            services = response.data.data || [];
+          }
+        }
+
+        // Only update state if component is still mounted
+        if (isMounted) {
+          // Display maximum 3 services, prioritizing nearest if location available
+          setNearbyServices(services.slice(0, 3));
+        }
       } catch (error) {
         console.error('Error fetching nearby services:', error);
+        if (isMounted) {
+          setNearbyServices([]);
+        }
       } finally {
-        setLoadingServices(false);
+        if (isMounted) {
+          setLoadingServices(false);
+        }
       }
     };
 
-    loadNearbyServices();
-  }, [location]);
+    // Only load if we haven't already loaded services or location changed significantly
+    if (nearbyServices.length === 0 || location) {
+      loadNearbyServices();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Remove location dependency to prevent frequent refreshes
+
+  // Fetch user profile for welcome message
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await apiClient.get('/users/profile');
+        if (response.data && response.data.data && response.data.data.user) {
+          setUserName(response.data.data.user.firstName || 'User');
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        setUserName('User');
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  // Fetch featured businesses
+  useEffect(() => {
+    const loadFeaturedBusinesses = async () => {
+      try {
+        setLoadingBusinesses(true);
+        const response = await apiClient.get('/businesses', {
+          params: {
+            page: 1,
+            limit: 3,
+            sort: '-averageRating',
+          }
+        });
+
+        if (response.data && response.data.success) {
+          setFeaturedBusinesses(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching featured businesses:', error);
+      } finally {
+        setLoadingBusinesses(false);
+      }
+    };
+
+    loadFeaturedBusinesses();
+  }, []);
 
   const handleServicePress = (service) => {
     // Check if profile is complete before allowing access
@@ -325,6 +436,20 @@ export default function HomeScreen() {
     });
   };
 
+  const handleBusinessPress = (business) => {
+    // Check if profile is complete before allowing access
+    if (!isProfileComplete) {
+      setShowProfileIncompleteModal(true);
+      return;
+    }
+    router.push({
+      pathname: 'home/business-details',
+      params: {
+        id: business._id,
+      },
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <SearchHeader
@@ -339,6 +464,13 @@ export default function HomeScreen() {
       >
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.mainContent}>
+            {/* Welcome Message */}
+            <View style={styles.welcomeContainer}>
+              <Text style={styles.welcomeText}>
+                Welcome back, <Text style={styles.welcomeName}>{userName || 'User'}!</Text>
+              </Text>
+            </View>
+
             {/* Featured Carousel */}
             <View style={styles.featuredCard} {...panResponder.panHandlers}>
               <Animated.View
@@ -385,8 +517,16 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Services Grid */}
-            <View style={styles.servicesGrid}>
+            {/* Categories Label */}
+            <Text style={styles.categoriesLabel}>Browse by Categories</Text>
+
+            {/* Services Horizontal Scroll */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.servicesScrollContent}
+              style={styles.servicesScroll}
+            >
               {services.map((service) => (
                 <TouchableOpacity
                   key={service.id}
@@ -404,10 +544,15 @@ export default function HomeScreen() {
                   <Text style={styles.serviceTitle}>{service.title}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
-            {/* Nearby Services Title */}
-            <Text style={styles.sectionTitle}>Nearby Services</Text>
+            {/* Nearby Services Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Nearby Services</Text>
+              <TouchableOpacity onPress={() => router.push('/(user)/(tabs)/services')}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Nearby Services Grid */}
             {loadingServices ? (
@@ -422,7 +567,7 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View style={styles.nearbyGrid}>
-                {nearbyServices.slice(0, 3).map((service) => (
+                {nearbyServices.map((service) => (
                   <TouchableOpacity
                     key={service._id}
                     style={styles.nearbyCardWrapper}
@@ -441,6 +586,67 @@ export default function HomeScreen() {
                       {service.rating && (
                         <View style={styles.nearbyStarsContainer}>
                           {renderStars(service.rating)}
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Featured Business Section */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Featured Business</Text>
+              <TouchableOpacity onPress={() => router.push('/(user)/(tabs)/home/businesses')}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingBusinesses ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Loading featured businesses...</Text>
+              </View>
+            ) : featuredBusinesses.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="business-outline" size={moderateScale(48)} color="#ccc" />
+                <Text style={styles.emptyText}>No featured businesses found</Text>
+                <Text style={styles.emptySubtext}>Check back later for featured businesses</Text>
+              </View>
+            ) : (
+              <View style={styles.featuredBusinessGrid}>
+                {featuredBusinesses.map((business) => (
+                  <TouchableOpacity
+                    key={business._id}
+                    style={styles.businessCardWrapper}
+                    onPress={() => handleBusinessPress(business)}
+                  >
+                    <View style={styles.businessCard}>
+                      <View style={styles.businessImageContainer}>
+                        <Image
+                          source={
+                            business.images?.logo
+                              ? { uri: business.images.logo }
+                              : require("@assets/images/serviceimages/18.png")
+                          }
+                          style={styles.businessImage}
+                        />
+                        {business.businessHours && (() => {
+                          const { isOpen, status } = isBusinessOpen(business.businessHours);
+                          return (
+                            <View style={[styles.businessStatusBadge, isOpen ? styles.businessStatusOpen : styles.businessStatusClosed]}>
+                              <Text style={styles.businessStatusText}>{status}</Text>
+                            </View>
+                          );
+                        })()}
+                      </View>
+                    </View>
+                    <View style={styles.businessCardInfo}>
+                      <Text style={styles.businessName} numberOfLines={2}>
+                        {business.businessName}
+                      </Text>
+                      {business.averageRating && (
+                        <View style={styles.businessStarsContainer}>
+                          {renderStars(business.averageRating)}
                         </View>
                       )}
                     </View>
@@ -475,12 +681,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(4),
     paddingBottom: moderateScale(20),
   },
+  welcomeContainer: {
+    width: "100%",
+    paddingVertical: moderateScale(15),
+    paddingHorizontal: 0,
+  },
+  welcomeText: {
+    fontSize: scaleFontSize(20),
+    color: "#666",
+    fontFamily: "SFProReg",
+  },
+  welcomeName: {
+    fontSize: scaleFontSize(20),
+    fontWeight: "bold",
+    color: "#1C86FF",
+    fontFamily: "SFProBold",
+  },
+  categoriesLabel: {
+    fontSize: scaleFontSize(20),
+    fontWeight: "bold",
+    color: "#1C86FF",
+    fontFamily: "SFProBold",
+    alignSelf: "flex-start",
+    marginBottom: moderateScale(12),
+    marginTop: moderateScale(10),
+  },
+  servicesScroll: {
+    width: "100%",
+    marginBottom: moderateScale(20),
+  },
+  servicesScrollContent: {
+    paddingRight: wp(4),
+    gap: moderateScale(12),
+  },
   featuredCard: {
     position: "relative",
     height: hp(28),
     width: "100%",
-    marginTop: moderateScale(20),
-    marginBottom: moderateScale(30),
+    marginTop: moderateScale(5),
+    marginBottom: moderateScale(15),
     overflow: "hidden",
   },
   carouselSlide: {
@@ -532,49 +771,64 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     width: moderateScale(24),
   },
-  servicesGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginBottom: moderateScale(15),
-  },
   serviceCard: {
     alignItems: "center",
-    flex: 1,
+    marginRight: moderateScale(8),
+    width: moderateScale(75),
   },
   serviceIconContainer: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(15),
+    width: moderateScale(65),
+    height: moderateScale(65),
+    borderRadius: moderateScale(16),
     justifyContent: "center",
     alignItems: "center",
     marginBottom: moderateScale(8),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   serviceIcon: {
-    width: moderateScale(30),
-    height: moderateScale(30),
+    width: moderateScale(32),
+    height: moderateScale(32),
     tintColor: "#fff",
   },
   serviceTitle: {
-    fontSize: scaleFontSize(12),
+    fontSize: scaleFontSize(11),
     color: "#333",
     textAlign: "center",
-    fontWeight: "500",
+    fontWeight: "600",
+    lineHeight: scaleFontSize(14),
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+    marginBottom: moderateScale(15),
+    marginTop: moderateScale(10),
   },
   sectionTitle: {
-    fontSize: scaleFontSize(30),
+    fontSize: scaleFontSize(18),
     fontFamily: "SFProBold",
     color: "#1C86FF",
-    textAlign: "center",
+  },
+  viewAllText: {
+    fontSize: scaleFontSize(14),
+    color: "#1C86FF",
+    fontFamily: "SFProSB",
   },
   nearbyGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     width: "100%",
     gap: moderateScale(10),
   },
   nearbyCardWrapper: {
-    flex: 1,
+    width: "31%",
+    marginBottom: moderateScale(10),
   },
   nearbyCard: {
     backgroundColor: "#fff",
@@ -743,5 +997,70 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: '#4CAF50',
     fontWeight: '600',
+  },
+  featuredBusinessGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: moderateScale(10),
+    marginBottom: moderateScale(20),
+  },
+  businessCardWrapper: {
+    width: "31%",
+    marginBottom: moderateScale(10),
+  },
+  businessCard: {
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    borderWidth: 2,
+    borderColor: "#1C86FF",
+    overflow: "hidden",
+    height: hp(18),
+  },
+  businessImageContainer: {
+    flex: 1,
+    width: "100%",
+  },
+  businessImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  businessCardInfo: {
+    backgroundColor: "transparent",
+    paddingTop: moderateScale(8),
+    alignItems: "center",
+  },
+  businessName: {
+    fontSize: scaleFontSize(13),
+    fontWeight: "600",
+    color: "#1C86FF",
+    textAlign: "center",
+    marginBottom: moderateScale(4),
+  },
+  businessStarsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: moderateScale(2),
+  },
+  businessStatusBadge: {
+    position: "absolute",
+    top: moderateScale(8),
+    right: moderateScale(8),
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+  },
+  businessStatusOpen: {
+    backgroundColor: "#4CAF50",
+  },
+  businessStatusClosed: {
+    backgroundColor: "#F44336",
+  },
+  businessStatusText: {
+    color: "#fff",
+    fontSize: scaleFontSize(10),
+    fontWeight: "600",
   },
 });

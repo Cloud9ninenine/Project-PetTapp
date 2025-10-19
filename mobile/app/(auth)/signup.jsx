@@ -202,6 +202,7 @@ export default function SignUpScreen() {
                   if (errors.password) setErrors((p) => ({ ...p, password: "" }));
                 }}
                 placeholder="Enter your password"
+                placeholderTextColor="#999"
                 secureTextEntry={!showPassword}
                 style={styles.passwordInput}
               />
@@ -221,6 +222,7 @@ export default function SignUpScreen() {
                   if (errors.confirmPassword) setErrors((p) => ({ ...p, confirmPassword: "" }));
                 }}
                 placeholder="Re-enter your password"
+                placeholderTextColor="#999"
                 secureTextEntry={!showConfirm}
                 style={styles.passwordInput}
               />
@@ -349,6 +351,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(3),
     paddingVertical: hp(1.5),
     fontSize: scaleFontSize(18),
+    color: "#333",
   },
 
   eyeWrap: {

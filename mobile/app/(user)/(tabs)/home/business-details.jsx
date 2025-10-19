@@ -19,6 +19,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import Header from '@components/Header';
+import { isBusinessOpen } from "@utils/businessHelpers";
 
 export default function BusinessDetailsScreen() {
   const router = useRouter();
@@ -94,6 +96,20 @@ export default function BusinessDetailsScreen() {
     fetchBusinessData();
   }, [params.id]);
 
+  // Debug: Log business data when it changes
+  useEffect(() => {
+    if (businessData) {
+      console.log('Business Data:', {
+        hasLocation: !!businessData.location,
+        hasCoordinates: !!businessData.location?.coordinates,
+        hasLatLong: !!(businessData.latitude && businessData.longitude),
+        locationData: businessData.location,
+        latitude: businessData.latitude,
+        longitude: businessData.longitude
+      });
+    }
+  }, [businessData]);
+
   const renderStars = (rating) => {
     const stars = [];
     const safeRating = rating && !isNaN(rating) ? rating : 0;
@@ -130,6 +146,52 @@ export default function BusinessDetailsScreen() {
       pathname: '/(user)/(tabs)/home/service-details',
       params: { id: service._id }
     });
+  };
+
+  const handleViewOnMap = () => {
+    // Check multiple possible location field structures
+    let latitude = null;
+    let longitude = null;
+
+    // Primary: Check for address.coordinates.latitude/longitude (as per backend schema)
+    if (businessData?.address?.coordinates?.latitude && businessData?.address?.coordinates?.longitude) {
+      latitude = businessData.address.coordinates.latitude;
+      longitude = businessData.address.coordinates.longitude;
+    }
+    // Check for location.coordinates [longitude, latitude] format (GeoJSON)
+    else if (businessData?.location?.coordinates && Array.isArray(businessData.location.coordinates)) {
+      [longitude, latitude] = businessData.location.coordinates;
+    }
+    // Check for separate latitude/longitude fields
+    else if (businessData?.latitude && businessData?.longitude) {
+      latitude = businessData.latitude;
+      longitude = businessData.longitude;
+    }
+    // Check for nested location fields
+    else if (businessData?.location?.latitude && businessData?.location?.longitude) {
+      latitude = businessData.location.latitude;
+      longitude = businessData.location.longitude;
+    }
+
+    if (latitude && longitude) {
+      console.log('Navigating to map with:', { latitude, longitude });
+      router.push({
+        pathname: '/(user)/(tabs)/home/business-map',
+        params: {
+          latitude: latitude.toString(),
+          longitude: longitude.toString(),
+          businessName: businessData.businessName || 'Business Location'
+        }
+      });
+    } else {
+      console.log('Business data structure:', {
+        hasAddress: !!businessData?.address,
+        hasAddressCoordinates: !!businessData?.address?.coordinates,
+        addressCoordinates: businessData?.address?.coordinates,
+        location: businessData?.location
+      });
+      Alert.alert('Location Not Available', 'This business has not set their location coordinates.');
+    }
   };
 
   const renderServiceItem = ({ item }) => (
@@ -254,6 +316,12 @@ export default function BusinessDetailsScreen() {
                   )}
                 </View>
               </View>
+
+              {/* See it on map button - always show if address exists */}
+              <TouchableOpacity style={styles.mapButton} onPress={handleViewOnMap}>
+                <Ionicons name="map" size={moderateScale(20)} color="#fff" />
+                <Text style={styles.mapButtonText}>See it on map</Text>
+              </TouchableOpacity>
             </>
           )}
 
@@ -368,14 +436,7 @@ export default function BusinessDetailsScreen() {
         resizeMode="repeat"
       />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#1C86FF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Business Details</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <Header title="Business Details" showBack={true} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -432,6 +493,17 @@ export default function BusinessDetailsScreen() {
                 <Text style={styles.verifiedText}>Verified Business</Text>
               </View>
             )}
+
+            {/* Business Status */}
+            {businessData.businessHours && (() => {
+              const { isOpen, status } = isBusinessOpen(businessData.businessHours);
+              return (
+                <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
+                  <View style={[styles.statusDot, isOpen ? styles.dotOpen : styles.dotClosed]} />
+                  <Text style={styles.statusText}>{status} Today</Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
 
@@ -489,33 +561,6 @@ const styles = StyleSheet.create({
   backgroundImageStyle: { opacity: 0.08 },
   scrollView: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(5),
-    paddingVertical: moderateScale(15),
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  backButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: scaleFontSize(18),
-    fontWeight: 'bold',
-    color: '#333',
-    fontFamily: 'SFProBold',
-  },
-  headerSpacer: {
-    width: moderateScale(40),
   },
   businessHeaderCard: {
     backgroundColor: '#fff',
@@ -868,5 +913,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1C86FF',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(10),
+    marginTop: moderateScale(10),
+    gap: moderateScale(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    fontFamily: 'SFProSB',
   },
 });

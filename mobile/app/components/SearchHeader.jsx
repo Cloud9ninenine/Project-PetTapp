@@ -266,7 +266,7 @@
 
     return (
       <View style={styles.wrapper}>
-        <View style={[styles.container, { paddingTop: insets.top + moderateScale(15) }]}>
+        <View style={[styles.container, { paddingTop: insets.top + moderateScale(25) }]}>
           {/* Search bar */}
           <View style={styles.searchContainer}>
             <Ionicons name="search-outline" size={moderateScale(20)} color="#A0AEC0" />
@@ -292,7 +292,7 @@
 
           {/* Notification bell */}
           <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
-            <Ionicons name="notifications-outline" size={moderateScale(22)} color="#1E90FF" />
+            <Ionicons name="notifications-outline" size={moderateScale(26)} color="#fff" />
             {showNotificationBadge && unreadCount > 0 && (
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>
@@ -340,7 +340,7 @@
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: wp(5),
-      paddingBottom: moderateScale(15),
+      paddingBottom: moderateScale(25),
       borderBottomRightRadius: moderateScale(10),
       borderBottomLeftRadius: moderateScale(10),
     },
@@ -352,7 +352,7 @@
       borderRadius: moderateScale(10),
       paddingHorizontal: moderateScale(15),
       marginRight: moderateScale(10),
-      height: moderateScale(50),
+      height: moderateScale(55),
     },
     searchInput: {
       flex: 1,
@@ -364,26 +364,33 @@
       marginRight: moderateScale(8),
     },
     bellContainer: {
-      backgroundColor: "#fff",
-      borderRadius: moderateScale(20),
       padding: moderateScale(8),
-      justifyContent: "center",
-      alignItems: "center",
       position: 'relative',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: moderateScale(20),
+      width: moderateScale(44),
+      height: moderateScale(44),
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     badgeContainer: {
       position: 'absolute',
-      top: moderateScale(4),
-      right: moderateScale(4),
-      backgroundColor: '#FF6B6B',
+      top: moderateScale(0),
+      right: moderateScale(0),
+      backgroundColor: '#FF3B30',
       borderRadius: moderateScale(10),
-      minWidth: moderateScale(18),
-      height: moderateScale(18),
-      paddingHorizontal: moderateScale(4),
+      minWidth: moderateScale(20),
+      height: moderateScale(20),
+      paddingHorizontal: moderateScale(5),
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 2,
-      borderColor: '#fff',
+      borderColor: '#1E90FF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 5,
     },
     badgeText: {
       color: '#fff',

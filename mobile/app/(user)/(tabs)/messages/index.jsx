@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
-export default function CustomerMessagesScreen() {
+export default function MessagesScreen() {
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText}>Messages</Text>
@@ -35,8 +35,8 @@ export default function CustomerMessagesScreen() {
         <View style={styles.iconContainer}>
           <Ionicons name="chatbubbles" size={moderateScale(80)} color="#1C86FF" />
         </View>
-        <Text style={styles.title}>Customer Messages</Text>
-        <Text style={styles.subtitle}>Chat with your customers</Text>
+        <Text style={styles.title}>Messages</Text>
+        <Text style={styles.subtitle}>Chat with pet service providers</Text>
         <Text style={styles.comingSoon}>Coming Soon</Text>
       </View>
     </SafeAreaView>

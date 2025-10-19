@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,11 +40,16 @@ const Bookings = () => {
     total: 0,
     pages: 0,
   });
-  const [selectedStatus, setSelectedStatus] = useState('active'); // active, all, pending, confirmed, in-progress, completed, cancelled
+  const [selectedStatus, setSelectedStatus] = useState('all'); // active, all, pending, confirmed, in-progress, completed, cancelled
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  // Search state
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  const abortControllerRef = useRef(null);
+
   // Fetch bookings from API
-  const fetchBookings = useCallback(async (page = 1, status = selectedStatus, isRefresh = false, isLoadMore = false) => {
+  const fetchBookings = useCallback(async (page = 1, status = selectedStatus, isRefresh = false, isLoadMore = false, searchQuery = '') => {
     try {
       if (isRefresh) {
         setIsRefreshing(true);
@@ -59,6 +65,11 @@ const Bookings = () => {
         sort: '-appointmentDateTime', // Sort by appointment date descending (most recent/upcoming first)
       };
 
+      // Add search query if provided
+      if (searchQuery && searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+
       // Handle special filter statuses
       if (status === 'active') {
         // Active bookings: pending, confirmed, in-progress
@@ -72,6 +83,15 @@ const Bookings = () => {
 
       if (response.data.success) {
         const newBookings = response.data.data || [];
+
+        // Debug: Log booking data to check serviceId structure
+        if (newBookings.length > 0) {
+          console.log('📋 First booking data:', {
+            serviceId: newBookings[0].serviceId,
+            hasImageUrl: !!newBookings[0].serviceId?.imageUrl,
+            category: newBookings[0].serviceId?.category
+          });
+        }
 
         // If loading more, append to existing bookings
         if (isLoadMore && page > 1) {
@@ -107,19 +127,40 @@ const Bookings = () => {
     }
   }, [isProfileComplete]);
 
-  // Filter bookings by search text
-  const filteredBookings = bookings.filter(booking => {
-    if (!searchText) return true;
+  // Debounced search effect
+  useEffect(() => {
+    // Cancel previous request if it exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-    const searchLower = searchText.toLowerCase();
-    const serviceName = booking.serviceId?.name?.toLowerCase() || '';
-    const businessName = booking.businessId?.businessName?.toLowerCase() || '';
-    const petName = booking.petId?.name?.toLowerCase() || '';
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
 
-    return serviceName.includes(searchLower) ||
-           businessName.includes(searchLower) ||
-           petName.includes(searchLower);
-  });
+    if (searchText.trim().length >= 2) {
+      setIsSearching(true);
+      searchTimeoutRef.current = setTimeout(() => {
+        console.log('🔍 Searching bookings for:', searchText.trim());
+        fetchBookings(1, selectedStatus, false, false, searchText.trim());
+        setIsSearching(false);
+      }, 300);
+    } else if (searchText.trim().length === 0) {
+      // Reset to show all bookings when search is cleared
+      fetchBookings(1, selectedStatus, false, false, '');
+      setIsSearching(false);
+    }
+
+    return () => {
+      // Cleanup: cancel pending requests and clear timeout
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchText, selectedStatus]);
 
   // Handle refresh
   const handleRefresh = () => {
@@ -168,23 +209,60 @@ const Bookings = () => {
     }
   };
 
-  // Get icon based on service category or default
-  const getServiceIcon = (serviceId) => {
+  // Get service image based on category
+  const getServiceImage = (serviceId) => {
+    const category = serviceId?.category?.toLowerCase();
+
+    // First check if service has an imageUrl
+    if (serviceId?.imageUrl) {
+      return { uri: serviceId.imageUrl };
+    }
+
+    // Otherwise return category-based image
+    switch (category) {
+      case 'veterinary':
+        return require('@assets/images/service_icon/10.png');
+      case 'grooming':
+        return require('@assets/images/service_icon/11.png');
+      case 'boarding':
+        return require('@assets/images/service_icon/12.png');
+      case 'daycare':
+        return require('@assets/images/service_icon/13.png');
+      case 'training':
+        return require('@assets/images/service_icon/10.png');
+      case 'emergency':
+        return require('@assets/images/service_icon/11.png');
+      case 'consultation':
+        return require('@assets/images/service_icon/12.png');
+      case 'other':
+        return require('@assets/images/service_icon/13.png');
+      default:
+        return require('@assets/images/service_icon/10.png');
+    }
+  };
+
+  // Get background color based on service category
+  const getServiceColor = (serviceId) => {
     const category = serviceId?.category?.toLowerCase();
     switch (category) {
       case 'veterinary':
-        return 'medical-outline';
+        return '#FF6B6B';
       case 'grooming':
-        return 'cut-outline';
+        return '#4ECDC4';
       case 'boarding':
+        return '#95E1D3';
       case 'daycare':
-        return 'home-outline';
+        return '#FFD93D';
       case 'training':
-        return 'school-outline';
+        return '#6C5CE7';
       case 'emergency':
-        return 'alert-circle-outline';
+        return '#FF6348';
+      case 'consultation':
+        return '#74B9FF';
+      case 'other':
+        return '#A29BFE';
       default:
-        return 'paw-outline';
+        return '#1C86FF';
     }
   };
 
@@ -234,9 +312,13 @@ const Bookings = () => {
         }
       })}
     >
-      {/* Icon inside circle */}
-      <View style={styles.circlePlaceholder}>
-        <Ionicons name={getServiceIcon(item.serviceId)} size={hp(4)} color="#1C86FF" />
+      {/* Service Image inside colored circle */}
+      <View style={[styles.circlePlaceholder, { backgroundColor: getServiceColor(item.serviceId) }]}>
+        <Image
+          source={getServiceImage(item.serviceId)}
+          style={styles.serviceIconImage}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Details */}
@@ -268,8 +350,8 @@ const Bookings = () => {
 
   // Status filter chips
   const statusFilters = [
-    { value: 'active', label: 'Active', icon: 'time-outline' },
     { value: 'all', label: 'All', icon: 'list-outline' },
+    { value: 'active', label: 'Active', icon: 'time-outline' },
     { value: 'pending', label: 'Pending', icon: 'hourglass-outline' },
     { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
     { value: 'in-progress', label: 'In Progress', icon: 'play-circle-outline' },
@@ -390,6 +472,14 @@ const Bookings = () => {
           value={searchText}
           onChangeText={setSearchText}
         />
+        {isSearching && (
+          <ActivityIndicator size="small" color="#1C86FF" style={styles.searchLoader} />
+        )}
+        {searchText.length > 0 && !isSearching && (
+          <TouchableOpacity onPress={() => setSearchText('')}>
+            <Ionicons name="close-circle" size={moderateScale(20)} color="#C7C7CC" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Status Filter */}
@@ -404,7 +494,7 @@ const Bookings = () => {
       ) : (
         /* List */
         <FlatList
-          data={filteredBookings}
+          data={bookings}
           renderItem={renderScheduleItem}
           keyExtractor={(item) => item._id}
           showsVerticalScrollIndicator={false}
@@ -474,6 +564,9 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(10),
     color: '#333',
   },
+  searchLoader: {
+    marginRight: moderateScale(8),
+  },
   listContent: {
     paddingHorizontal: wp(4),
     paddingBottom: moderateScale(20),
@@ -493,10 +586,19 @@ const styles = StyleSheet.create({
     width: hp(9),
     height: hp(9),
     borderRadius: hp(4.5),
-    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: moderateScale(15),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  serviceIconImage: {
+    width: hp(5),
+    height: hp(5),
+    tintColor: '#fff',
   },
   scheduleDetails: {
     flex: 1,
