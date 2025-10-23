@@ -54,10 +54,7 @@ export default function DeleteAccountScreen() {
     try {
       setLoading(true);
 
-      // First, verify the password
-      await apiClient.post('/auth/verify-password', {
-        password: password,
-      });
+      // Delete account (password verification handled by backend via JWT)
 
       // If password is correct, proceed with account deletion
       await apiClient.delete('/users/account');

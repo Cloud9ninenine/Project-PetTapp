@@ -213,21 +213,12 @@ const Bookings = () => {
   const getServiceImage = (serviceId) => {
     const category = serviceId?.category?.toLowerCase();
 
-    // First check if service has images array (from backend)
-    if (serviceId?.images && Array.isArray(serviceId.images) && serviceId.images.length > 0) {
-      // Find the primary image or use the first one
-      const primaryImage = serviceId.images.find(img => img.isPrimary) || serviceId.images[0];
-      if (primaryImage?.url) {
-        return { uri: primaryImage.url };
-      }
-    }
-
-    // Check for direct imageUrl property (fallback)
+    // First check if service has an imageUrl
     if (serviceId?.imageUrl) {
       return { uri: serviceId.imageUrl };
     }
 
-    // Otherwise return category-based fallback image
+    // Otherwise return category-based image
     switch (category) {
       case 'veterinary':
         return require('@assets/images/service_icon/10.png');
@@ -326,7 +317,7 @@ const Bookings = () => {
         <Image
           source={getServiceImage(item.serviceId)}
           style={styles.serviceIconImage}
-          resizeMode="cover"
+          resizeMode="contain"
         />
       </View>
 
@@ -607,7 +598,7 @@ const styles = StyleSheet.create({
   serviceIconImage: {
     width: hp(5),
     height: hp(5),
-    borderRadius: hp(2.5),
+    tintColor: '#fff',
   },
   scheduleDetails: {
     flex: 1,

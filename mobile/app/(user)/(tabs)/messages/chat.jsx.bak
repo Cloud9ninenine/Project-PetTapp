@@ -23,9 +23,7 @@ import {
   sendMessage,
   markMessagesAsRead,
   getConversationDetails,
-  getFirebaseAuthToken,
 } from '@utils/messageService';
-import { signInWithBackendToken } from '@config/firebase';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
@@ -44,76 +42,55 @@ export default function ChatScreen() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState('');
   const [currentUserImage, setCurrentUserImage] = useState('');
-  const [firebaseAuthenticated, setFirebaseAuthenticated] = useState(false);
 
   useEffect(() => {
-    let unsubscribe = null;
-
-    const initializeChat = async () => {
-      try {
-        const [userId, userData] = await AsyncStorage.multiGet([
-          'userId',
-          'userData',
-        ]);
-
-        const uid = userId[1];
-        setCurrentUserId(uid);
-
-        if (userData[1]) {
-          const user = JSON.parse(userData[1]);
-          setCurrentUserName(`${user.firstName || ''} ${user.lastName || ''}`.trim());
-          setCurrentUserImage(user.images?.profile || '');
-        }
-
-        // Initialize Firebase authentication first
-        try {
-          const firebaseToken = await getFirebaseAuthToken();
-          await signInWithBackendToken(firebaseToken);
-          setFirebaseAuthenticated(true);
-        } catch (firebaseError) {
-          console.error('Error initializing Firebase auth:', firebaseError);
-          setLoading(false);
-          Alert.alert(
-            'Authentication Error',
-            'Could not connect to messaging service. Please try again later.'
-          );
-          return;
-        }
-
-        // Mark messages as read
-        if (conversationId) {
-          await markMessagesAsRead(conversationId, uid);
-        }
-
-        // Subscribe to real-time messages
-        unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
-          setMessages(newMessages);
-          setLoading(false);
-
-          // Auto-scroll to bottom
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 100);
-        });
-      } catch (error) {
-        console.error('Error initializing chat:', error);
-        setLoading(false);
-        Alert.alert('Error', 'Could not load messages. Please try again.');
-      }
-    };
-
     initializeChat();
-
-    // Cleanup function
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
   }, []);
 
+  const initializeChat = async () => {
+    try {
+      const [userId, userData] = await AsyncStorage.multiGet([
+        'userId',
+        'userData',
+      ]);
+
+      const uid = userId[1];
+      setCurrentUserId(uid);
+
+      if (userData[1]) {
+        const user = JSON.parse(userData[1]);
+        setCurrentUserName(`${user.firstName || ''} ${user.lastName || ''}`.trim());
+        setCurrentUserImage(user.images?.profile || '');
+      }
+
+      // Mark messages as read
+      if (conversationId) {
+        await markMessagesAsRead(conversationId, uid);
+      }
+
+      // Subscribe to real-time messages
+      const unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
+        setMessages(newMessages);
+        setLoading(false);
+
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      });
+
+      return () => {
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error initializing chat:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Could not load messages. Please try again.');
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (messageText.trim() === '' || sendingMessage || !firebaseAuthenticated) return;
+    if (messageText.trim() === '' || sendingMessage) return;
 
     const textToSend = messageText.trim();
     setMessageText('');
@@ -355,10 +332,10 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (!messageText.trim() || sendingMessage || !firebaseAuthenticated) && styles.sendButtonDisabled,
+              (!messageText.trim() || sendingMessage) && styles.sendButtonDisabled,
             ]}
             onPress={handleSendMessage}
-            disabled={!messageText.trim() || sendingMessage || !firebaseAuthenticated}
+            disabled={!messageText.trim() || sendingMessage}
           >
             {sendingMessage ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -366,7 +343,7 @@ export default function ChatScreen() {
               <Ionicons
                 name="send"
                 size={moderateScale(20)}
-                color={messageText.trim() && firebaseAuthenticated ? '#fff' : '#999'}
+                color={messageText.trim() ? '#fff' : '#999'}
               />
             )}
           </TouchableOpacity>

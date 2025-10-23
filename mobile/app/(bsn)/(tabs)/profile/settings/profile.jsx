@@ -148,7 +148,7 @@ export default function ProfileScreen() {
           type,
         });
 
-        await apiClient.post('/files/users/profile', imageFormData, {
+        await apiClient.post('/api/files/users/profile', imageFormData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }

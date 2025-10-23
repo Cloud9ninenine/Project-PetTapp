@@ -28,11 +28,11 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
     // 4. Refresh cached data
     // etc.
 
-    console.log('Background task completed successfully');
-    return BackgroundFetch.BackgroundFetchResult.NewData;
+  console.log('Background task completed successfully');
+  return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {
     console.error('Background task error:', error);
-    return BackgroundFetch.BackgroundFetch Result.Failed;
+    return BackgroundFetch.BackgroundFetchResult.Failed;
   }
 });
 

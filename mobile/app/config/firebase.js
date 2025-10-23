@@ -1,15 +1,17 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import Constants from 'expo-constants';
 
 // Firebase configuration from environment variables
+// In Expo/React Native, environment variables from .env are accessed via Constants.expoConfig.extra
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyCHLZaEuwJZqJWkKh2N7tCTkGYyJaeGbf4",
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "pettapp-73df7.firebaseapp.com",
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "pettapp-73df7",
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "pettapp-73df7.firebasestorage.app",
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "7963028027",
-  appId: process.env.VITE_FIREBASE_APP_ID || "1:7963028027:web:89ecaca1bd8808b8fe4a1e"
+  apiKey: Constants.expoConfig?.extra?.VITE_FIREBASE_API_KEY || "AIzaSyCHLZaEuwJZqJWkKh2N7tCTkGYyJaeGbf4",
+  authDomain: Constants.expoConfig?.extra?.VITE_FIREBASE_AUTH_DOMAIN || "pettapp-73df7.firebaseapp.com",
+  projectId: Constants.expoConfig?.extra?.VITE_FIREBASE_PROJECT_ID || "pettapp-73df7",
+  storageBucket: Constants.expoConfig?.extra?.VITE_FIREBASE_STORAGE_BUCKET || "pettapp-73df7.firebasestorage.app",
+  messagingSenderId: Constants.expoConfig?.extra?.VITE_FIREBASE_MESSAGING_SENDER_ID || "7963028027",
+  appId: Constants.expoConfig?.extra?.VITE_FIREBASE_APP_ID || "1:7963028027:web:89ecaca1bd8808b8fe4a1e"
 };
 
 // Initialize Firebase only if it hasn't been initialized

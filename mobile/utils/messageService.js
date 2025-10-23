@@ -22,7 +22,7 @@ import apiClient from '@config/api';
  */
 export const getFirebaseAuthToken = async () => {
   try {
-    const response = await apiClient.post('/messages/token');
+    const response = await apiClient.post('/api/messages/token');
     if (response.data.success) {
       return response.data.data.token;
     }
@@ -56,7 +56,7 @@ export const createConversation = async (recipientId, bookingId = null) => {
       body.bookingId = bookingId;
     }
 
-    const response = await apiClient.post('/messages/conversations', body);
+    const response = await apiClient.post('/api/messages/conversations', body);
     if (response.data.success) {
       return response.data.data;
     }
@@ -73,7 +73,7 @@ export const createConversation = async (recipientId, bookingId = null) => {
  */
 export const getUserConversations = async () => {
   try {
-    const response = await apiClient.get('/messages/conversations');
+    const response = await apiClient.get('/api/messages/conversations');
     if (response.data.success) {
       return response.data.data;
     }
@@ -91,7 +91,7 @@ export const getUserConversations = async () => {
  */
 export const getBusinessOwnerId = async (businessId) => {
   try {
-    const response = await apiClient.get(`/messages/business/${businessId}/owner`);
+    const response = await apiClient.get(`/api/messages/business/${businessId}/owner`);
     if (response.data.success) {
       return response.data.data.ownerId;
     }
