@@ -34,12 +34,40 @@ export const getFirebaseAuthToken = async () => {
 };
 
 /**
+ * Refresh conversation participant details
+ * Calls backend to update user info across all conversations
+ * @returns {Promise<boolean>} Success status
+ */
+export const refreshConversationParticipants = async () => {
+  try {
+    const response = await apiClient.post('/api/messages/refresh-participants');
+    return response.data.success;
+  } catch (error) {
+    console.error('Error refreshing conversation participants:', error);
+    return false;
+  }
+};
+
+/**
+ * Convert user ID to Firebase UID format
+ * CRITICAL: Must match backend format (pettapp_userId)
+ * @param {string} userId - The user's ID
+ * @returns {string} Firebase UID
+ */
+export const toFirebaseUid = (userId) => {
+  return `pettapp_${userId}`;
+};
+
+/**
  * Get conversation ID with another user
+ * CRITICAL: Uses Firebase UID format to match backend
  * @param {string} userId - The other user's ID
  * @returns {Promise<string>} Conversation ID
  */
 export const getConversationId = (currentUserId, otherUserId) => {
-  const participants = [currentUserId, otherUserId].sort();
+  const firebaseUid1 = toFirebaseUid(currentUserId);
+  const firebaseUid2 = toFirebaseUid(otherUserId);
+  const participants = [firebaseUid1, firebaseUid2].sort();
   return `${participants[0]}_${participants[1]}`;
 };
 
@@ -105,28 +133,31 @@ export const getBusinessOwnerId = async (businessId) => {
 /**
  * Send a message in a conversation
  * @param {string} conversationId - Conversation ID
- * @param {string} senderId - Sender user ID
+ * @param {string} senderId - Sender user ID (will be converted to Firebase UID)
  * @param {string} messageText - Message content
  * @param {object} senderInfo - Sender information (name, image, etc.)
  * @returns {Promise<object>} Created message
  */
 export const sendMessage = async (conversationId, senderId, messageText, senderInfo = {}) => {
   try {
+    const firebaseUid = toFirebaseUid(senderId);
+
     console.log('=== SENDING MESSAGE DEBUG ===');
     console.log('Conversation ID:', conversationId);
     console.log('Sender ID:', senderId);
+    console.log('Firebase UID:', firebaseUid);
     console.log('Message:', messageText);
     console.log('============================');
 
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
     const messageData = {
-      senderId,
+      senderId: firebaseUid, // Use Firebase UID format
       senderName: senderInfo.name || 'Unknown',
       senderImage: senderInfo.image || null,
-      message: messageText,
+      text: messageText, // FIXED: Use 'text' instead of 'message' to match Firestore
       messageType: 'text',
-      createdAt: serverTimestamp(),
+      timestamp: serverTimestamp(), // FIXED: Use 'timestamp' instead of 'createdAt'
       isRead: false,
     };
 
@@ -136,18 +167,19 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
     const conversationRef = doc(firestore, 'conversations', conversationId);
     await updateDoc(conversationRef, {
       lastMessage: {
-        message: messageText,
-        senderId,
-        createdAt: new Date().toISOString(),
+        text: messageText, // FIXED: Use 'text' instead of 'message'
+        senderId: firebaseUid, // Use Firebase UID format
+        timestamp: new Date().toISOString(), // FIXED: Use 'timestamp' instead of 'createdAt'
       },
       updatedAt: serverTimestamp(),
-      [`unreadCount.${senderId}`]: 0, // Reset sender's unread count
+      [`unreadCount.${firebaseUid}`]: 0, // Reset sender's unread count using Firebase UID
     });
 
     return {
       id: docRef.id,
       ...messageData,
-      createdAt: new Date(),
+      createdAt: new Date(), // For compatibility
+      timestamp: new Date(), // Match Firestore field
     };
   } catch (error) {
     console.error('Error sending message:', error);
@@ -165,24 +197,69 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
 export const subscribeToMessages = (conversationId, callback, messageLimit = 50) => {
   try {
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
+    // Order by timestamp DESCENDING because FlatList is inverted
+    // Inverted FlatList shows last item at bottom, so newest (first in array) appears at bottom
     const q = query(
       messagesRef,
-      orderBy('createdAt', 'desc'),
+      orderBy('timestamp', 'desc'),
       limit(messageLimit)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messages = [];
       snapshot.forEach((doc) => {
+        const data = doc.data();
+
+        // FIXED: Handle both Firestore Timestamp and ISO string formats
+        let createdAtDate;
+        if (data.timestamp) {
+          // Check if it's a Firestore Timestamp or a string
+          if (typeof data.timestamp === 'string') {
+            createdAtDate = new Date(data.timestamp);
+          } else if (data.timestamp.toDate) {
+            createdAtDate = data.timestamp.toDate();
+          } else {
+            createdAtDate = new Date();
+          }
+        } else if (data.createdAt) {
+          if (typeof data.createdAt === 'string') {
+            createdAtDate = new Date(data.createdAt);
+          } else if (data.createdAt.toDate) {
+            createdAtDate = data.createdAt.toDate();
+          } else {
+            createdAtDate = new Date();
+          }
+        } else {
+          createdAtDate = new Date();
+        }
+
         messages.push({
           id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          ...data,
+          createdAt: createdAtDate,
+          // Map 'text' to 'message' for display compatibility (keep both for compatibility)
+          message: data.text || data.message || '',
+          text: data.text || data.message || '',
         });
       });
 
-      // Reverse to show oldest first
-      callback(messages.reverse());
+      // Messages come from Firestore ordered DESC (newest first)
+      // With inverted FlatList: Index 0 (newest) shows at BOTTOM
+      // NO REVERSE needed!
+
+      console.log('📱 Messages received:', messages.length);
+      if (messages.length > 0) {
+        console.log('🔽 FIRST in array (will show at BOTTOM - NEWEST):', {
+          text: messages[0].text?.substring(0, 30),
+          timestamp: messages[0].timestamp
+        });
+        console.log('🔼 LAST in array (will show at TOP - OLDEST):', {
+          text: messages[messages.length - 1].text?.substring(0, 30),
+          timestamp: messages[messages.length - 1].timestamp
+        });
+      }
+
+      callback(messages);
     }, (error) => {
       console.error('Error listening to messages:', error);
       callback([]);
@@ -198,13 +275,14 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 50)
 /**
  * Mark messages as read
  * @param {string} conversationId - Conversation ID
- * @param {string} userId - Current user ID
+ * @param {string} userId - Current user ID (will be converted to Firebase UID)
  */
 export const markMessagesAsRead = async (conversationId, userId) => {
   try {
+    const firebaseUid = toFirebaseUid(userId);
     const conversationRef = doc(firestore, 'conversations', conversationId);
     await updateDoc(conversationRef, {
-      [`unreadCount.${userId}`]: 0,
+      [`unreadCount.${firebaseUid}`]: 0, // Use Firebase UID format
     });
   } catch (error) {
     console.error('Error marking messages as read:', error);
@@ -276,18 +354,19 @@ export const getMessagesPage = async (conversationId, pageSize = 50, lastMessage
   try {
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
+    // Order by timestamp DESC to match inverted FlatList pattern
     let q;
     if (lastMessage) {
       q = query(
         messagesRef,
-        orderBy('createdAt', 'desc'),
-        startAfter(lastMessage.createdAt),
+        orderBy('timestamp', 'desc'),
+        startAfter(lastMessage.timestamp || lastMessage.createdAt),
         limit(pageSize)
       );
     } else {
       q = query(
         messagesRef,
-        orderBy('createdAt', 'desc'),
+        orderBy('timestamp', 'desc'),
         limit(pageSize)
       );
     }
@@ -295,14 +374,42 @@ export const getMessagesPage = async (conversationId, pageSize = 50, lastMessage
     const snapshot = await getDocs(q);
     const messages = [];
     snapshot.forEach((doc) => {
+      const data = doc.data();
+
+      // FIXED: Handle both Firestore Timestamp and ISO string formats
+      let createdAtDate;
+      if (data.timestamp) {
+        if (typeof data.timestamp === 'string') {
+          createdAtDate = new Date(data.timestamp);
+        } else if (data.timestamp.toDate) {
+          createdAtDate = data.timestamp.toDate();
+        } else {
+          createdAtDate = new Date();
+        }
+      } else if (data.createdAt) {
+        if (typeof data.createdAt === 'string') {
+          createdAtDate = new Date(data.createdAt);
+        } else if (data.createdAt.toDate) {
+          createdAtDate = data.createdAt.toDate();
+        } else {
+          createdAtDate = new Date();
+        }
+      } else {
+        createdAtDate = new Date();
+      }
+
       messages.push({
         id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        ...data,
+        createdAt: createdAtDate,
+        // Map 'text' to 'message' for display compatibility
+        message: data.text || data.message || '',
+        text: data.text || data.message || '',
       });
     });
 
-    return messages.reverse();
+    // Messages ordered DESC (newest first) for inverted FlatList
+    return messages;
   } catch (error) {
     console.error('Error getting messages page:', error);
     return [];

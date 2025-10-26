@@ -27,6 +27,14 @@ import {
 import { auth } from '@config/firebase';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 
+/**
+ * Convert user ID to Firebase UID format
+ * CRITICAL: Must match backend format (pettapp_userId)
+ */
+const getFirebaseUid = (userId) => {
+  return `pettapp_${userId}`;
+};
+
 export default function ChatScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -67,8 +75,10 @@ export default function ChatScreen() {
 
         // Ensure Firebase authentication
         try {
-          // Check if Firebase UID matches current user
-          if (auth.currentUser && auth.currentUser.uid !== uid) {
+          const expectedFirebaseUid = getFirebaseUid(uid);
+
+          // Check if Firebase UID matches expected format
+          if (auth.currentUser && auth.currentUser.uid !== expectedFirebaseUid) {
             console.log('Firebase UID mismatch in chat. Signing out and re-authenticating...');
             await auth.signOut();
           }
@@ -79,8 +89,8 @@ export default function ChatScreen() {
           }
 
           // Verify UID matches after authentication
-          if (auth.currentUser?.uid !== uid) {
-            throw new Error(`Firebase UID mismatch: expected ${uid}, got ${auth.currentUser?.uid}`);
+          if (auth.currentUser?.uid !== expectedFirebaseUid) {
+            throw new Error(`Firebase UID mismatch: expected ${expectedFirebaseUid}, got ${auth.currentUser?.uid}`);
           }
 
           setFirebaseAuthenticated(true);
@@ -102,13 +112,21 @@ export default function ChatScreen() {
 
         // Subscribe to real-time messages
         unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
+          console.log('💬 Chat received messages:', newMessages.length);
+          if (newMessages.length > 0) {
+            const firstMsg = newMessages[0];
+            const lastMsg = newMessages[newMessages.length - 1];
+            console.log('🔼 FIRST (should be oldest):', {
+              text: firstMsg.text?.substring(0, 30),
+              time: firstMsg.createdAt
+            });
+            console.log('🔽 LAST (should be newest):', {
+              text: lastMsg.text?.substring(0, 30),
+              time: lastMsg.createdAt
+            });
+          }
           setMessages(newMessages);
           setLoading(false);
-
-          // Auto-scroll to bottom
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: true });
-          }, 100);
         });
       } catch (error) {
         console.error('Error initializing chat:', error);
@@ -126,6 +144,22 @@ export default function ChatScreen() {
       }
     };
   }, []);
+
+  // With inverted FlatList, newest message (index 0) is at bottom
+  // No need to scroll - inverted FlatList automatically shows bottom
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      // Inverted FlatList automatically keeps you at the "bottom" (index 0)
+      // Only scroll if user was already at bottom
+      setTimeout(() => {
+        try {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        } catch (error) {
+          // Ignore scroll errors
+        }
+      }, 100);
+    }
+  }, [messages]);
 
   const handleSendMessage = async () => {
     if (messageText.trim() === '' || sendingMessage || !firebaseAuthenticated) return;
@@ -157,7 +191,22 @@ export default function ChatScreen() {
   const formatTimestamp = (date) => {
     if (!date) return '';
 
-    const messageDate = date instanceof Date ? date : new Date(date);
+    let messageDate;
+    try {
+      if (date instanceof Date) {
+        messageDate = date;
+      } else if (typeof date === 'string') {
+        messageDate = new Date(date);
+      } else if (date.toDate && typeof date.toDate === 'function') {
+        messageDate = date.toDate();
+      } else {
+        messageDate = new Date(date);
+      }
+    } catch (error) {
+      console.error('Error parsing message timestamp:', error);
+      return '';
+    }
+
     const now = new Date();
     const diff = now - messageDate;
 
@@ -191,7 +240,9 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item, index }) => {
-    const isUserMessage = item.senderId === currentUserId;
+    // CRITICAL: Compare using Firebase UID format
+    const currentFirebaseUid = getFirebaseUid(currentUserId);
+    const isUserMessage = item.senderId === currentFirebaseUid;
     const showAvatar = !isUserMessage;
 
     // Check if we should show date separator
@@ -257,8 +308,35 @@ export default function ChatScreen() {
 
   const isSameDay = (date1, date2) => {
     if (!date1 || !date2) return false;
-    const d1 = date1 instanceof Date ? date1 : new Date(date1);
-    const d2 = date2 instanceof Date ? date2 : new Date(date2);
+
+    let d1, d2;
+    try {
+      // Convert date1
+      if (date1 instanceof Date) {
+        d1 = date1;
+      } else if (typeof date1 === 'string') {
+        d1 = new Date(date1);
+      } else if (date1.toDate && typeof date1.toDate === 'function') {
+        d1 = date1.toDate();
+      } else {
+        d1 = new Date(date1);
+      }
+
+      // Convert date2
+      if (date2 instanceof Date) {
+        d2 = date2;
+      } else if (typeof date2 === 'string') {
+        d2 = new Date(date2);
+      } else if (date2.toDate && typeof date2.toDate === 'function') {
+        d2 = date2.toDate();
+      } else {
+        d2 = new Date(date2);
+      }
+    } catch (error) {
+      console.error('Error comparing dates:', error);
+      return false;
+    }
+
     return (
       d1.getFullYear() === d2.getFullYear() &&
       d1.getMonth() === d2.getMonth() &&
@@ -268,7 +346,23 @@ export default function ChatScreen() {
 
   const formatDateSeparator = (date) => {
     if (!date) return '';
-    const messageDate = date instanceof Date ? date : new Date(date);
+
+    let messageDate;
+    try {
+      if (date instanceof Date) {
+        messageDate = date;
+      } else if (typeof date === 'string') {
+        messageDate = new Date(date);
+      } else if (date.toDate && typeof date.toDate === 'function') {
+        messageDate = date.toDate();
+      } else {
+        messageDate = new Date(date);
+      }
+    } catch (error) {
+      console.error('Error parsing date separator:', error);
+      return '';
+    }
+
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -352,7 +446,7 @@ export default function ChatScreen() {
             renderItem={renderMessage}
             keyExtractor={(item, index) => item.id || index.toString()}
             contentContainerStyle={styles.messagesList}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            inverted
           />
         )}
 
@@ -370,10 +464,10 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              (!messageText.trim() || sendingMessage) && styles.sendButtonDisabled,
+              (!messageText.trim() || sendingMessage || !firebaseAuthenticated) && styles.sendButtonDisabled,
             ]}
             onPress={handleSendMessage}
-            disabled={!messageText.trim() || sendingMessage}
+            disabled={!messageText.trim() || sendingMessage || !firebaseAuthenticated}
           >
             {sendingMessage ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -381,7 +475,7 @@ export default function ChatScreen() {
               <Ionicons
                 name="send"
                 size={moderateScale(20)}
-                color={messageText.trim() ? '#fff' : '#999'}
+                color={messageText.trim() && firebaseAuthenticated ? '#fff' : '#999'}
               />
             )}
           </TouchableOpacity>

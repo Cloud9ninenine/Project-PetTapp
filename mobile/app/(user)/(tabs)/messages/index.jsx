@@ -26,8 +26,17 @@ import { firestore, auth } from '@config/firebase';
 import { signOut } from 'firebase/auth';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 import { debugAllConversations } from '@utils/debugFirestore';
+import { toFirebaseUid } from '@utils/messageService';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+
+/**
+ * Convert user ID to Firebase UID format
+ * CRITICAL: Must match backend format (pettapp_userId)
+ */
+const getFirebaseUid = (userId) => {
+  return `pettapp_${userId}`;
+};
 
 export default function MessagesScreen() {
   const router = useRouter();
@@ -114,20 +123,24 @@ export default function MessagesScreen() {
 
   const subscribeToConversations = async (userId) => {
     try {
+      // Get Firebase UID format
+      const firebaseUid = getFirebaseUid(userId);
+
       // Debug: Check Firebase auth state
       let currentUser = auth.currentUser;
       console.log('Firebase Auth State:', {
         isAuthenticated: !!currentUser,
         uid: currentUser?.uid,
         localUserId: userId,
-        uidMatch: currentUser?.uid === userId
+        firebaseUid: firebaseUid,
+        uidMatch: currentUser?.uid === firebaseUid
       });
 
-      // If Firebase UID doesn't match local userId, re-authenticate
-      if (!currentUser || currentUser.uid !== userId) {
+      // If Firebase UID doesn't match expected format, re-authenticate
+      if (!currentUser || currentUser.uid !== firebaseUid) {
         console.log('Firebase UID mismatch or not authenticated. Re-authenticating...');
         try {
-          await signOut(auth); // Sign out the previous user
+          await auth.signOut(); // Sign out the previous user
           const isAuthenticated = await ensureFirebaseAuth();
           if (!isAuthenticated) {
             throw new Error('Failed to re-authenticate with Firebase');
@@ -149,17 +162,27 @@ export default function MessagesScreen() {
         return;
       }
 
+      // CRITICAL: Query using Firebase UID format
       const conversationsRef = collection(firestore, 'conversations');
       const q = query(
         conversationsRef,
-        where('participants', 'array-contains', userId)
+        where('participants', 'array-contains', firebaseUid)
       );
 
       const unsubscribe = onSnapshot(q, async (snapshot) => {
         console.log('=== CONVERSATION SYNC DEBUG ===');
         console.log('Query userId:', userId);
-        console.log('Firebase UID:', auth.currentUser?.uid);
+        console.log('Query Firebase UID:', firebaseUid);
+        console.log('Actual Firebase UID:', auth.currentUser?.uid);
+        console.log('UID Match:', auth.currentUser?.uid === firebaseUid);
         console.log('Number of conversations found:', snapshot.docs.length);
+
+        // Debug: Log raw query details
+        if (snapshot.docs.length === 0) {
+          console.warn('⚠️ NO CONVERSATIONS FOUND!');
+          console.warn('Expected Firebase UID in participants array:', firebaseUid);
+          console.warn('Make sure Firestore has conversations with participants array containing:', firebaseUid);
+        }
 
         const conversationsList = [];
 
@@ -168,7 +191,7 @@ export default function MessagesScreen() {
           const data = docSnap.data();
           console.log('Conversation ID:', docSnap.id);
           console.log('Participants:', data.participants);
-          console.log('Last message:', data.lastMessage?.message);
+          console.log('Last message:', data.lastMessage?.text || data.lastMessage?.message);
 
           const otherParticipant = await getOtherParticipant(data, userId);
 
@@ -226,31 +249,32 @@ export default function MessagesScreen() {
 
   const getOtherParticipant = async (conversationData, currentUserId) => {
     const participants = conversationData.participants || [];
-    const otherUserId = participants.find(id => id !== currentUserId);
+    const currentFirebaseUid = getFirebaseUid(currentUserId);
+    const otherFirebaseUid = participants.find(id => id !== currentFirebaseUid);
 
-    if (!otherUserId) {
+    if (!otherFirebaseUid) {
       return {
         userId: 'unknown',
         fullName: 'Unknown User',
         profileImage: null,
-        role: 'pet-owner',
+        role: 'business-owner',
       };
     }
 
-    // First try to get from conversation participantDetails
-    if (conversationData.participantDetails && conversationData.participantDetails[otherUserId]) {
-      return conversationData.participantDetails[otherUserId];
+    // First try to get from conversation participantDetails using Firebase UID
+    if (conversationData.participantDetails && conversationData.participantDetails[otherFirebaseUid]) {
+      return conversationData.participantDetails[otherFirebaseUid];
     }
 
-    // If not in participantDetails, fetch from users collection
+    // If not in participantDetails, fetch from users collection using Firebase UID
     try {
-      const userDocRef = doc(firestore, 'users', otherUserId);
+      const userDocRef = doc(firestore, 'users', otherFirebaseUid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
         return {
-          userId: otherUserId,
+          userId: userData.userId || otherFirebaseUid, // Get original userId from Firestore or use Firebase UID
           fullName: userData.fullName || 'Unknown User',
           profileImage: userData.profileImage || null,
           role: userData.role || 'business-owner',
@@ -262,7 +286,7 @@ export default function MessagesScreen() {
 
     // Fallback
     return {
-      userId: otherUserId,
+      userId: otherFirebaseUid,
       fullName: 'Unknown User',
       profileImage: null,
       role: 'business-owner',
@@ -282,12 +306,19 @@ export default function MessagesScreen() {
     if (!timestamp) return '';
 
     let date;
-    if (typeof timestamp === 'string') {
-      date = new Date(timestamp);
-    } else if (timestamp.toDate) {
-      date = timestamp.toDate();
-    } else {
-      date = new Date(timestamp);
+    try {
+      if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+        date = timestamp.toDate();
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        date = new Date(timestamp);
+      }
+    } catch (error) {
+      console.error('Error parsing timestamp:', error);
+      return '';
     }
 
     const now = new Date();
@@ -310,7 +341,9 @@ export default function MessagesScreen() {
 
   const getUnreadCount = (conversation) => {
     if (!conversation.unreadCount || !currentUserId) return 0;
-    return conversation.unreadCount[currentUserId] || 0;
+    // CRITICAL: Use Firebase UID format for unread count
+    const firebaseUid = getFirebaseUid(currentUserId);
+    return conversation.unreadCount[firebaseUid] || 0;
   };
 
   const renderConversation = ({ item }) => {
@@ -359,14 +392,14 @@ export default function MessagesScreen() {
             <Text style={styles.userName} numberOfLines={1}>
               {otherParticipant.fullName}
             </Text>
-            {lastMessage && lastMessage.createdAt && (
+            {lastMessage && (lastMessage.timestamp || lastMessage.createdAt) && (
               <Text style={styles.timestamp}>
-                {formatTime(lastMessage.createdAt)}
+                {formatTime(lastMessage.timestamp || lastMessage.createdAt)}
               </Text>
             )}
           </View>
 
-          {lastMessage && lastMessage.message && (
+          {lastMessage && (lastMessage.text || lastMessage.message) && (
             <Text
               style={[
                 styles.lastMessage,
@@ -374,8 +407,8 @@ export default function MessagesScreen() {
               ]}
               numberOfLines={1}
             >
-              {lastMessage.senderId === currentUserId && 'You: '}
-              {lastMessage.message}
+              {lastMessage.senderId === getFirebaseUid(currentUserId) && 'You: '}
+              {lastMessage.text || lastMessage.message}
             </Text>
           )}
         </View>
