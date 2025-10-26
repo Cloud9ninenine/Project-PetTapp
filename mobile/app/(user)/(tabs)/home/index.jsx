@@ -196,7 +196,7 @@ export default function HomeScreen() {
     })
   ).current;
 
-  // Services categories array (expanded)
+  // Services categories array (limited to 5 categories)
   const services = [
     {
       id: 1,
@@ -214,45 +214,24 @@ export default function HomeScreen() {
     },
     {
       id: 3,
-      title: "Boarding",
+      title: "Accommodation",
       icon: require("@assets/images/service_icon/12.png"),
       color: "#95E1D3",
-      category: "boarding",
+      category: "accommodation",
     },
     {
       id: 4,
-      title: "Daycare",
+      title: "Transport",
       icon: require("@assets/images/service_icon/13.png"),
       color: "#FFD93D",
-      category: "daycare",
+      category: "transport",
     },
     {
       id: 5,
-      title: "Training",
+      title: "Pet Supplies",
       icon: require("@assets/images/service_icon/10.png"),
       color: "#6C5CE7",
-      category: "training",
-    },
-    {
-      id: 6,
-      title: "Emergency",
-      icon: require("@assets/images/service_icon/11.png"),
-      color: "#FF6348",
-      category: "emergency",
-    },
-    {
-      id: 7,
-      title: "Consultation",
-      icon: require("@assets/images/service_icon/12.png"),
-      color: "#74B9FF",
-      category: "consultation",
-    },
-    {
-      id: 8,
-      title: "Other",
-      icon: require("@assets/images/service_icon/13.png"),
-      color: "#A29BFE",
-      category: "other",
+      category: "pet-supplies",
     },
   ];
 

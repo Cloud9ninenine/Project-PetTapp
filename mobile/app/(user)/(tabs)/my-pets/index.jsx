@@ -172,7 +172,8 @@ export default function MyPetsScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={() => router.push('/(user)/(tabs)/home')}
       />
 
       {/* Content */}
@@ -183,7 +184,6 @@ export default function MyPetsScreen() {
           <>
             {pets.length > 0 && (
               <View style={styles.petsSection}>
-                <Text style={styles.sectionTitle}>Your Pets</Text>
                 {pets.map(renderPetCard)}
               </View>
             )}

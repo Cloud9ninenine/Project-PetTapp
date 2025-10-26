@@ -347,7 +347,8 @@ export default function ProfileScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={() => router.push('/(user)/(tabs)/home')}
       />
 
       {isLoading ? (

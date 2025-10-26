@@ -7,6 +7,7 @@ import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotifications, setupNotificationListeners, clearBadgeCount } from "@utils/notificationHelpers";
 import { initializeFirebaseAuth } from "@utils/firebaseAuthPersistence";
+import { wakeServerSequence, initializeAppStateListener } from "@config/api";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -39,12 +40,31 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  // Hide splash when fonts are ready
+  // Hide splash when fonts are ready and wake server
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+
+      // Wake server on app launch (non-blocking)
+      wakeServerSequence().then(() => {
+        console.log('Server wake sequence completed on app launch');
+      }).catch((error) => {
+        console.log('Server wake sequence failed (non-critical):', error);
+      });
     }
   }, [loaded]);
+
+  // Initialize keep-alive mechanism with app state management
+  useEffect(() => {
+    console.log('Initializing server keep-alive listener...');
+    const keepAliveSubscription = initializeAppStateListener();
+
+    return () => {
+      if (keepAliveSubscription) {
+        keepAliveSubscription.remove();
+      }
+    };
+  }, []);
 
   // Handle app state changes (background/foreground)
   useEffect(() => {
@@ -57,30 +77,37 @@ export default function RootLayout() {
         // Clear badge count when app comes to foreground
         clearBadgeCount();
 
-        // Initialize Firebase auth when app comes to foreground (only if user is logged in)
+        // Wake server when returning from background (only if user is logged in)
+        // This ensures server is ready for any immediate requests
         try {
           const userId = await AsyncStorage.getItem('userId');
           if (userId) {
+            console.log('User logged in, waking server...');
+            // Non-blocking wake sequence
+            wakeServerSequence().catch((error) => {
+              console.log('Server wake on resume failed (non-critical):', error);
+            });
+
+            // Initialize Firebase auth
             await initializeFirebaseAuth();
             console.log('Firebase auth initialized on app foreground');
           } else {
-            console.log('No userId found, skipping Firebase initialization');
+            console.log('No userId found, skipping server wake and Firebase initialization');
           }
         } catch (error) {
-          console.error('Failed to initialize Firebase auth:', error);
+          console.error('Failed to initialize on app foreground:', error);
         }
 
-        // You can add additional logic here when app returns to foreground:
-        // - Refresh data
-        // - Sync with server
-        // - Check for updates
+        // Additional logic when app returns to foreground:
+        // - Server wake sequence is handled above
+        // - Keep-alive automatically starts (handled by initializeAppStateListener)
+        // - Refresh data, sync with server, check for updates can be added here
       } else if (nextAppState.match(/inactive|background/)) {
         console.log('App has gone to the background!');
 
-        // You can add cleanup logic here when app goes to background:
-        // - Save state
-        // - Cancel pending operations
-        // - Pause timers
+        // Cleanup logic when app goes to background:
+        // - Keep-alive automatically stops (handled by initializeAppStateListener)
+        // - Save state, cancel pending operations, pause timers can be added here
       }
 
       appState.current = nextAppState;
@@ -127,10 +154,10 @@ export default function RootLayout() {
     // Cleanup listeners on unmount
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, []);

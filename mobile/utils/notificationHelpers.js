@@ -170,8 +170,8 @@ export function setupNotificationListeners(onNotificationReceived, onNotificatio
     notificationListener,
     responseListener,
     remove: () => {
-      Notifications.removeNotificationSubscription(notificationListener);
-      Notifications.removeNotificationSubscription(responseListener);
+      notificationListener.remove();
+      responseListener.remove();
     },
   };
 }

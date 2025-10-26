@@ -151,13 +151,16 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
 
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
+    // CRITICAL FIX: Use actual timestamp instead of serverTimestamp()
+    // serverTimestamp() returns null initially, causing ordering issues
+    const now = new Date();
     const messageData = {
       senderId: firebaseUid, // Use Firebase UID format
       senderName: senderInfo.name || 'Unknown',
       senderImage: senderInfo.image || null,
       text: messageText, // FIXED: Use 'text' instead of 'message' to match Firestore
       messageType: 'text',
-      timestamp: serverTimestamp(), // FIXED: Use 'timestamp' instead of 'createdAt'
+      timestamp: now, // Use actual Date object for immediate, correct ordering
       isRead: false,
     };
 
@@ -169,17 +172,17 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
       lastMessage: {
         text: messageText, // FIXED: Use 'text' instead of 'message'
         senderId: firebaseUid, // Use Firebase UID format
-        timestamp: new Date().toISOString(), // FIXED: Use 'timestamp' instead of 'createdAt'
+        timestamp: now.toISOString(), // Use ISO string for last message
       },
-      updatedAt: serverTimestamp(),
+      updatedAt: now, // Use actual timestamp
       [`unreadCount.${firebaseUid}`]: 0, // Reset sender's unread count using Firebase UID
     });
 
     return {
       id: docRef.id,
       ...messageData,
-      createdAt: new Date(), // For compatibility
-      timestamp: new Date(), // Match Firestore field
+      createdAt: now, // For compatibility
+      timestamp: now, // Match Firestore field
     };
   } catch (error) {
     console.error('Error sending message:', error);
@@ -197,11 +200,11 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
 export const subscribeToMessages = (conversationId, callback, messageLimit = 50) => {
   try {
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
-    // Order by timestamp DESCENDING because FlatList is inverted
-    // Inverted FlatList shows last item at bottom, so newest (first in array) appears at bottom
+    // Order by timestamp ASCENDING (oldest first) - matching web implementation
+    // Regular FlatList will show oldest at top, newest at bottom
     const q = query(
       messagesRef,
-      orderBy('timestamp', 'desc'),
+      orderBy('timestamp', 'asc'),
       limit(messageLimit)
     );
 
@@ -210,22 +213,31 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 50)
       snapshot.forEach((doc) => {
         const data = doc.data();
 
-        // FIXED: Handle both Firestore Timestamp and ISO string formats
+        // FIXED: Handle both Firestore Timestamp, Date object, and ISO string formats
         let createdAtDate;
         if (data.timestamp) {
-          // Check if it's a Firestore Timestamp or a string
-          if (typeof data.timestamp === 'string') {
+          // Check if it's a Date object, Firestore Timestamp, or a string
+          if (data.timestamp instanceof Date) {
+            createdAtDate = data.timestamp;
+          } else if (typeof data.timestamp === 'string') {
             createdAtDate = new Date(data.timestamp);
           } else if (data.timestamp.toDate) {
             createdAtDate = data.timestamp.toDate();
+          } else if (data.timestamp.seconds) {
+            // Handle Firestore Timestamp object with seconds
+            createdAtDate = new Date(data.timestamp.seconds * 1000);
           } else {
             createdAtDate = new Date();
           }
         } else if (data.createdAt) {
-          if (typeof data.createdAt === 'string') {
+          if (data.createdAt instanceof Date) {
+            createdAtDate = data.createdAt;
+          } else if (typeof data.createdAt === 'string') {
             createdAtDate = new Date(data.createdAt);
           } else if (data.createdAt.toDate) {
             createdAtDate = data.createdAt.toDate();
+          } else if (data.createdAt.seconds) {
+            createdAtDate = new Date(data.createdAt.seconds * 1000);
           } else {
             createdAtDate = new Date();
           }
@@ -243,18 +255,24 @@ export const subscribeToMessages = (conversationId, callback, messageLimit = 50)
         });
       });
 
-      // Messages come from Firestore ordered DESC (newest first)
-      // With inverted FlatList: Index 0 (newest) shows at BOTTOM
-      // NO REVERSE needed!
+      // Sort messages by createdAt date in ascending order (oldest first)
+      // This ensures proper chronological order even if Firestore ordering has issues
+      messages.sort((a, b) => {
+        const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return timeA - timeB; // ASC order: oldest first
+      });
 
       console.log('📱 Messages received:', messages.length);
       if (messages.length > 0) {
-        console.log('🔽 FIRST in array (will show at BOTTOM - NEWEST):', {
+        console.log('🔼 FIRST in array (will show at TOP - OLDEST):', {
           text: messages[0].text?.substring(0, 30),
+          createdAt: messages[0].createdAt,
           timestamp: messages[0].timestamp
         });
-        console.log('🔼 LAST in array (will show at TOP - OLDEST):', {
+        console.log('🔽 LAST in array (will show at BOTTOM - NEWEST):', {
           text: messages[messages.length - 1].text?.substring(0, 30),
+          createdAt: messages[messages.length - 1].createdAt,
           timestamp: messages[messages.length - 1].timestamp
         });
       }
@@ -354,19 +372,19 @@ export const getMessagesPage = async (conversationId, pageSize = 50, lastMessage
   try {
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
-    // Order by timestamp DESC to match inverted FlatList pattern
+    // Order by timestamp ASC to match web implementation and regular FlatList
     let q;
     if (lastMessage) {
       q = query(
         messagesRef,
-        orderBy('timestamp', 'desc'),
+        orderBy('timestamp', 'asc'),
         startAfter(lastMessage.timestamp || lastMessage.createdAt),
         limit(pageSize)
       );
     } else {
       q = query(
         messagesRef,
-        orderBy('timestamp', 'desc'),
+        orderBy('timestamp', 'asc'),
         limit(pageSize)
       );
     }
@@ -376,21 +394,29 @@ export const getMessagesPage = async (conversationId, pageSize = 50, lastMessage
     snapshot.forEach((doc) => {
       const data = doc.data();
 
-      // FIXED: Handle both Firestore Timestamp and ISO string formats
+      // FIXED: Handle both Firestore Timestamp, Date object, and ISO string formats
       let createdAtDate;
       if (data.timestamp) {
-        if (typeof data.timestamp === 'string') {
+        if (data.timestamp instanceof Date) {
+          createdAtDate = data.timestamp;
+        } else if (typeof data.timestamp === 'string') {
           createdAtDate = new Date(data.timestamp);
         } else if (data.timestamp.toDate) {
           createdAtDate = data.timestamp.toDate();
+        } else if (data.timestamp.seconds) {
+          createdAtDate = new Date(data.timestamp.seconds * 1000);
         } else {
           createdAtDate = new Date();
         }
       } else if (data.createdAt) {
-        if (typeof data.createdAt === 'string') {
+        if (data.createdAt instanceof Date) {
+          createdAtDate = data.createdAt;
+        } else if (typeof data.createdAt === 'string') {
           createdAtDate = new Date(data.createdAt);
         } else if (data.createdAt.toDate) {
           createdAtDate = data.createdAt.toDate();
+        } else if (data.createdAt.seconds) {
+          createdAtDate = new Date(data.createdAt.seconds * 1000);
         } else {
           createdAtDate = new Date();
         }
@@ -408,7 +434,14 @@ export const getMessagesPage = async (conversationId, pageSize = 50, lastMessage
       });
     });
 
-    // Messages ordered DESC (newest first) for inverted FlatList
+    // Sort messages by createdAt date in ascending order (oldest first)
+    // This ensures proper chronological order even if Firestore ordering has issues
+    messages.sort((a, b) => {
+      const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+      const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+      return timeA - timeB; // ASC order: oldest first
+    });
+
     return messages;
   } catch (error) {
     console.error('Error getting messages page:', error);

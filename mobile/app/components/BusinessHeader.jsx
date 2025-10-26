@@ -28,34 +28,39 @@ const BusinessHeader = ({
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        // Fetch recent bookings from last 24 hours
-        const response = await apiClient.get('/bookings', {
+        // Fetch notifications with unread filter
+        const response = await apiClient.get('/notifications', {
           params: {
             page: 1,
-            limit: 50,
+            limit: 100,
+            isRead: false, // Only fetch unread notifications
             sort: '-createdAt',
           }
         });
 
         if (response.data && response.data.success) {
-          const bookings = response.data.data || [];
-          // Count bookings created in the last 24 hours
-          const recent = bookings.filter(booking => {
-            const createdAt = new Date(booking.createdAt || booking.appointmentDateTime);
-            const now = new Date();
-            return (now - createdAt) < 24 * 60 * 60 * 1000;
+          const notifications = response.data.data || [];
+          // Count unread notifications
+          const unread = notifications.filter(notification => {
+            if (!notification) return false;
+            // Check if notification is explicitly marked as unread
+            return notification.isRead === false;
           });
-          setUnreadCount(recent.length);
+          setUnreadCount(unread.length);
         }
       } catch (error) {
-        console.error('Error fetching unread count:', error);
+        console.error('Error fetching unread notification count:', error);
+        // Fallback: try to get total count from response
+        if (error.response?.data?.pagination?.total) {
+          setUnreadCount(error.response.data.pagination.total);
+        }
       }
     };
 
     if (showNotificationBadge) {
       fetchUnreadCount();
-      // Refresh count every 5 minutes
-      const interval = setInterval(fetchUnreadCount, 5 * 60 * 1000);
+      // Refresh count every 2 minutes for more real-time updates
+      const interval = setInterval(fetchUnreadCount, 2 * 60 * 1000);
       return () => clearInterval(interval);
     }
   }, [showNotificationBadge]);

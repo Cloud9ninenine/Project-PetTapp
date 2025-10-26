@@ -300,11 +300,23 @@ export default function BusinessesScreen() {
           {item.businessName}
         </Text>
 
-        <View style={styles.businessType}>
-          <Ionicons name="pricetag" size={moderateScale(14)} color="#666" />
-          <Text style={styles.businessTypeText} numberOfLines={1}>
-            {item.businessType?.charAt(0).toUpperCase() + item.businessType?.slice(1)}
-          </Text>
+        <View style={styles.businessTypesContainer}>
+          {(Array.isArray(item.businessType) ? item.businessType : [item.businessType])
+            .filter(type => type && typeof type === 'string')
+            .slice(0, 3)
+            .map((type, index) => (
+              <View key={index} style={styles.businessTypeChip}>
+                <Ionicons name="pricetag-outline" size={moderateScale(12)} color="#FF9B79" />
+                <Text style={styles.businessTypeChipText}>
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </Text>
+              </View>
+            ))}
+          {Array.isArray(item.businessType) && item.businessType.length > 3 && (
+            <View style={styles.businessTypeChip}>
+              <Text style={styles.businessTypeChipText}>+{item.businessType.length - 3}</Text>
+            </View>
+          )}
         </View>
 
         {item.description && (
@@ -576,23 +588,28 @@ const styles = StyleSheet.create({
   },
   businessCard: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#1C86FF',
+    borderRadius: moderateScale(16),
     marginBottom: moderateScale(16),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   businessImageContainer: {
     position: 'relative',
     width: '100%',
-    height: hp(20),
+    height: hp(22),
+    backgroundColor: '#f8f9fa',
   },
   businessImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   placeholderImage: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -618,16 +635,25 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: moderateScale(6),
   },
-  businessType: {
+  businessTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
+    marginBottom: moderateScale(10),
+  },
+  businessTypeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: moderateScale(8),
-    gap: moderateScale(4),
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(3),
   },
-  businessTypeText: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
-    flex: 1,
+  businessTypeChipText: {
+    fontSize: scaleFontSize(11),
+    color: '#FF9B79',
+    fontWeight: '600',
   },
   businessDescription: {
     fontSize: scaleFontSize(14),
@@ -663,6 +689,39 @@ const styles = StyleSheet.create({
   distanceText: {
     fontSize: scaleFontSize(12),
     color: '#1C86FF',
+    fontWeight: '600',
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: moderateScale(10),
+    left: moderateScale(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+  },
+  openBadge: {
+    backgroundColor: 'rgba(76, 175, 80, 0.95)',
+  },
+  closedBadge: {
+    backgroundColor: 'rgba(244, 67, 54, 0.95)',
+  },
+  statusDot: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
+  },
+  openDot: {
+    backgroundColor: '#fff',
+  },
+  closedDot: {
+    backgroundColor: '#fff',
+  },
+  statusText: {
+    fontSize: scaleFontSize(11),
+    color: '#fff',
     fontWeight: '600',
   },
   centerContainer: {

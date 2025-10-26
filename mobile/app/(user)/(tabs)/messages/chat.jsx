@@ -145,15 +145,13 @@ export default function ChatScreen() {
     };
   }, []);
 
-  // With inverted FlatList, newest message (index 0) is at bottom
-  // No need to scroll - inverted FlatList automatically shows bottom
+  // Auto-scroll to bottom when new messages arrive (matching web implementation)
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
-      // Inverted FlatList automatically keeps you at the "bottom" (index 0)
-      // Only scroll if user was already at bottom
+      // Scroll to the end of the list (newest message at bottom)
       setTimeout(() => {
         try {
-          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+          flatListRef.current?.scrollToEnd({ animated: true });
         } catch (error) {
           // Ignore scroll errors
         }
@@ -246,7 +244,10 @@ export default function ChatScreen() {
     const showAvatar = !isUserMessage;
 
     // Check if we should show date separator
-    const showDateSeparator = index === 0 || !isSameDay(
+    // With regular FlatList and ASC order: index 0 is oldest (top), last index is newest (bottom)
+    // Show separator if it's the first message OR if the PREVIOUS message (index-1) is from a different day
+    const isFirstMessage = index === 0;
+    const showDateSeparator = isFirstMessage || !isSameDay(
       item.createdAt,
       messages[index - 1]?.createdAt
     );
@@ -446,7 +447,6 @@ export default function ChatScreen() {
             renderItem={renderMessage}
             keyExtractor={(item, index) => item.id || index.toString()}
             contentContainerStyle={styles.messagesList}
-            inverted
           />
         )}
 

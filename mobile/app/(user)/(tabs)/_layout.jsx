@@ -19,7 +19,7 @@ export default function RootLayout() {
   ];
 
   const shouldHideFooter = hideFooterOn.some((path) =>
-    pathname.startsWith(path)
+    pathname.startsWith(path) || pathname.includes('/messages/chat')
   );
 
   return (

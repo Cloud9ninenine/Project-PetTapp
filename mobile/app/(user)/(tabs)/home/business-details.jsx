@@ -51,13 +51,7 @@ export default function BusinessDetailsScreen() {
 
           // Fetch services for this business
           try {
-            const servicesResponse = await apiClient.get('/services', {
-              params: {
-                businessId: businessId,
-                page: 1,
-                limit: 20
-              }
-            });
+            const servicesResponse = await apiClient.get(`/services/business/${businessId}`);
 
             if (servicesResponse.status === 200 && servicesResponse.data.success) {
               setServices(servicesResponse.data.data || []);
@@ -220,7 +214,7 @@ export default function BusinessDetailsScreen() {
         <Text style={styles.serviceName} numberOfLines={1}>
           {item?.name || 'Unnamed Service'}
         </Text>
-        {item.category && (
+        {item.category && typeof item.category === 'string' && (
           <Text style={styles.serviceCategory} numberOfLines={1}>
             {item.category.charAt(0).toUpperCase() + item.category.slice(1)}
           </Text>
@@ -343,7 +337,7 @@ export default function BusinessDetailsScreen() {
           {/* Credentials */}
           {businessData.credentials && (
             <>
-              <Text style={styles.sectionTitle}>Credentials</Text>
+              <Text style={styles.sectionTitle}>Credentials & Certifications</Text>
               <View style={styles.credentialsCard}>
                 {businessData.credentials.licenseNumber && (
                   <View style={styles.credentialItem}>
@@ -360,6 +354,12 @@ export default function BusinessDetailsScreen() {
                         <Text style={styles.bulletText}>{cert}</Text>
                       </View>
                     ))}
+                  </View>
+                )}
+                {businessData.credentials.insuranceInfo && (
+                  <View style={styles.credentialItem}>
+                    <Text style={styles.credentialLabel}>Insurance Information</Text>
+                    <Text style={styles.credentialValue}>{businessData.credentials.insuranceInfo}</Text>
                   </View>
                 )}
               </View>
@@ -465,12 +465,19 @@ export default function BusinessDetailsScreen() {
           <View style={styles.businessHeaderInfo}>
             <Text style={styles.businessName}>{businessData?.businessName || 'Business Name'}</Text>
 
+            {/* Business Type Categories */}
             {businessData.businessType && (
-              <View style={styles.businessTypeBadge}>
-                <Ionicons name="pricetag" size={moderateScale(14)} color="#FF9B79" />
-                <Text style={styles.businessTypeText}>
-                  {businessData.businessType.charAt(0).toUpperCase() + businessData.businessType.slice(1)}
-                </Text>
+              <View style={styles.businessTypesContainer}>
+                {(Array.isArray(businessData.businessType) ? businessData.businessType : [businessData.businessType]).map((type, index) => (
+                  typeof type === 'string' && (
+                    <View key={index} style={styles.businessTypeBadge}>
+                      <Ionicons name="pricetag" size={moderateScale(12)} color="#FF9B79" />
+                      <Text style={styles.businessTypeText}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </Text>
+                    </View>
+                  )
+                ))}
               </View>
             )}
 
@@ -486,24 +493,25 @@ export default function BusinessDetailsScreen() {
               </View>
             )}
 
-            {/* Verification Badge */}
-            {businessData.isVerified && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#4CAF50" />
-                <Text style={styles.verifiedText}>Verified Business</Text>
-              </View>
-            )}
-
-            {/* Business Status */}
-            {businessData.businessHours && (() => {
-              const { isOpen, status } = isBusinessOpen(businessData.businessHours);
-              return (
-                <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
-                  <View style={[styles.statusDot, isOpen ? styles.dotOpen : styles.dotClosed]} />
-                  <Text style={styles.statusText}>{status} Today</Text>
+            {/* Verification Badge and Business Status on same line */}
+            <View style={styles.badgesRow}>
+              {businessData.isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#4CAF50" />
+                  <Text style={styles.verifiedText}>Verified</Text>
                 </View>
-              );
-            })()}
+              )}
+
+              {businessData.businessHours && (() => {
+                const { isOpen, status } = isBusinessOpen(businessData.businessHours);
+                return (
+                  <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
+                    <View style={[styles.statusDot, isOpen ? styles.dotOpen : styles.dotClosed]} />
+                    <Text style={styles.statusText}>{status}</Text>
+                  </View>
+                );
+              })()}
+            </View>
           </View>
         </View>
 
@@ -607,18 +615,24 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(8),
     fontFamily: 'SFProBold',
   },
+  businessTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    marginBottom: moderateScale(10),
+  },
   businessTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF3E0',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(5),
     borderRadius: moderateScale(12),
-    marginBottom: moderateScale(10),
     gap: moderateScale(4),
   },
   businessTypeText: {
-    fontSize: scaleFontSize(13),
+    fontSize: scaleFontSize(12),
     fontWeight: '600',
     color: '#FF9B79',
   },
@@ -635,6 +649,14 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: scaleFontSize(13),
     color: '#666',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    marginTop: moderateScale(8),
+    flexWrap: 'wrap',
   },
   verifiedBadge: {
     flexDirection: 'row',
@@ -656,7 +678,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(6),
     borderRadius: moderateScale(12),
-    marginTop: moderateScale(8),
     gap: moderateScale(6),
   },
   statusOpen: {
@@ -817,6 +838,8 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#333',
     fontWeight: '500',
+    lineHeight: moderateScale(20),
+    flexWrap: 'wrap',
   },
   bulletPoint: {
     flexDirection: 'row',

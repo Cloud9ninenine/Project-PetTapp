@@ -11,7 +11,8 @@
       "Bash(cat:*)",
       "Bash(npx react-native-community/cli doctor:*)",
       "Bash(node:*)",
-      "Bash(npm run android)"
+      "Bash(npm run android)",
+      "Read(//c/Users/user/Documents/GitHub/**)"
     ],
     "deny": [],
     "ask": []

@@ -246,6 +246,7 @@ export default function ServicesScreen() {
           const { isOpen, status } = isBusinessOpen(item.businessId.businessHours);
           return (
             <View style={[styles.serviceStatusBadge, isOpen ? styles.serviceStatusOpen : styles.serviceStatusClosed]}>
+              <View style={styles.serviceStatusDot} />
               <Text style={styles.serviceStatusText}>{status}</Text>
             </View>
           );
@@ -535,23 +536,28 @@ const styles = StyleSheet.create({
   },
   serviceCard: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#1C86FF',
+    borderRadius: moderateScale(16),
     marginBottom: moderateScale(16),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   serviceImageContainer: {
     position: 'relative',
     width: '100%',
-    height: hp(20),
+    height: hp(22),
+    backgroundColor: '#f8f9fa',
   },
   serviceImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   placeholderImage: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -559,10 +565,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: moderateScale(10),
     right: moderateScale(10),
-    backgroundColor: 'rgba(28, 134, 255, 0.9)',
+    backgroundColor: 'rgba(255, 155, 121, 0.95)',
     paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(4),
+    paddingVertical: moderateScale(5),
     borderRadius: moderateScale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   categoryBadgeText: {
     color: '#fff',
@@ -571,21 +582,35 @@ const styles = StyleSheet.create({
   },
   serviceStatusBadge: {
     position: 'absolute',
-    top: moderateScale(10),
+    bottom: moderateScale(10),
     left: moderateScale(10),
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(4),
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(5),
     borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   serviceStatusOpen: {
-    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    backgroundColor: 'rgba(76, 175, 80, 0.95)',
   },
   serviceStatusClosed: {
-    backgroundColor: 'rgba(244, 67, 54, 0.9)',
+    backgroundColor: 'rgba(244, 67, 54, 0.95)',
+  },
+  serviceStatusDot: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
+    backgroundColor: '#fff',
   },
   serviceStatusText: {
     color: '#fff',
-    fontSize: scaleFontSize(12),
+    fontSize: scaleFontSize(11),
     fontWeight: '600',
   },
   serviceInfo: {

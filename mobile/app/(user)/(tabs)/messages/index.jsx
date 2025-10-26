@@ -431,7 +431,8 @@ export default function MessagesScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={() => router.push('/(user)/(tabs)/home')}
         />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -447,7 +448,8 @@ export default function MessagesScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={() => router.push('/(user)/(tabs)/home')}
       />
 
       {conversations.length === 0 ? (

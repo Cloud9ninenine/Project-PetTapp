@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
-import apiClient from "@config/api";
+import apiClient, { wakeServerSequence, apiRequestWithRetry } from "@config/api";
 import { registerForPushNotifications, getExpoPushToken, sendPushTokenToServer } from "@utils/notificationHelpers";
 import { registerBackgroundFetchAsync } from '@utils/backgroundTasks';
 import { initializeFirebaseAuth } from '@utils/firebaseAuthPersistence';
@@ -28,6 +28,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Logging in...");
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,11 +39,19 @@ export default function LoginScreen() {
     setIsLoading(true);
 
   try {
-    // Step 1: Login to verify credentials
-    const loginResponse = await apiClient.post('/auth/login', {
-      email: email.trim(),
-      password: password,
-    });
+    // Step 0: Wake server if needed (especially for first login after cold start)
+    setLoadingMessage("Connecting to server...");
+    console.log('Attempting to wake server...');
+    await wakeServerSequence();
+
+    // Step 1: Login to verify credentials with retry mechanism
+    setLoadingMessage("Logging in...");
+    const loginResponse = await apiRequestWithRetry(
+      (client) => client.post('/auth/login', {
+        email: email.trim(),
+        password: password,
+      })
+    );
 
     if (loginResponse.status === 200 && loginResponse.data?.tokens) {
       const { user, tokens } = loginResponse.data;
@@ -106,13 +115,24 @@ export default function LoginScreen() {
         } else {
           Alert.alert("Login Failed", data?.message || "An error occurred during login.");
         }
+      } else if (error.code === 'ECONNABORTED') {
+        // Timeout error - server might be slow to wake up
+        Alert.alert(
+          "Connection Timeout",
+          "The server is taking longer than expected to respond. This can happen when the server is waking up. Please try again in a moment."
+        );
       } else if (error.request) {
-        Alert.alert("Network Error", "Please check your connection and try again.");
+        // Network error - no response received
+        Alert.alert(
+          "Network Error",
+          "Unable to reach the server. Please check your internet connection and try again."
+        );
       } else {
         Alert.alert("Error", "An unexpected error occurred.");
       }
     } finally {
       setIsLoading(false);
+      setLoadingMessage("Logging in...");
     }
   };
 
@@ -216,7 +236,10 @@ export default function LoginScreen() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#fff" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.loginButtonText}>{loadingMessage}</Text>
+                  </View>
                 ) : (
                   <Text style={styles.loginButtonText}>Login</Text>
                 )}
