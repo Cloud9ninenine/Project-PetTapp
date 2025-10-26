@@ -22,8 +22,7 @@ export default {
           "fetch"
         ]
       },
-      // Google Services configuration for iOS (if using FCM)
-      googleServicesFile: process.env.GOOGLE_SERVICES_INFOPLIST || "./GoogleService-Info.plist"
+      googleServicesFile: "./GoogleService-Info.plist"
     },
     android: {
       adaptiveIcon: {
@@ -47,8 +46,7 @@ export default {
         }
       },
       package: "com.leleoj.pettapp",
-      // Google Services configuration for Android (if using FCM)
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || "./google-services.json"
+      googleServicesFile: "./google-services.json"
     },
     notification: {
       icon: "./app/assets/images/AppIcon.png",

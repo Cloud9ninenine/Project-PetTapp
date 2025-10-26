@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import { performCompleteLogout } from '@utils/logoutHelper';
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
@@ -82,7 +83,15 @@ export default function ChangePasswordScreen() {
             text: 'OK',
             onPress: async () => {
               try {
-                await apiClient.post('/auth/logout');
+                // Call backend logout API
+                try {
+                  await apiClient.post('/auth/logout');
+                } catch (logoutError) {
+                  console.error('Backend logout error:', logoutError);
+                }
+
+                // Clear all local data
+                await performCompleteLogout();
               } catch (error) {
                 console.error('Logout error:', error);
               } finally {

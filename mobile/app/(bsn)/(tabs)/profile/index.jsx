@@ -23,8 +23,7 @@ import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { unregisterBackgroundFetchAsync } from '@utils/backgroundTasks';
-import { clearBadgeCount, cancelAllScheduledNotifications } from '@utils/notificationHelpers';
+import { performCompleteLogout } from '@utils/logoutHelper';
 
 export default function BusinessProfileScreen() {
   const router = useRouter();
@@ -516,10 +515,23 @@ export default function BusinessProfileScreen() {
                   onPress: async () => {
                     setIsLoggingOut(true);
                     try {
-                      await apiClient.post('/auth/logout');
+                      // Call backend logout API
+                      try {
+                        await apiClient.post('/auth/logout');
+                      } catch (apiError) {
+                        console.error('Backend logout error:', apiError);
+                        // Continue with local cleanup even if backend fails
+                      }
+
+                      // Clear all local data (AsyncStorage, Firebase auth, notifications, etc.)
+                      console.log('Performing complete local logout...');
+                      await performCompleteLogout();
+
+                      // Navigate to login screen
                       router.replace('/(auth)/login');
                     } catch (error) {
                       console.error('Logout error:', error);
+                      // Force navigate to login even if there's an error
                       router.replace('/(auth)/login');
                     } finally {
                       setIsLoggingOut(false);

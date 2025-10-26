@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from "expo-splash-screen";
 import * as Notifications from 'expo-notifications';
 import { registerForPushNotifications, setupNotificationListeners, clearBadgeCount } from "@utils/notificationHelpers";
+import { initializeFirebaseAuth } from "@utils/firebaseAuthPersistence";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -46,7 +48,7 @@ export default function RootLayout() {
 
   // Handle app state changes (background/foreground)
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
@@ -54,6 +56,19 @@ export default function RootLayout() {
         console.log('App has come to the foreground!');
         // Clear badge count when app comes to foreground
         clearBadgeCount();
+
+        // Initialize Firebase auth when app comes to foreground (only if user is logged in)
+        try {
+          const userId = await AsyncStorage.getItem('userId');
+          if (userId) {
+            await initializeFirebaseAuth();
+            console.log('Firebase auth initialized on app foreground');
+          } else {
+            console.log('No userId found, skipping Firebase initialization');
+          }
+        } catch (error) {
+          console.error('Failed to initialize Firebase auth:', error);
+        }
 
         // You can add additional logic here when app returns to foreground:
         // - Refresh data

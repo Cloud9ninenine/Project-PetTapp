@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "7963028027",
+    "project_id": "pettapp-73df7",
+    "storage_bucket": "pettapp-73df7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:7963028027:android:f843f660b2f57158fe4a1e",
+        "android_client_info": {
+          "package_name": "com.leleoj.pettapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwS3nxk_et-UUFmSbnVIyVj5GsZ35cxCM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

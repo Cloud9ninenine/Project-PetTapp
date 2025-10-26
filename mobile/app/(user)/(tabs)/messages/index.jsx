@@ -19,10 +19,13 @@ import {
   query,
   where,
   onSnapshot,
-  orderBy,
+  doc,
+  getDoc,
 } from 'firebase/firestore';
-import { firestore, signInWithBackendToken } from '@config/firebase';
-import { getFirebaseAuthToken } from '@utils/messageService';
+import { firestore, auth } from '@config/firebase';
+import { signOut } from 'firebase/auth';
+import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { debugAllConversations } from '@utils/debugFirestore';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
@@ -35,52 +38,163 @@ export default function MessagesScreen() {
   const [firebaseAuthenticated, setFirebaseAuthenticated] = useState(false);
 
   useEffect(() => {
-    initializeFirebaseAuth();
+    let unsubscribeConversations = null;
+
+    const initialize = async () => {
+      unsubscribeConversations = await initializeFirebaseAuth();
+    };
+
+    initialize();
+
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribeConversations) {
+        console.log('Unsubscribing from conversations...');
+        unsubscribeConversations();
+      }
+    };
   }, []);
 
   const initializeFirebaseAuth = async () => {
     try {
       const userId = await AsyncStorage.getItem('userId');
+
+      if (!userId) {
+        console.error('No userId found in AsyncStorage');
+        setLoading(false);
+        Alert.alert(
+          'Authentication Error',
+          'User session not found. Please log in again.'
+        );
+        return;
+      }
+
+      console.log('Retrieved userId from AsyncStorage:', userId);
       setCurrentUserId(userId);
 
-      // Get Firebase custom token from backend
-      const firebaseToken = await getFirebaseAuthToken();
+      // Ensure Firebase authentication (uses cached token if valid)
+      console.log('Ensuring Firebase authentication...');
+      const isAuthenticated = await ensureFirebaseAuth();
 
-      // Sign in to Firebase with custom token
-      await signInWithBackendToken(firebaseToken);
+      if (!isAuthenticated) {
+        throw new Error('Failed to authenticate with Firebase');
+      }
+
       setFirebaseAuthenticated(true);
+      console.log('Firebase authentication successful');
 
-      // Subscribe to user's conversations
-      subscribeToConversations(userId);
+      // Debug: Check ALL conversations in Firestore (temporary)
+      try {
+        await debugAllConversations();
+      } catch (debugError) {
+        console.error('Debug error:', debugError);
+      }
+
+      // Subscribe to user's conversations and return unsubscribe function
+      const unsubscribe = await subscribeToConversations(userId);
+      return unsubscribe;
     } catch (error) {
       console.error('Error initializing Firebase auth:', error);
+      console.error('Error details:', error.response?.data || error.message);
       setLoading(false);
-      Alert.alert(
-        'Authentication Error',
-        'Could not connect to messaging service. Please try again later.'
-      );
+
+      let errorMessage = 'Could not connect to messaging service. Please try again later.';
+
+      if (error.response?.status === 401) {
+        errorMessage = 'Session expired. Please log in again.';
+      } else if (error.response?.status === 503) {
+        errorMessage = 'Messaging service is temporarily unavailable.';
+      } else if (error.message?.includes('token')) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      }
+
+      Alert.alert('Authentication Error', errorMessage);
     }
   };
 
-  const subscribeToConversations = (userId) => {
+  const subscribeToConversations = async (userId) => {
     try {
+      // Debug: Check Firebase auth state
+      let currentUser = auth.currentUser;
+      console.log('Firebase Auth State:', {
+        isAuthenticated: !!currentUser,
+        uid: currentUser?.uid,
+        localUserId: userId,
+        uidMatch: currentUser?.uid === userId
+      });
+
+      // If Firebase UID doesn't match local userId, re-authenticate
+      if (!currentUser || currentUser.uid !== userId) {
+        console.log('Firebase UID mismatch or not authenticated. Re-authenticating...');
+        try {
+          await signOut(auth); // Sign out the previous user
+          const isAuthenticated = await ensureFirebaseAuth();
+          if (!isAuthenticated) {
+            throw new Error('Failed to re-authenticate with Firebase');
+          }
+          currentUser = auth.currentUser;
+          console.log('Re-authenticated. New UID:', currentUser?.uid);
+        } catch (reAuthError) {
+          console.error('Re-authentication failed:', reAuthError);
+          Alert.alert('Error', 'Failed to authenticate. Please restart the app.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!currentUser) {
+        console.error('User not authenticated with Firebase!');
+        Alert.alert('Error', 'Not authenticated. Please restart the app.');
+        setLoading(false);
+        return;
+      }
+
       const conversationsRef = collection(firestore, 'conversations');
       const q = query(
         conversationsRef,
-        where('participants', 'array-contains', userId),
-        orderBy('updatedAt', 'desc')
+        where('participants', 'array-contains', userId)
       );
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        console.log('=== CONVERSATION SYNC DEBUG ===');
+        console.log('Query userId:', userId);
+        console.log('Firebase UID:', auth.currentUser?.uid);
+        console.log('Number of conversations found:', snapshot.docs.length);
+
         const conversationsList = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
+
+        // Fetch all conversations with participant details
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+          console.log('Conversation ID:', docSnap.id);
+          console.log('Participants:', data.participants);
+          console.log('Last message:', data.lastMessage?.message);
+
+          const otherParticipant = await getOtherParticipant(data, userId);
+
           conversationsList.push({
-            id: doc.id,
+            id: docSnap.id,
             ...data,
-            // Get other participant's details
-            otherParticipant: getOtherParticipant(data, userId),
+            otherParticipant,
           });
+        }
+
+        console.log('Total conversations loaded:', conversationsList.length);
+        console.log('=================================');
+
+        // Sort conversations by updatedAt (handles both string and Timestamp formats)
+        conversationsList.sort((a, b) => {
+          const getTimestamp = (conv) => {
+            if (!conv.updatedAt) return 0;
+            if (typeof conv.updatedAt === 'string') {
+              return new Date(conv.updatedAt).getTime();
+            }
+            if (conv.updatedAt.toDate) {
+              return conv.updatedAt.toDate().getTime();
+            }
+            return new Date(conv.updatedAt).getTime();
+          };
+          return getTimestamp(b) - getTimestamp(a); // descending order
         });
 
         setConversations(conversationsList);
@@ -88,8 +202,17 @@ export default function MessagesScreen() {
         setRefreshing(false);
       }, (error) => {
         console.error('Error fetching conversations:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
         setLoading(false);
         setRefreshing(false);
+
+        if (error.code === 'permission-denied') {
+          Alert.alert(
+            'Permission Error',
+            'Firestore rules may not be deployed. Please contact support.'
+          );
+        }
       });
 
       // Clean up subscription on unmount
@@ -101,24 +224,48 @@ export default function MessagesScreen() {
     }
   };
 
-  const getOtherParticipant = (conversationData, currentUserId) => {
+  const getOtherParticipant = async (conversationData, currentUserId) => {
     const participants = conversationData.participants || [];
     const otherUserId = participants.find(id => id !== currentUserId);
 
-    if (!otherUserId || !conversationData.participantDetails) {
+    if (!otherUserId) {
       return {
-        userId: otherUserId || 'unknown',
+        userId: 'unknown',
         fullName: 'Unknown User',
         profileImage: null,
         role: 'pet-owner',
       };
     }
 
-    return conversationData.participantDetails[otherUserId] || {
+    // First try to get from conversation participantDetails
+    if (conversationData.participantDetails && conversationData.participantDetails[otherUserId]) {
+      return conversationData.participantDetails[otherUserId];
+    }
+
+    // If not in participantDetails, fetch from users collection
+    try {
+      const userDocRef = doc(firestore, 'users', otherUserId);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        return {
+          userId: otherUserId,
+          fullName: userData.fullName || 'Unknown User',
+          profileImage: userData.profileImage || null,
+          role: userData.role || 'business-owner',
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+
+    // Fallback
+    return {
       userId: otherUserId,
       fullName: 'Unknown User',
       profileImage: null,
-      role: 'pet-owner',
+      role: 'business-owner',
     };
   };
 

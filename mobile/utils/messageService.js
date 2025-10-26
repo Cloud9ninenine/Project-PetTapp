@@ -112,6 +112,12 @@ export const getBusinessOwnerId = async (businessId) => {
  */
 export const sendMessage = async (conversationId, senderId, messageText, senderInfo = {}) => {
   try {
+    console.log('=== SENDING MESSAGE DEBUG ===');
+    console.log('Conversation ID:', conversationId);
+    console.log('Sender ID:', senderId);
+    console.log('Message:', messageText);
+    console.log('============================');
+
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
     const messageData = {

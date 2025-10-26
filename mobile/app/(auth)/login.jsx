@@ -18,9 +18,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
-import apiClient from "../config/api";
+import apiClient from "@config/api";
 import { registerForPushNotifications, getExpoPushToken, sendPushTokenToServer } from "@utils/notificationHelpers";
 import { registerBackgroundFetchAsync } from '@utils/backgroundTasks';
+import { initializeFirebaseAuth } from '@utils/firebaseAuthPersistence';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -47,13 +48,18 @@ export default function LoginScreen() {
       const { user, tokens } = loginResponse.data;
       const { accessToken, refreshToken } = tokens;
 
-      // Store tokens
+      // Store tokens and user data
       try {
         await AsyncStorage.multiSet([
           ['accessToken', accessToken],
           ['refreshToken', refreshToken],
+          ['userId', user._id || user.id],
+          ['userEmail', user.email],
+          ['userRole', user.role],
+          ['userFirstName', user.firstName || ''],
+          ['userLastName', user.lastName || ''],
         ]);
-        console.log('Access and refresh tokens stored successfully');
+        console.log('Access token, refresh token, and user data stored successfully');
       } catch (storageError) {
         console.error('AsyncStorage error:', storageError);
         Alert.alert("Warning", "Token saved but storage issue detected.");
@@ -61,6 +67,16 @@ export default function LoginScreen() {
 
       // Step 2: Get user info (optional since you already have user data)
       console.log('User data:', user);
+
+      // Step 3: Initialize Firebase authentication for messaging
+      try {
+        console.log('Initializing Firebase authentication...');
+        await initializeFirebaseAuth();
+        console.log('Firebase authentication initialized successfully');
+      } catch (firebaseError) {
+        console.error('Firebase initialization error:', firebaseError);
+        // Don't block login if Firebase fails, just log the error
+      }
 
       // Navigate based on role
       const role = user.role;

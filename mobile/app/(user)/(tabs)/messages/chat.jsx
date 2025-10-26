@@ -23,9 +23,9 @@ import {
   sendMessage,
   markMessagesAsRead,
   getConversationDetails,
-  getFirebaseAuthToken,
 } from '@utils/messageService';
-import { signInWithBackendToken } from '@config/firebase';
+import { auth } from '@config/firebase';
+import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
@@ -65,11 +65,26 @@ export default function ChatScreen() {
           setCurrentUserImage(user.images?.profile || '');
         }
 
-        // Initialize Firebase authentication first
+        // Ensure Firebase authentication
         try {
-          const firebaseToken = await getFirebaseAuthToken();
-          await signInWithBackendToken(firebaseToken);
+          // Check if Firebase UID matches current user
+          if (auth.currentUser && auth.currentUser.uid !== uid) {
+            console.log('Firebase UID mismatch in chat. Signing out and re-authenticating...');
+            await auth.signOut();
+          }
+
+          const isAuthenticated = await ensureFirebaseAuth();
+          if (!isAuthenticated) {
+            throw new Error('Failed to authenticate with Firebase');
+          }
+
+          // Verify UID matches after authentication
+          if (auth.currentUser?.uid !== uid) {
+            throw new Error(`Firebase UID mismatch: expected ${uid}, got ${auth.currentUser?.uid}`);
+          }
+
           setFirebaseAuthenticated(true);
+          console.log('Firebase authenticated for chat. UID:', auth.currentUser?.uid);
         } catch (firebaseError) {
           console.error('Error initializing Firebase auth:', firebaseError);
           setLoading(false);
