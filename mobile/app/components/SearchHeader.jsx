@@ -8,15 +8,12 @@
   import { hp, wp, moderateScale, scaleFontSize } from "@utils/responsive";
   import apiClient from "@config/api";
   import AsyncStorage from '@react-native-async-storage/async-storage';
-  import { collection, query, where, onSnapshot } from 'firebase/firestore';
-  import { firestore } from '@config/firebase';
+  import { useNotificationCount } from '@utils/useNotificationCount';
 
   export default function SearchHeader({ onNotifPress,
   showNotificationBadge = true }) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-    const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState(""); // Internal state
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -24,106 +21,8 @@
     const searchTimeoutRef = useRef(null);
     const abortControllerRef = useRef(null);
 
-    // Helper function to convert user ID to Firebase UID format
-    const getFirebaseUid = (userId) => {
-      return `pettapp_${userId}`;
-    };
-
-    // Fetch unread notification count
-    useEffect(() => {
-      const fetchUnreadNotificationsCount = async () => {
-        try {
-          // Fetch notifications with unread filter
-          const response = await apiClient.get('/notifications', {
-            params: {
-              page: 1,
-              limit: 100,
-              isRead: false, // Only fetch unread notifications
-              sort: '-createdAt',
-            }
-          });
-
-          if (response.data && response.data.success) {
-            const notifications = response.data.data || [];
-            // Count unread notifications
-            const unread = notifications.filter(notification => {
-              if (!notification) return false;
-              // Check if notification is explicitly marked as unread
-              return notification.isRead === false;
-            });
-            setUnreadNotificationsCount(unread.length);
-          }
-        } catch (error) {
-          console.error('Error fetching unread notification count:', error);
-          // Fallback: try to get total count from response
-          if (error.response?.data?.pagination?.total) {
-            setUnreadNotificationsCount(error.response.data.pagination.total);
-          }
-        }
-      };
-
-      if (showNotificationBadge) {
-        fetchUnreadNotificationsCount();
-        // Refresh count every 2 minutes for more real-time updates
-        const interval = setInterval(fetchUnreadNotificationsCount, 2 * 60 * 1000);
-        return () => clearInterval(interval);
-      }
-    }, [showNotificationBadge]);
-
-    // Subscribe to unread messages count from Firebase
-    useEffect(() => {
-      if (!showNotificationBadge) return;
-
-      let unsubscribe = null;
-
-      const subscribeToUnreadMessages = async () => {
-        try {
-          const userId = await AsyncStorage.getItem('userId');
-          if (!userId) {
-            console.error('No userId found for message notifications');
-            return;
-          }
-
-          const firebaseUid = getFirebaseUid(userId);
-          console.log('📬 Subscribing to unread messages for:', firebaseUid);
-
-          // Subscribe to conversations where user has unread messages
-          const conversationsRef = collection(firestore, 'conversations');
-          const q = query(
-            conversationsRef,
-            where('participants', 'array-contains', firebaseUid)
-          );
-
-          unsubscribe = onSnapshot(q, (snapshot) => {
-            let totalUnread = 0;
-
-            snapshot.docs.forEach((doc) => {
-              const data = doc.data();
-              // Get unread count for this user from the conversation
-              if (data.unreadCount && data.unreadCount[firebaseUid]) {
-                totalUnread += data.unreadCount[firebaseUid];
-              }
-            });
-
-            console.log('📬 Total unread messages:', totalUnread);
-            setUnreadMessagesCount(totalUnread);
-          }, (error) => {
-            console.error('Error subscribing to unread messages:', error);
-          });
-        } catch (error) {
-          console.error('Error setting up message subscription:', error);
-        }
-      };
-
-      subscribeToUnreadMessages();
-
-      // Cleanup subscription on unmount
-      return () => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      };
-    }, [showNotificationBadge]);
+    // Use custom hook for notification count
+    const { unreadCount: unreadNotificationsCount } = useNotificationCount(showNotificationBadge);
 
     // Search both businesses and services with debounce
     useEffect(() => {
@@ -351,10 +250,10 @@
           {/* Notification bell */}
           <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
             <Ionicons name="notifications-outline" size={moderateScale(26)} color="#fff" />
-            {showNotificationBadge && (unreadNotificationsCount + unreadMessagesCount) > 0 && (
+            {showNotificationBadge && unreadNotificationsCount > 0 && (
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>
-                  {(unreadNotificationsCount + unreadMessagesCount) > 99 ? '99+' : (unreadNotificationsCount + unreadMessagesCount)}
+                  {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                 </Text>
               </View>
             )}

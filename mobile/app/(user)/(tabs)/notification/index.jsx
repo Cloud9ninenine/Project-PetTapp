@@ -20,6 +20,7 @@ import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "../../../config/api";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import notificationEvents, { NOTIFICATION_EVENTS } from '@utils/notificationEvents';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -29,122 +30,38 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [userId, setUserId] = useState(null);
 
-  // Fetch user ID
-  const fetchUserId = async () => {
-    try {
-      // 1. Try from AsyncStorage first
-      const storedUserId = await AsyncStorage.getItem('userId');
-      if (storedUserId) {
-        setUserId(storedUserId);
-        return storedUserId;
-      }
 
-      // 2. Try from /auth/me API
-      const response = await apiClient.get('/auth/me');
-      const user = response.data?.user || response.data;
-
-      if (user) {
-        const resolvedId = user._id || user.id || user.userId;
-
-        if (resolvedId) {
-          await AsyncStorage.setItem('userId', resolvedId);
-          setUserId(resolvedId);
-          return resolvedId;
-        } else {
-          console.error('⚠️ User ID missing from /auth/me response:', user);
-        }
-      } else {
-        console.error('⚠️ No user object found in /auth/me response:', response.data);
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error fetching user ID:', error);
-      return null;
-    }
+  // Map notification type to icon and colors
+  const getNotificationStyle = (type) => {
+    const styles = {
+      booking: { icon: 'calendar', iconColor: '#4CAF50', iconBg: '#E8F5E9' },
+      business: { icon: 'storefront', iconColor: '#2196F3', iconBg: '#E3F2FD' },
+      payment: { icon: 'cash', iconColor: '#FF9800', iconBg: '#FFF3E0' },
+      rating: { icon: 'star', iconColor: '#FFB300', iconBg: '#FFF8E1' },
+      admin: { icon: 'shield', iconColor: '#9C27B0', iconBg: '#F3E5F5' },
+      reminder: { icon: 'alarm', iconColor: '#FF5722', iconBg: '#FBE9E7' },
+    };
+    return styles[type] || styles.booking;
   };
 
-
-  // Convert bookings to notifications
-  const convertBookingsToNotifications = (bookings) => {
-    return bookings.map(booking => {
-      const business = booking.businessId || {};
-      const businessName = business.businessName || 'Service Provider';
-      const serviceName = booking.serviceId?.name || 'Service';
-      const petName = booking.petId?.name || 'Your pet';
-
-      let type = 'booking';
-      let icon = 'calendar';
-      let iconColor = '#4CAF50';
-      let iconBg = '#E8F5E9';
-      let title = 'Booking Update';
-      let message = '';
-
-      // Determine notification type and message based on booking status
-      if (booking.status === 'pending') {
-        type = 'booking';
-        icon = 'time-outline';
-        iconColor = '#FF9B79';
-        iconBg = '#FFF3E0';
-        title = 'Booking Pending';
-        message = `Your ${serviceName} appointment for ${petName} at ${businessName} is pending confirmation`;
-      } else if (booking.status === 'confirmed') {
-        type = 'booking';
-        icon = 'checkmark-circle';
-        iconColor = '#4CAF50';
-        iconBg = '#E8F5E9';
-        title = 'Booking Confirmed';
-        message = `Your ${serviceName} appointment for ${petName} at ${businessName} has been confirmed`;
-      } else if (booking.status === 'cancelled') {
-        type = 'booking';
-        icon = 'close-circle';
-        iconColor = '#FF6B6B';
-        iconBg = '#FFEBEE';
-        title = 'Booking Cancelled';
-        message = `Your ${serviceName} appointment for ${petName} has been cancelled`;
-      } else if (booking.status === 'in-progress') {
-        type = 'booking';
-        icon = 'play-circle';
-        iconColor = '#2196F3';
-        iconBg = '#E3F2FD';
-        title = 'Service In Progress';
-        message = `${serviceName} for ${petName} is currently in progress`;
-      } else if (booking.status === 'completed') {
-        type = 'booking';
-        icon = 'checkmark-done';
-        iconColor = '#4CAF50';
-        iconBg = '#E8F5E9';
-        title = 'Service Completed';
-        message = `Your ${serviceName} for ${petName} has been completed. Rate your experience!`;
-      } else if (booking.status === 'no-show') {
-        type = 'booking';
-        icon = 'alert-circle';
-        iconColor = '#999';
-        iconBg = '#F5F5F5';
-        title = 'Missed Appointment';
-        message = `You missed your ${serviceName} appointment for ${petName}`;
-      }
-
-      // Calculate time ago
-      const time = getTimeAgo(booking.createdAt || booking.appointmentDateTime);
-
-      // Mark recent bookings (last 24 hours) as unread
-      const isRecent = new Date() - new Date(booking.createdAt || booking.appointmentDateTime) < 24 * 60 * 60 * 1000;
+  // Format notifications for display
+  const formatNotifications = (notifications) => {
+    return notifications.map(notification => {
+      const style = getNotificationStyle(notification.type);
+      const time = getTimeAgo(notification.createdAt);
 
       return {
-        id: booking._id,
-        type,
-        icon,
-        iconColor,
-        iconBg,
-        title,
-        message,
+        id: notification._id,
+        type: notification.type,
+        icon: style.icon,
+        iconColor: style.iconColor,
+        iconBg: style.iconBg,
+        title: notification.title,
+        message: notification.message,
         time,
-        read: !isRecent,
-        bookingId: booking._id,
-        appointmentDate: booking.appointmentDateTime,
+        read: notification.isRead,
+        data: notification.data, // Additional data like bookingId, businessId, etc.
       };
     });
   };
@@ -163,12 +80,11 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Fetch bookings and convert to notifications
-  const fetchNotifications = async (uId) => {
+  // Fetch real notifications from API
+  const fetchNotifications = async () => {
     try {
-      const response = await apiClient.get('/bookings', {
+      const response = await apiClient.get('/notifications', {
         params: {
-          userId: uId, // include if required by backend
           page: 1,
           limit: 50,
           sort: '-createdAt',
@@ -176,12 +92,24 @@ export default function NotificationsScreen() {
       });
 
       if (response.data?.success) {
-        const bookings = response.data.data || [];
-        const notificationsList = convertBookingsToNotifications(bookings);
-        setNotifications(notificationsList);
+        const rawNotifications = response.data.data || [];
+        const formattedNotifications = formatNotifications(rawNotifications);
+        setNotifications(formattedNotifications);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      await apiClient.patch('/notifications/read-all');
+      // Emit event to update badge counts everywhere
+      notificationEvents.emit(NOTIFICATION_EVENTS.ALL_READ);
+      console.log('✅ All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
     }
   };
 
@@ -190,11 +118,7 @@ export default function NotificationsScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const uId = userId || await fetchUserId();
-
-      if (uId) {
-        await fetchNotifications(uId);
-      }
+      await fetchNotifications();
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -216,10 +140,10 @@ export default function NotificationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (userId) {
-        loadData();
-      }
-    }, [userId])
+      loadData();
+      // Mark all notifications as read when screen is focused
+      markAllAsRead();
+    }, [])
   );
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -236,12 +160,24 @@ export default function NotificationsScreen() {
   }, [isProfileComplete]);
 
   const handleNotificationPress = (notification) => {
-    if (notification.bookingId) {
+    // Handle navigation based on notification type and data
+    if (notification.type === 'booking' && notification.data?.bookingId) {
       router.push({
         pathname: '/(user)/(tabs)/booking/ScheduleDetail',
-        params: { bookingId: notification.bookingId }
+        params: { bookingId: notification.data.bookingId }
+      });
+    } else if (notification.type === 'business' && notification.data?.businessId) {
+      router.push({
+        pathname: '/(user)/(tabs)/home/business-details',
+        params: { id: notification.data.businessId }
+      });
+    } else if (notification.type === 'rating' && notification.data?.bookingId) {
+      router.push({
+        pathname: '/(user)/(tabs)/booking/ScheduleDetail',
+        params: { bookingId: notification.data.bookingId }
       });
     } else {
+      // Default: go to bookings
       router.push('/(user)/(tabs)/booking');
     }
   };

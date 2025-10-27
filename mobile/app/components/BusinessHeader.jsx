@@ -1,12 +1,11 @@
 // mobile/app/components/BusinessHeader.jsx
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { wp, moderateScale, scaleFontSize } from "@utils/responsive";
-import apiClient from "@config/api";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNotificationCount } from "@utils/useNotificationCount";
 
 const BusinessHeader = ({
   businessName = "Business Dashboard",
@@ -22,48 +21,9 @@ const BusinessHeader = ({
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch unread notification count
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        // Fetch notifications with unread filter
-        const response = await apiClient.get('/notifications', {
-          params: {
-            page: 1,
-            limit: 100,
-            isRead: false, // Only fetch unread notifications
-            sort: '-createdAt',
-          }
-        });
-
-        if (response.data && response.data.success) {
-          const notifications = response.data.data || [];
-          // Count unread notifications
-          const unread = notifications.filter(notification => {
-            if (!notification) return false;
-            // Check if notification is explicitly marked as unread
-            return notification.isRead === false;
-          });
-          setUnreadCount(unread.length);
-        }
-      } catch (error) {
-        console.error('Error fetching unread notification count:', error);
-        // Fallback: try to get total count from response
-        if (error.response?.data?.pagination?.total) {
-          setUnreadCount(error.response.data.pagination.total);
-        }
-      }
-    };
-
-    if (showNotificationBadge) {
-      fetchUnreadCount();
-      // Refresh count every 2 minutes for more real-time updates
-      const interval = setInterval(fetchUnreadCount, 2 * 60 * 1000);
-      return () => clearInterval(interval);
-    }
-  }, [showNotificationBadge]);
+  // Use custom hook for notification count
+  const { unreadCount } = useNotificationCount(showNotificationBadge);
 
   const handleNotificationPress = () => {
     if (onNotificationPress) {

@@ -1,0 +1,672 @@
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ImageBackground,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import Header from "@components/Header";
+import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
+import apiClient from "@config/api";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export default function AnalyticsScreen() {
+  const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [businessId, setBusinessId] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
+
+  // Fetch business ID from AsyncStorage
+  const fetchBusinessId = async () => {
+    try {
+      const storedBusinessId = await AsyncStorage.getItem('businessId');
+      if (storedBusinessId) {
+        setBusinessId(storedBusinessId);
+        return storedBusinessId;
+      } else {
+        // Try to fetch from API
+        const response = await apiClient.get('/businesses');
+        if (response.data && response.data.data && response.data.data.length > 0) {
+          const business = response.data.data[0];
+          await AsyncStorage.setItem('businessId', business._id);
+          setBusinessId(business._id);
+          return business._id;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching business ID:', error);
+      return null;
+    }
+  };
+
+  // Calculate date range based on selected period
+  const getDateRange = () => {
+    const endDate = new Date();
+    const startDate = new Date();
+
+    if (selectedPeriod === 'week') {
+      startDate.setDate(endDate.getDate() - 7);
+    } else if (selectedPeriod === 'month') {
+      startDate.setMonth(endDate.getMonth() - 1);
+    } else if (selectedPeriod === 'year') {
+      startDate.setFullYear(endDate.getFullYear() - 1);
+    }
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    };
+  };
+
+  // Fetch analytics data from API
+  const fetchAnalyticsData = async () => {
+    try {
+      const { startDate, endDate } = getDateRange();
+      const response = await apiClient.get('/analytics', {
+        params: {
+          startDate,
+          endDate
+        }
+      });
+
+      if (response.data && response.data.success) {
+        setAnalyticsData(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      Alert.alert('Error', 'Failed to load analytics data');
+    }
+  };
+
+  // Load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const bId = businessId || await fetchBusinessId();
+
+      if (bId) {
+        await fetchAnalyticsData();
+      } else {
+        Alert.alert('Business Required', 'Please set up your business profile first.');
+      }
+    } catch (error) {
+      console.error('Error loading analytics data:', error);
+      Alert.alert('Error', 'Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh data
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Load data on mount and when period changes
+  useEffect(() => {
+    loadData();
+  }, [selectedPeriod]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (businessId) {
+        loadData();
+      }
+    }, [businessId, selectedPeriod])
+  );
+
+  const renderTitle = () => (
+    <View style={styles.titleContainer}>
+      <Text style={styles.titleText} numberOfLines={1}>
+        Business Analytics
+      </Text>
+    </View>
+  );
+
+  // Helper functions
+  const formatCurrency = (amount) => {
+    return `₱${(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatPercentage = (value) => {
+    return `${(value || 0).toFixed(1)}%`;
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={false}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading analytics...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const { overview, topServices, customerStats, statusBreakdown, dayOfWeekDistribution } = analyticsData || {};
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
+      <Header
+        backgroundColor="#1C86FF"
+        titleColor="#fff"
+        customTitle={renderTitle()}
+        showBack={false}
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Period Selector */}
+        <View style={styles.periodSelector}>
+          <TouchableOpacity
+            style={[
+              styles.periodButton,
+              selectedPeriod === "week" && styles.periodButtonActive,
+            ]}
+            onPress={() => setSelectedPeriod("week")}
+          >
+            <Text
+              style={[
+                styles.periodButtonText,
+                selectedPeriod === "week" && styles.periodButtonTextActive,
+              ]}
+            >
+              Week
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.periodButton,
+              selectedPeriod === "month" && styles.periodButtonActive,
+            ]}
+            onPress={() => setSelectedPeriod("month")}
+          >
+            <Text
+              style={[
+                styles.periodButtonText,
+                selectedPeriod === "month" && styles.periodButtonTextActive,
+              ]}
+            >
+              Month
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.periodButton,
+              selectedPeriod === "year" && styles.periodButtonActive,
+            ]}
+            onPress={() => setSelectedPeriod("year")}
+          >
+            <Text
+              style={[
+                styles.periodButtonText,
+                selectedPeriod === "year" && styles.periodButtonTextActive,
+              ]}
+            >
+              Year
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Key Metrics Grid */}
+        <View style={styles.metricsGrid}>
+          <View style={[styles.metricCard, { backgroundColor: '#E8F5E9' }]}>
+            <View style={[styles.metricIcon, { backgroundColor: '#4CAF50' }]}>
+              <Ionicons name="cash" size={moderateScale(24)} color="#fff" />
+            </View>
+            <Text style={styles.metricValue}>{formatCurrency(overview?.totalRevenue)}</Text>
+            <Text style={styles.metricLabel}>Total Revenue</Text>
+          </View>
+
+          <View style={[styles.metricCard, { backgroundColor: '#E3F2FD' }]}>
+            <View style={[styles.metricIcon, { backgroundColor: '#2196F3' }]}>
+              <Ionicons name="calendar" size={moderateScale(24)} color="#fff" />
+            </View>
+            <Text style={styles.metricValue}>{overview?.totalBookings || 0}</Text>
+            <Text style={styles.metricLabel}>Total Bookings</Text>
+          </View>
+
+          <View style={[styles.metricCard, { backgroundColor: '#FFF3E0' }]}>
+            <View style={[styles.metricIcon, { backgroundColor: '#FF9800' }]}>
+              <Ionicons name="checkmark-done" size={moderateScale(24)} color="#fff" />
+            </View>
+            <Text style={styles.metricValue}>{overview?.completedBookings || 0}</Text>
+            <Text style={styles.metricLabel}>Completed</Text>
+          </View>
+
+          <View style={[styles.metricCard, { backgroundColor: '#F3E5F5' }]}>
+            <View style={[styles.metricIcon, { backgroundColor: '#9C27B0' }]}>
+              <Ionicons name="stats-chart" size={moderateScale(24)} color="#fff" />
+            </View>
+            <Text style={styles.metricValue}>{formatCurrency(overview?.averageBookingValue)}</Text>
+            <Text style={styles.metricLabel}>Avg. Value</Text>
+          </View>
+        </View>
+
+        {/* Performance Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Performance Metrics</Text>
+          <View style={styles.performanceGrid}>
+            <View style={styles.performanceCard}>
+              <View style={styles.performanceHeader}>
+                <Ionicons name="checkmark-circle" size={moderateScale(28)} color="#4CAF50" />
+                <Text style={[styles.performanceValue, { color: '#4CAF50' }]}>
+                  {formatPercentage(overview?.completionRate)}
+                </Text>
+              </View>
+              <Text style={styles.performanceLabel}>Completion Rate</Text>
+            </View>
+
+            <View style={styles.performanceCard}>
+              <View style={styles.performanceHeader}>
+                <Ionicons name="close-circle" size={moderateScale(28)} color="#F44336" />
+                <Text style={[styles.performanceValue, { color: '#F44336' }]}>
+                  {formatPercentage(overview?.cancellationRate)}
+                </Text>
+              </View>
+              <Text style={styles.performanceLabel}>Cancellation Rate</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Customer Insights Section */}
+        {customerStats && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Customer Insights</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Ionicons name="people" size={moderateScale(28)} color="#1C86FF" />
+                <Text style={styles.statValue}>{customerStats.totalCustomers || 0}</Text>
+                <Text style={styles.statLabel}>Total Customers</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="repeat" size={moderateScale(28)} color="#4CAF50" />
+                <Text style={styles.statValue}>{customerStats.repeatCustomers || 0}</Text>
+                <Text style={styles.statLabel}>Repeat Customers</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="trending-up" size={moderateScale(28)} color="#FF9800" />
+                <Text style={styles.statValue}>{formatPercentage(customerStats.retentionRate)}</Text>
+                <Text style={styles.statLabel}>Retention Rate</Text>
+              </View>
+
+              <View style={styles.statCard}>
+                <Ionicons name="bar-chart" size={moderateScale(28)} color="#9C27B0" />
+                <Text style={styles.statValue}>
+                  {customerStats.averageBookingsPerCustomer?.toFixed(1) || '0.0'}
+                </Text>
+                <Text style={styles.statLabel}>Avg. Bookings</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Top Services Section */}
+        {topServices && topServices.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Top Services</Text>
+            {topServices.slice(0, 5).map((service, index) => (
+              <View key={index} style={styles.serviceCard}>
+                <View style={styles.serviceRank}>
+                  <Text style={styles.serviceRankText}>{index + 1}</Text>
+                </View>
+                <View style={styles.serviceInfo}>
+                  <Text style={styles.serviceName} numberOfLines={1}>
+                    {service.serviceName || 'Unknown Service'}
+                  </Text>
+                  <Text style={styles.serviceStats}>
+                    {service.bookings || 0} bookings • {formatCurrency(service.revenue)}
+                  </Text>
+                </View>
+                <View style={styles.serviceRevenue}>
+                  <Ionicons name="trending-up" size={moderateScale(20)} color="#4CAF50" />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Booking Status Breakdown */}
+        {statusBreakdown && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Booking Status</Text>
+            <View style={styles.statusGrid}>
+              {Object.entries(statusBreakdown).map(([status, count]) => (
+                <View key={status} style={styles.statusCard}>
+                  <Text style={styles.statusCount}>{count || 0}</Text>
+                  <Text style={styles.statusLabel}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Day of Week Distribution */}
+        {dayOfWeekDistribution && dayOfWeekDistribution.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Busiest Days</Text>
+            {dayOfWeekDistribution
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 3)
+              .map((day, index) => (
+                <View key={index} style={styles.dayCard}>
+                  <View style={styles.dayRank}>
+                    <Text style={styles.dayRankText}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.dayInfo}>
+                    <Text style={styles.dayName}>{day.day}</Text>
+                    <Text style={styles.dayCount}>{day.count} bookings</Text>
+                  </View>
+                </View>
+              ))}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+  backgroundImageStyle: {
+    opacity: 0.1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontFamily: 'SFProReg',
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  titleText: {
+    color: '#fff',
+    fontSize: scaleFontSize(24),
+    fontFamily: 'SFProBold',
+    textAlign: 'center',
+  },
+  content: {
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(20),
+    paddingBottom: moderateScale(40),
+  },
+  periodSelector: {
+    flexDirection: "row",
+    backgroundColor: "#F5F5F5",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(4),
+    marginBottom: moderateScale(20),
+  },
+  periodButton: {
+    flex: 1,
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(8),
+    alignItems: "center",
+  },
+  periodButtonActive: {
+    backgroundColor: "#1C86FF",
+  },
+  periodButtonText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: "600",
+    color: "#666",
+  },
+  periodButtonTextActive: {
+    color: "#fff",
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(12),
+    marginBottom: moderateScale(20),
+  },
+  metricCard: {
+    flex: 1,
+    minWidth: '47%',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(16),
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  metricIcon: {
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+  },
+  metricValue: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(4),
+  },
+  metricLabel: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    textAlign: 'center',
+  },
+  section: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(20),
+    marginBottom: moderateScale(16),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  sectionTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginBottom: moderateScale(16),
+  },
+  performanceGrid: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+  },
+  performanceCard: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    alignItems: 'center',
+  },
+  performanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(8),
+  },
+  performanceValue: {
+    fontSize: scaleFontSize(24),
+    fontWeight: 'bold',
+  },
+  performanceLabel: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    textAlign: 'center',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(12),
+  },
+  statCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: moderateScale(8),
+    marginBottom: moderateScale(4),
+  },
+  statLabel: {
+    fontSize: scaleFontSize(11),
+    color: '#666',
+    textAlign: 'center',
+  },
+  serviceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(8),
+  },
+  serviceRank: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    backgroundColor: '#1C86FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: moderateScale(12),
+  },
+  serviceRankText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  serviceInfo: {
+    flex: 1,
+  },
+  serviceName: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(4),
+  },
+  serviceStats: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+  },
+  serviceRevenue: {
+    marginLeft: moderateScale(8),
+  },
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(12),
+  },
+  statusCard: {
+    flex: 1,
+    minWidth: '30%',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    alignItems: 'center',
+  },
+  statusCount: {
+    fontSize: scaleFontSize(24),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginBottom: moderateScale(4),
+  },
+  statusLabel: {
+    fontSize: scaleFontSize(11),
+    color: '#666',
+    textAlign: 'center',
+  },
+  dayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(8),
+  },
+  dayRank: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: '#FF9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: moderateScale(12),
+  },
+  dayRankText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  dayInfo: {
+    flex: 1,
+  },
+  dayName: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(2),
+  },
+  dayCount: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+  },
+});

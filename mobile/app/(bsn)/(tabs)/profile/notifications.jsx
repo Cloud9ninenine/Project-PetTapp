@@ -16,103 +16,54 @@ import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import notificationEvents, { NOTIFICATION_EVENTS } from '@utils/notificationEvents';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const [selectedTab, setSelectedTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [businessId, setBusinessId] = useState(null);
   const [notifications, setNotifications] = useState([]);
 
-  // Fetch business ID
-  const fetchBusinessId = async () => {
-    try {
-      const storedBusinessId = await AsyncStorage.getItem('businessId');
-      if (storedBusinessId) {
-        setBusinessId(storedBusinessId);
-        return storedBusinessId;
-      } else {
-        const response = await apiClient.get('/businesses');
-        if (response.data && response.data.data && response.data.data.length > 0) {
-          const business = response.data.data[0];
-          await AsyncStorage.setItem('businessId', business._id);
-          setBusinessId(business._id);
-          return business._id;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching business ID:', error);
-      return null;
-    }
+  // Map notification type to icon and colors
+  const getNotificationStyle = (type) => {
+    const styles = {
+      booking: { icon: 'calendar', iconColor: '#4CAF50' },
+      business: { icon: 'storefront', iconColor: '#2196F3' },
+      payment: { icon: 'cash', iconColor: '#FF9800' },
+      rating: { icon: 'star', iconColor: '#FFB300' },
+      admin: { icon: 'shield', iconColor: '#9C27B0' },
+      reminder: { icon: 'alarm', iconColor: '#FF5722' },
+      cancelled: { icon: 'close-circle', iconColor: '#FF6B6B' },
+      message: { icon: 'chatbubble', iconColor: '#2196F3' },
+    };
+    return styles[type] || styles.booking;
   };
 
-  // Convert bookings to notifications
-  const convertBookingsToNotifications = (bookings) => {
-    return bookings.map(booking => {
-      const petOwner = booking.petOwnerId || {};
-      const customerName = `${petOwner.firstName || ''} ${petOwner.lastName || ''}`.trim() || 'Customer';
-      const petName = booking.petId?.name || 'Pet';
-      const serviceName = booking.serviceId?.name || 'Service';
+  // Format notifications for display
+  const formatNotifications = (notifications) => {
+    return notifications.map(notification => {
+      const style = getNotificationStyle(notification.type);
+      const time = getTimeAgo(notification.createdAt);
 
-      let type = 'booking';
-      let icon = 'calendar';
-      let iconColor = '#4CAF50';
-      let message = 'New booking request';
-
-      // Determine notification type and message based on booking status
-      if (booking.status === 'pending') {
-        type = 'booking';
-        icon = 'time-outline';
-        iconColor = '#FF9B79';
-        message = 'New booking request';
-      } else if (booking.status === 'confirmed') {
-        type = 'booking';
-        icon = 'checkmark-circle';
-        iconColor = '#4CAF50';
-        message = 'Booking confirmed';
-      } else if (booking.status === 'cancelled') {
-        type = 'cancelled';
-        icon = 'close-circle';
-        iconColor = '#FF6B6B';
-        message = 'Cancelled booking';
-      } else if (booking.status === 'in-progress') {
-        type = 'booking';
-        icon = 'play-circle';
-        iconColor = '#2196F3';
-        message = 'Service in progress';
-      } else if (booking.status === 'completed') {
-        type = 'booking';
-        icon = 'checkmark-done';
-        iconColor = '#4CAF50';
-        message = 'Service completed';
-      } else if (booking.status === 'no-show') {
-        type = 'cancelled';
-        icon = 'alert-circle';
-        iconColor = '#999';
-        message = 'Customer no-show';
-      }
-
-      // Calculate time ago
-      const timeAgo = getTimeAgo(booking.createdAt || booking.appointmentDateTime);
-
-      // Mark recent bookings (last 24 hours) as unread
-      const isRecent = new Date() - new Date(booking.createdAt || booking.appointmentDateTime) < 24 * 60 * 60 * 1000;
+      // Extract customer/pet info from notification data if available
+      const customerName = notification.data?.customerName || notification.title || 'Customer';
+      const petName = notification.data?.petName || null;
+      const service = notification.data?.serviceName || null;
 
       return {
-        id: booking._id,
-        type,
-        icon,
-        iconColor,
+        id: notification._id,
+        type: notification.type,
+        icon: style.icon,
+        iconColor: style.iconColor,
         customerName,
         petName,
-        service: serviceName,
-        message,
-        time: timeAgo,
-        read: !isRecent,
-        bookingId: booking._id,
-        appointmentDate: booking.appointmentDateTime,
+        service,
+        message: notification.message,
+        time,
+        read: notification.isRead,
+        bookingId: notification.data?.bookingId,
+        appointmentDate: notification.data?.appointmentDate,
       };
     });
   };
@@ -130,11 +81,10 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Fetch bookings and convert to notifications
-  const fetchNotifications = async (bId) => {
+  // Fetch real notifications from API
+  const fetchNotifications = async () => {
     try {
-      // Fetch recent bookings (last 30 days)
-      const response = await apiClient.get('/bookings', {
+      const response = await apiClient.get('/notifications', {
         params: {
           page: 1,
           limit: 50,
@@ -143,12 +93,24 @@ export default function NotificationsScreen() {
       });
 
       if (response.data && response.data.success) {
-        const bookings = response.data.data || [];
-        const notificationsList = convertBookingsToNotifications(bookings);
-        setNotifications(notificationsList);
+        const rawNotifications = response.data.data || [];
+        const formattedNotifications = formatNotifications(rawNotifications);
+        setNotifications(formattedNotifications);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Mark all notifications as read
+  const markAllAsRead = async () => {
+    try {
+      await apiClient.patch('/notifications/read-all');
+      // Emit event to update badge counts everywhere
+      notificationEvents.emit(NOTIFICATION_EVENTS.ALL_READ);
+      console.log('✅ All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
     }
   };
 
@@ -156,11 +118,7 @@ export default function NotificationsScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const bId = businessId || await fetchBusinessId();
-
-      if (bId) {
-        await fetchNotifications(bId);
-      }
+      await fetchNotifications();
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -182,10 +140,10 @@ export default function NotificationsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (businessId) {
-        loadData();
-      }
-    }, [businessId])
+      loadData();
+      // Mark all notifications as read when screen is focused
+      markAllAsRead();
+    }, [])
   );
 
   const filterNotifications = () => {

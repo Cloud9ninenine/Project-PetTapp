@@ -9,11 +9,13 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
+  Platform,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
@@ -31,6 +33,18 @@ const ScheduleDetail = () => {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // State for edit modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    appointmentDateTime: null,
+    notes: '',
+    specialRequests: '',
+    paymentMethod: '',
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   // Fetch booking details from API
   useEffect(() => {
@@ -255,6 +269,73 @@ const ScheduleDetail = () => {
     });
   };
 
+  const handleEditPress = () => {
+    if (!booking) return;
+
+    // Pre-fill form with current booking data
+    setEditFormData({
+      appointmentDateTime: booking.appointmentDateTime ? new Date(booking.appointmentDateTime) : new Date(),
+      notes: booking.notes || '',
+      specialRequests: booking.specialRequests || '',
+      paymentMethod: booking.paymentMethod || 'cash',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSubmitEdit = async () => {
+    try {
+      setIsSubmittingEdit(true);
+
+      const editData = {
+        appointmentDateTime: editFormData.appointmentDateTime?.toISOString(),
+        notes: editFormData.notes,
+        specialRequests: editFormData.specialRequests,
+        paymentMethod: editFormData.paymentMethod,
+      };
+
+      const response = await apiClient.put(`/bookings/${booking._id}`, editData);
+
+      if (response.data.success) {
+        Alert.alert(
+          'Edit Request Submitted',
+          'Your booking edit request has been submitted. The business owner will review and approve your changes.',
+          [{ text: 'OK', onPress: () => {
+            setShowEditModal(false);
+            fetchBookingDetail(); // Refresh booking data
+          }}]
+        );
+      }
+    } catch (error) {
+      console.error('Error submitting edit request:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit edit request';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const onDateChange = (event, selectedDate) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      const currentDateTime = editFormData.appointmentDateTime || new Date();
+      const newDateTime = new Date(selectedDate);
+      newDateTime.setHours(currentDateTime.getHours());
+      newDateTime.setMinutes(currentDateTime.getMinutes());
+      setEditFormData({ ...editFormData, appointmentDateTime: newDateTime });
+    }
+  };
+
+  const onTimeChange = (event, selectedTime) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      const currentDateTime = editFormData.appointmentDateTime || new Date();
+      const newDateTime = new Date(currentDateTime);
+      newDateTime.setHours(selectedTime.getHours());
+      newDateTime.setMinutes(selectedTime.getMinutes());
+      setEditFormData({ ...editFormData, appointmentDateTime: newDateTime });
+    }
+  };
+
   const renderActionButtons = () => {
     if (!booking) return null;
 
@@ -356,10 +437,14 @@ const ScheduleDetail = () => {
       );
     }
 
-    // Show cancel button only for pending/confirmed bookings with proof uploaded or paid
+    // Show edit and cancel buttons for pending/confirmed bookings with proof uploaded or paid
     if ((status === "pending" || status === "confirmed") && (paymentStatus === "proof-uploaded" || paymentStatus === "paid")) {
       return (
         <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity style={styles.fullButton} onPress={handleEditPress}>
+            <Ionicons name="create-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Edit Booking</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
             <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
             <Text style={styles.fullButtonText}>Cancel Booking</Text>
@@ -534,6 +619,57 @@ const ScheduleDetail = () => {
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Cancellation Reason</Text>
               <Text style={styles.detailValueNote}>{booking.cancellationReason}</Text>
+            </View>
+          )}
+
+          {booking.editRequest && (
+            <View style={styles.editRequestSection}>
+              <View style={styles.editRequestHeader}>
+                <Ionicons
+                  name={
+                    booking.editRequest.approvalStatus === 'approved' ? 'checkmark-circle' :
+                    booking.editRequest.approvalStatus === 'rejected' ? 'close-circle' :
+                    'time-outline'
+                  }
+                  size={moderateScale(24)}
+                  color={
+                    booking.editRequest.approvalStatus === 'approved' ? '#4CAF50' :
+                    booking.editRequest.approvalStatus === 'rejected' ? '#FF6B6B' :
+                    '#FF9B79'
+                  }
+                />
+                <Text style={styles.editRequestTitle}>
+                  {booking.editRequest.approvalStatus === 'approved' ? 'Edit Request Approved' :
+                   booking.editRequest.approvalStatus === 'rejected' ? 'Edit Request Rejected' :
+                   'Edit Request Pending'}
+                </Text>
+              </View>
+
+              {booking.editRequest.approvalStatus === 'pending' && (
+                <Text style={styles.editRequestMessage}>
+                  Your edit request is waiting for business owner approval.
+                </Text>
+              )}
+
+              {booking.editRequest.approvalStatus === 'rejected' && booking.editRequest.rejectionReason && (
+                <View style={styles.editRequestRejectionBox}>
+                  <Text style={styles.editRequestRejectionLabel}>Rejection Reason:</Text>
+                  <Text style={styles.editRequestRejectionText}>{booking.editRequest.rejectionReason}</Text>
+                </View>
+              )}
+
+              {booking.editRequest.appointmentDateTime && (
+                <View style={styles.editRequestDetailRow}>
+                  <Text style={styles.editRequestDetailLabel}>Requested Date:</Text>
+                  <Text style={styles.editRequestDetailValue}>
+                    {formatDateTime(booking.editRequest.appointmentDateTime)}
+                  </Text>
+                </View>
+              )}
+
+              <Text style={styles.editRequestTimestamp}>
+                Requested on {formatDateTime(booking.editRequest.requestedAt)}
+              </Text>
             </View>
           )}
 
