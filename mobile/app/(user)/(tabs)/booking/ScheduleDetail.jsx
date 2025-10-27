@@ -14,7 +14,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useNavigation } from "expo-router";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
@@ -22,6 +22,7 @@ import apiClient from "@config/api";
 
 const ScheduleDetail = () => {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
 
   // State for API data
@@ -45,6 +46,13 @@ const ScheduleDetail = () => {
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Hide tab bar on this screen
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: { display: 'none' }
+    });
+  }, [navigation]);
 
   // Fetch booking details from API
   useEffect(() => {
@@ -357,7 +365,7 @@ const ScheduleDetail = () => {
 
     // Show payment buttons for pending/confirmed bookings with pending payment
     if ((status === "pending" || status === "confirmed") && paymentStatus === "pending") {
-      // For cash payment, show only cancel button with cash payment info
+      // For cash payment, show edit and cancel buttons with cash payment info
       if (paymentMethod === "cash") {
         return (
           <View style={styles.actionButtonsContainer}>
@@ -392,6 +400,10 @@ const ScheduleDetail = () => {
               </View>
             </View>
 
+            <TouchableOpacity style={styles.fullButton} onPress={handleEditPress}>
+              <Ionicons name="create-outline" size={moderateScale(20)} color="#fff" />
+              <Text style={styles.fullButtonText}>Edit Booking</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
               <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
               <Text style={styles.fullButtonText}>Cancel Booking</Text>
@@ -400,7 +412,7 @@ const ScheduleDetail = () => {
         );
       }
 
-      // For other payment methods, show QR and upload buttons
+      // For other payment methods, show QR, upload, edit, and cancel buttons
       return (
         <View style={styles.actionButtonsContainer}>
           <View style={styles.actionButtonsRow}>
@@ -413,6 +425,10 @@ const ScheduleDetail = () => {
               <Text style={styles.sideBySideButtonOutlineText}>Upload Proof</Text>
             </TouchableOpacity>
           </View>
+          <TouchableOpacity style={styles.fullButton} onPress={handleEditPress}>
+            <Ionicons name="create-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Edit Booking</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
             <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
             <Text style={styles.fullButtonText}>Cancel Booking</Text>
@@ -428,6 +444,10 @@ const ScheduleDetail = () => {
           <TouchableOpacity style={styles.fullButton} onPress={handleUploadProof}>
             <Ionicons name="cloud-upload-outline" size={moderateScale(20)} color="#fff" />
             <Text style={styles.fullButtonText}>Re-upload Payment Proof</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.fullButton} onPress={handleEditPress}>
+            <Ionicons name="create-outline" size={moderateScale(20)} color="#fff" />
+            <Text style={styles.fullButtonText}>Edit Booking</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.fullButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancelPress}>
             <Ionicons name="close-circle-outline" size={moderateScale(20)} color="#fff" />
@@ -521,6 +541,19 @@ const ScheduleDetail = () => {
           <Text style={styles.clinicName}>{booking.businessId?.businessName || 'Business Name'}</Text>
           <Text style={styles.serviceName}>{booking.serviceId?.name || 'Service'}</Text>
         </View>
+
+        {/* Rescheduled Alert - if approved */}
+        {booking.editRequest?.approvalStatus === 'approved' && booking.editRequest?.appointmentDateTime && (
+          <View style={styles.rescheduledAlertCard}>
+            <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#4CAF50" />
+            <View style={styles.rescheduledAlertContent}>
+              <Text style={styles.rescheduledAlertTitle}>Reschedule Approved</Text>
+              <Text style={styles.rescheduledAlertText}>
+                Your appointment has been successfully rescheduled to {formatDate(booking.appointmentDateTime)} at {formatTime(booking.appointmentDateTime)}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Booking Details */}
         <View style={styles.detailsBox}>
@@ -748,6 +781,164 @@ const ScheduleDetail = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Edit Booking Modal */}
+      <Modal
+        visible={showEditModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, styles.editModalContainer]}>
+            <Text style={styles.modalTitle}>Edit Booking</Text>
+            <Text style={styles.modalSubtitle}>Request changes to your booking</Text>
+
+            <ScrollView style={styles.editFormScroll}>
+              {/* Date & Time Section */}
+              <Text style={styles.formSectionLabel}>Date & Time</Text>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.dateTimeButtonText}>
+                  {editFormData.appointmentDateTime
+                    ? formatDate(editFormData.appointmentDateTime.toISOString())
+                    : 'Select Date'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.dateTimeButtonText}>
+                  {editFormData.appointmentDateTime
+                    ? formatTime(editFormData.appointmentDateTime.toISOString())
+                    : 'Select Time'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Notes Section */}
+              <Text style={styles.formSectionLabel}>Notes</Text>
+              <TextInput
+                style={styles.editModalInput}
+                placeholder="Additional notes (max 500 characters)"
+                placeholderTextColor="#999"
+                value={editFormData.notes}
+                onChangeText={(text) => setEditFormData({ ...editFormData, notes: text })}
+                multiline
+                maxLength={500}
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+              <Text style={styles.characterCount}>{editFormData.notes.length}/500</Text>
+
+              {/* Special Requests Section */}
+              <Text style={styles.formSectionLabel}>Special Requests</Text>
+              <TextInput
+                style={styles.editModalInput}
+                placeholder="Special requests (max 300 characters)"
+                placeholderTextColor="#999"
+                value={editFormData.specialRequests}
+                onChangeText={(text) => setEditFormData({ ...editFormData, specialRequests: text })}
+                multiline
+                maxLength={300}
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+              <Text style={styles.characterCount}>{editFormData.specialRequests.length}/300</Text>
+
+              {/* Payment Method Section */}
+              <Text style={styles.formSectionLabel}>Payment Method</Text>
+              <View style={styles.paymentMethodContainer}>
+                {[
+                  { value: 'cash', label: 'Cash', icon: 'cash-outline' },
+                  { value: 'gcash', label: 'GCash', icon: 'wallet-outline' },
+                  { value: 'paymaya', label: 'PayMaya', icon: 'wallet-outline' },
+                  { value: 'qr-payment', label: 'QR Payment', icon: 'qr-code-outline' },
+                ].map((method) => (
+                  <TouchableOpacity
+                    key={method.value}
+                    style={[
+                      styles.paymentMethodButton,
+                      editFormData.paymentMethod === method.value && styles.paymentMethodButtonActive,
+                    ]}
+                    onPress={() => setEditFormData({ ...editFormData, paymentMethod: method.value })}
+                  >
+                    <Ionicons
+                      name={method.icon}
+                      size={moderateScale(20)}
+                      color={editFormData.paymentMethod === method.value ? '#fff' : '#1C86FF'}
+                    />
+                    <Text
+                      style={[
+                        styles.paymentMethodButtonText,
+                        editFormData.paymentMethod === method.value && styles.paymentMethodButtonTextActive,
+                      ]}
+                    >
+                      {method.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Info Box */}
+              <View style={styles.editInfoBox}>
+                <Ionicons name="information-circle" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.editInfoText}>
+                  Your edit request will be sent to the business owner for approval. You'll be notified once they review your changes.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonCancel}
+                onPress={() => setShowEditModal(false)}
+                disabled={isSubmittingEdit}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButtonConfirm, { backgroundColor: '#1C86FF' }, isSubmittingEdit && styles.modalButtonDisabled]}
+                onPress={handleSubmitEdit}
+                disabled={isSubmittingEdit}
+              >
+                {isSubmittingEdit ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonConfirmText}>Submit</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={editFormData.appointmentDateTime || new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
+      {/* Time Picker */}
+      {showTimePicker && (
+        <DateTimePicker
+          value={editFormData.appointmentDateTime || new Date()}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={onTimeChange}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -1058,6 +1249,186 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: scaleFontSize(19),
     marginLeft: moderateScale(10),
+  },
+  // Rescheduled alert card
+  rescheduledAlertCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginHorizontal: wp(5),
+    marginTop: moderateScale(16),
+    gap: moderateScale(12),
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rescheduledAlertContent: {
+    flex: 1,
+  },
+  rescheduledAlertTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+    color: '#4CAF50',
+    marginBottom: moderateScale(6),
+  },
+  rescheduledAlertText: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    lineHeight: scaleFontSize(19),
+  },
+  // Edit modal styles
+  editModalContainer: {
+    maxHeight: hp(85),
+  },
+  editFormScroll: {
+    maxHeight: hp(55),
+  },
+  formSectionLabel: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
+  },
+  dateTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F8FF',
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(14),
+    marginBottom: moderateScale(12),
+    gap: moderateScale(12),
+  },
+  dateTimeButtonText: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    fontWeight: '500',
+  },
+  editModalInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    padding: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    minHeight: moderateScale(80),
+  },
+  paymentMethodContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(10),
+    marginBottom: moderateScale(8),
+  },
+  paymentMethodButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
+    backgroundColor: '#fff',
+  },
+  paymentMethodButtonActive: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+  },
+  paymentMethodButtonText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '600',
+  },
+  paymentMethodButtonTextActive: {
+    color: '#fff',
+  },
+  editInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginTop: moderateScale(16),
+    gap: moderateScale(10),
+  },
+  editInfoText: {
+    flex: 1,
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    lineHeight: scaleFontSize(18),
+  },
+  editRequestSection: {
+    marginTop: moderateScale(12),
+    padding: moderateScale(16),
+    backgroundColor: '#F9F9F9',
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  editRequestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(10),
+    marginBottom: moderateScale(8),
+  },
+  editRequestTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+    color: '#333',
+  },
+  editRequestMessage: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+    marginBottom: moderateScale(12),
+  },
+  editRequestRejectionBox: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: moderateScale(6),
+    padding: moderateScale(10),
+    marginBottom: moderateScale(10),
+  },
+  editRequestRejectionLabel: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: moderateScale(4),
+  },
+  editRequestRejectionText: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    lineHeight: scaleFontSize(18),
+  },
+  editRequestDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
+  },
+  editRequestDetailLabel: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#666',
+  },
+  editRequestDetailValue: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    fontWeight: '500',
+  },
+  editRequestTimestamp: {
+    fontSize: scaleFontSize(12),
+    color: '#999',
+    marginTop: moderateScale(8),
+    fontStyle: 'italic',
   },
 });
 

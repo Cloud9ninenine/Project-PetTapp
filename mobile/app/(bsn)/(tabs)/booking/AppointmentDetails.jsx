@@ -29,6 +29,8 @@ const AppointmentDetail = () => {
   const [bookingData, setBookingData] = useState(null);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectEditModal, setRejectEditModal] = useState(false);
+  const [editRejectionReason, setEditRejectionReason] = useState('');
 
   useEffect(() => {
     if (params.bookingId) {
@@ -232,11 +234,71 @@ const AppointmentDetail = () => {
     }
   };
 
+  const handleApproveEdit = async () => {
+    Alert.alert(
+      'Approve Edit Request',
+      'Are you sure you want to approve this booking edit request? The changes will be applied immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: async () => {
+            try {
+              setUpdating(true);
+              await apiClient.patch(`/bookings/${params.bookingId}/approve-edit`);
+              Alert.alert('Success', 'Booking edit request approved successfully!');
+              fetchBookingDetails();
+            } catch (error) {
+              console.error('Error approving edit request:', error);
+              Alert.alert('Error', error.response?.data?.message || 'Failed to approve edit request');
+            } finally {
+              setUpdating(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRejectEdit = () => {
+    setRejectEditModal(true);
+  };
+
+  const confirmRejectEdit = async () => {
+    if (!editRejectionReason || editRejectionReason.trim() === '') {
+      Alert.alert('Error', 'Rejection reason is required');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      setRejectEditModal(false);
+
+      await apiClient.patch(`/bookings/${params.bookingId}/reject-edit`, {
+        rejectionReason: editRejectionReason,
+      });
+
+      Alert.alert('Success', 'Booking edit request rejected');
+      setEditRejectionReason('');
+      fetchBookingDetails();
+    } catch (error) {
+      console.error('Error rejecting edit request:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reject edit request');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
 
   const renderActionButtons = () => {
     if (!bookingData) return null;
 
     const status = bookingData.status?.toLowerCase();
+
+    // If there's a pending edit request, hide action buttons (notice shown at top)
+    if (bookingData.editRequest?.approvalStatus === 'pending') {
+      return null;
+    }
 
     if (status === "completed") {
       // Show rating/review if available
@@ -459,6 +521,135 @@ const AppointmentDetail = () => {
       />
       <ScrollView contentContainerStyle={styles.content}>
 
+        {/* Action Required Notice - if pending edit request */}
+        {bookingData.editRequest?.approvalStatus === 'pending' && (
+          <View style={styles.pendingEditNoticeContainer}>
+            <View style={styles.pendingEditNoticeBox}>
+              <Ionicons name="alert-circle-outline" size={moderateScale(24)} color="#FF9B79" />
+              <View style={styles.pendingEditNoticeContent}>
+                <Text style={styles.pendingEditNoticeTitle}>Action Required</Text>
+                <Text style={styles.pendingEditNoticeText}>
+                  Please approve or reject the pending request below before taking any other action on this booking.
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Pending Edit Request Section - if exists */}
+        {bookingData.editRequest && (bookingData.editRequest.approvalStatus !== 'approved' ||
+          bookingData.editRequest.notes || bookingData.editRequest.specialRequests ||
+          bookingData.editRequest.paymentMethod) && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons
+                name={
+                  bookingData.editRequest.approvalStatus === 'approved' ? 'checkmark-circle' :
+                  bookingData.editRequest.approvalStatus === 'rejected' ? 'close-circle' :
+                  'time-outline'
+                }
+                size={moderateScale(22)}
+                color={
+                  bookingData.editRequest.approvalStatus === 'approved' ? '#4CAF50' :
+                  bookingData.editRequest.approvalStatus === 'rejected' ? '#FF6B6B' :
+                  '#FF9B79'
+                }
+              />
+              <Text style={styles.sectionTitle}>
+                {bookingData.editRequest.approvalStatus === 'approved' ? 'Edit Request - Approved' :
+                 bookingData.editRequest.approvalStatus === 'rejected' ? 'Edit Request - Rejected' :
+                 'Pending Edit Request'}
+              </Text>
+            </View>
+
+            {bookingData.editRequest.approvalStatus === 'pending' && (
+              <View style={styles.editRequestPendingBox}>
+                <Ionicons name="alert-circle-outline" size={moderateScale(20)} color="#FF9B79" />
+                <Text style={styles.editRequestPendingText}>
+                  Customer has requested to edit this booking. Please review the changes below.
+                </Text>
+              </View>
+            )}
+
+            {bookingData.editRequest.appointmentDateTime && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>Requested Date/Time</Text>
+                <Text style={[styles.dataValue, { color: '#FF9B79', fontWeight: '700' }]}>
+                  {formatDateTime(bookingData.editRequest.appointmentDateTime)}
+                </Text>
+              </View>
+            )}
+
+            {bookingData.editRequest.notes && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>New Notes</Text>
+                <Text style={[styles.dataValue, styles.dataValueMultiline]}>
+                  {bookingData.editRequest.notes}
+                </Text>
+              </View>
+            )}
+
+            {bookingData.editRequest.specialRequests && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>New Special Requests</Text>
+                <Text style={[styles.dataValue, styles.dataValueMultiline]}>
+                  {bookingData.editRequest.specialRequests}
+                </Text>
+              </View>
+            )}
+
+            {bookingData.editRequest.paymentMethod && (
+              <View style={styles.dataRow}>
+                <Text style={styles.dataLabel}>New Payment Method</Text>
+                <Text style={styles.dataValue}>
+                  {getPaymentMethodLabel(bookingData.editRequest.paymentMethod)}
+                </Text>
+              </View>
+            )}
+
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Requested On</Text>
+              <Text style={styles.dataValue}>
+                {formatDateTime(bookingData.editRequest.requestedAt)}
+              </Text>
+            </View>
+
+            {bookingData.editRequest.approvalStatus === 'rejected' && bookingData.editRequest.rejectionReason && (
+              <View style={styles.editRejectionBox}>
+                <Text style={styles.editRejectionLabel}>Your Rejection Reason:</Text>
+                <Text style={styles.editRejectionText}>{bookingData.editRequest.rejectionReason}</Text>
+              </View>
+            )}
+
+            {bookingData.editRequest.approvalStatus === 'pending' && (
+              <View style={styles.editRequestActions}>
+                <TouchableOpacity
+                  style={[styles.approveEditButton, updating && styles.buttonDisabled]}
+                  onPress={handleApproveEdit}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
+                      <Text style={styles.approveEditButtonText}>Approve Changes</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.rejectEditButton, updating && styles.buttonDisabled]}
+                  onPress={handleRejectEdit}
+                  disabled={updating}
+                >
+                  <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
+                  <Text style={styles.rejectEditButtonText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* 1. Service Information */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
@@ -531,6 +722,12 @@ const AppointmentDetail = () => {
           <View style={styles.sectionHeaderRow}>
             <Ionicons name="calendar-outline" size={moderateScale(22)} color="#1C86FF" />
             <Text style={styles.sectionTitle}>Appointment Details</Text>
+            {bookingData.editRequest?.approvalStatus === 'approved' && bookingData.editRequest?.appointmentDateTime && (
+              <View style={styles.rescheduledBadge}>
+                <Ionicons name="sync-outline" size={moderateScale(14)} color="#4CAF50" />
+                <Text style={styles.rescheduledBadgeText}>Rescheduled</Text>
+              </View>
+            )}
           </View>
           <View style={styles.dataRow}>
             <Text style={styles.dataLabel}>Booking ID</Text>
@@ -546,6 +743,19 @@ const AppointmentDetail = () => {
             <Text style={styles.dataLabel}>Appointment Time</Text>
             <Text style={styles.dataValue}>{appointmentTime}</Text>
           </View>
+
+          {bookingData.editRequest?.approvalStatus === 'approved' && bookingData.editRequest?.appointmentDateTime && (
+            <View style={styles.rescheduledInfoBox}>
+              <View style={styles.rescheduledInfoHeader}>
+                <Ionicons name="information-circle" size={moderateScale(18)} color="#4CAF50" />
+                <Text style={styles.rescheduledInfoTitle}>Rescheduled Appointment</Text>
+              </View>
+              <Text style={styles.rescheduledInfoText}>
+                This appointment was rescheduled on {formatDateTime(bookingData.editRequest.approvedAt)}
+              </Text>
+            </View>
+          )}
+
           <View style={[styles.dataRow, styles.dataRowLast]}>
             <Text style={styles.dataLabel}>Booked On</Text>
             <Text style={styles.dataValue}>{createdAt}</Text>
@@ -705,6 +915,65 @@ const AppointmentDetail = () => {
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <Text style={styles.modalConfirmButtonText}>Reject Payment</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reject Edit Request Modal */}
+      <Modal
+        visible={rejectEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setRejectEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reject Edit Request</Text>
+              <TouchableOpacity onPress={() => {
+                setRejectEditModal(false);
+                setEditRejectionReason('');
+              }}>
+                <Ionicons name="close" size={moderateScale(28)} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalSectionTitle}>Rejection Reason *</Text>
+              <TextInput
+                style={styles.rejectInput}
+                value={editRejectionReason}
+                onChangeText={setEditRejectionReason}
+                placeholder="Please provide a reason for rejecting this edit request..."
+                placeholderTextColor="#999"
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => {
+                    setRejectEditModal(false);
+                    setEditRejectionReason('');
+                  }}
+                >
+                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalConfirmButton, { backgroundColor: '#FF6B6B' }]}
+                  onPress={confirmRejectEdit}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.modalConfirmButtonText}>Reject Edit</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1093,6 +1362,152 @@ const styles = StyleSheet.create({
     color: '#333',
     minHeight: moderateScale(100),
     marginBottom: moderateScale(20),
+  },
+  // Rescheduled Styles
+  rescheduledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+    marginLeft: 'auto',
+  },
+  rescheduledBadgeText: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  rescheduledInfoBox: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginVertical: moderateScale(12),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#4CAF50',
+  },
+  rescheduledInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    marginBottom: moderateScale(6),
+  },
+  rescheduledInfoTitle: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  rescheduledInfoText: {
+    fontSize: scaleFontSize(13),
+    color: '#2E7D32',
+    lineHeight: scaleFontSize(18),
+    marginLeft: moderateScale(24),
+  },
+  // Pending Edit Notice Styles
+  pendingEditNoticeContainer: {
+    marginBottom: moderateScale(20),
+  },
+  pendingEditNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    gap: moderateScale(12),
+    borderWidth: 2,
+    borderColor: '#FF9B79',
+  },
+  pendingEditNoticeContent: {
+    flex: 1,
+  },
+  pendingEditNoticeTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+    color: '#FF9B79',
+    marginBottom: moderateScale(6),
+  },
+  pendingEditNoticeText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+  },
+  // Edit Request Styles
+  editRequestPendingBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(16),
+    gap: moderateScale(10),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#FF9B79',
+  },
+  editRequestPendingText: {
+    flex: 1,
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+  },
+  editRejectionBox: {
+    backgroundColor: '#FFF3F3',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginTop: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#FFD6D6',
+  },
+  editRejectionLabel: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: moderateScale(6),
+  },
+  editRejectionText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+  },
+  editRequestActions: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    marginTop: moderateScale(16),
+    paddingTop: moderateScale(16),
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  approveEditButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+  },
+  approveEditButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+  },
+  rejectEditButton: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+  },
+  rejectEditButtonText: {
+    color: '#FF6B6B',
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
   },
 });
 

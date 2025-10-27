@@ -639,109 +639,82 @@ export default function ServiceDetailsScreen() {
         resizeMode="repeat"
       />
 
+      <Header title="Service Details" showBack={true} />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image Section with Overlay */}
-        <View style={styles.heroSection}>
-          <Image source={getServiceImage()} style={styles.heroImage} />
-
-          {/* Overlay Gradient Effect */}
-          <View style={styles.imageOverlay} />
-
-          {/* Back and Favorite Buttons on Image */}
-          <View style={styles.topButtonsContainer}>
-            <TouchableOpacity style={styles.circularButton} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={moderateScale(24)} color="#1C86FF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.circularButton} onPress={() => setIsFavorite(!isFavorite)}>
-              <Ionicons
-                name={isFavorite ? "heart" : "heart-outline"}
-                size={moderateScale(24)}
-                color={isFavorite ? "#FF9B79" : "#1C86FF"}
-              />
-            </TouchableOpacity>
+        {/* Service Header Card */}
+        <View style={styles.serviceHeaderCard}>
+          {/* Service Image */}
+          <View style={styles.serviceImageContainer}>
+            <Image
+              source={getServiceImage()}
+              style={styles.serviceImage}
+              resizeMode="cover"
+            />
           </View>
 
-          {/* Service Title Card Overlapping Image */}
-          <View style={styles.titleCard}>
-            <View style={styles.titleRow}>
-              <Text style={styles.serviceTitleText} numberOfLines={2}>
-                {serviceData?.name || 'Loading...'}
-              </Text>
-              <View style={styles.categoryBadge}>
-                <Ionicons name="pricetag" size={moderateScale(14)} color="#FF9B79" />
-                <Text style={styles.categoryBadgeText}>
-                  {serviceData?.category?.charAt(0).toUpperCase() + serviceData?.category?.slice(1)}
-                </Text>
+          {/* Service Info */}
+          <View style={styles.serviceHeaderInfo}>
+            <Text style={styles.serviceName}>{serviceData?.name || 'Service Name'}</Text>
+
+            {/* Category Badge */}
+            {serviceData?.category && (
+              <View style={styles.categoryBadgeContainer}>
+                <View style={styles.categoryBadge}>
+                  <Ionicons name="pricetag" size={moderateScale(12)} color="#FF9B79" />
+                  <Text style={styles.categoryBadgeText}>
+                    {serviceData.category.charAt(0).toUpperCase() + serviceData.category.slice(1)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Price and Duration */}
+            <View style={styles.priceInfoRow}>
+              <View style={styles.priceContainer}>
+                <Ionicons name="cash-outline" size={moderateScale(16)} color="#4CAF50" />
+                <Text style={styles.priceValue}>{formatPrice(serviceData?.price)}</Text>
+              </View>
+              <View style={styles.durationContainer}>
+                <Ionicons name="time-outline" size={moderateScale(16)} color="#1C86FF" />
+                <Text style={styles.durationValue}>{formatDuration(serviceData?.duration)}</Text>
               </View>
             </View>
-            {serviceData?.description && (
-              <Text style={styles.descriptionPreview} numberOfLines={3}>
-                {String(serviceData.description)}
-              </Text>
-            )}
+
+            {/* Business Status */}
+            {businessData?.businessHours && (() => {
+              const { isOpen, status } = isBusinessOpen(businessData.businessHours);
+              return (
+                <View style={[styles.statusBadge, isOpen ? styles.statusOpen : styles.statusClosed]}>
+                  <View style={[styles.statusDot, isOpen ? styles.dotOpen : styles.dotClosed]} />
+                  <Text style={styles.statusText}>{status}</Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
 
-        {/* Quick Info Cards */}
-        <View style={styles.quickInfoContainer}>
-          <View style={styles.quickInfoCard}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
-            </View>
-            <Text style={styles.quickInfoLabel}>Duration</Text>
-            <Text style={styles.quickInfoValue}>{formatDuration(serviceData?.duration)}</Text>
-          </View>
-
-          <View style={styles.quickInfoCard}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="calendar-outline" size={moderateScale(20)} color="#FF9B79" />
-            </View>
-            <Text style={styles.quickInfoLabel}>Available</Text>
-            <Text style={styles.quickInfoValue} numberOfLines={2}>
-              {formatAvailabilityShort(serviceData?.availability)}
-            </Text>
-          </View>
-
-          <View style={styles.quickInfoCard}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="cash-outline" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.quickInfoLabel}>Price</Text>
-            <Text style={styles.quickInfoValue}>{formatPrice(serviceData?.price)}</Text>
-          </View>
-        </View>
-
-        {/* Tab Navigation with Pills Design */}
-        <View style={styles.tabPillsContainer}>
+        {/* Tab Navigation */}
+        <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tabPill, activeTab === 'details' && styles.activeTabPill]}
+            style={[styles.tab, activeTab === 'details' && styles.activeTab]}
             onPress={() => setActiveTab('details')}
           >
-            <Ionicons
-              name="information-circle"
-              size={moderateScale(18)}
-              color={activeTab === 'details' ? '#fff' : '#666'}
-            />
-            <Text style={[styles.tabPillText, activeTab === 'details' && styles.activeTabPillText]}>
+            <Text style={[styles.tabText, activeTab === 'details' && styles.activeTabText]}>
               Details
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabPill, activeTab === 'reviews' && styles.activeTabPill]}
+            style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
             onPress={() => setActiveTab('reviews')}
           >
-            <Ionicons
-              name="star"
-              size={moderateScale(18)}
-              color={activeTab === 'reviews' ? '#fff' : '#666'}
-            />
-            <Text style={[styles.tabPillText, activeTab === 'reviews' && styles.activeTabPillText]}>
+            <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>
               Reviews
             </Text>
           </TouchableOpacity>
@@ -795,76 +768,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Hero Section Styles
-  heroSection: {
-    position: 'relative',
-    width: '100%',
-    height: hp(40),
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-  },
-  topButtonsContainer: {
-    position: 'absolute',
-    top: moderateScale(10),
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: wp(5),
-  },
-  circularButton: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
+  // Service Header Card Styles
+  serviceHeaderCard: {
     backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginHorizontal: wp(5),
+    marginTop: moderateScale(15),
+    borderRadius: moderateScale(16),
+    padding: moderateScale(20),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  titleCard: {
-    position: 'absolute',
-    bottom: moderateScale(-30),
-    left: wp(5),
-    right: wp(5),
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(16),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 4,
+    alignItems: 'center',
   },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: moderateScale(12),
+  serviceImageContainer: {
+    marginBottom: moderateScale(15),
   },
-  serviceTitleText: {
-    flex: 1,
-    fontSize: scaleFontSize(22),
-    fontFamily: 'SFProBold',
+  serviceImage: {
+    width: moderateScale(120),
+    height: moderateScale(120),
+    borderRadius: moderateScale(12),
+    borderWidth: 2,
+    borderColor: '#E3F2FD',
+  },
+  serviceHeaderInfo: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  serviceName: {
+    fontSize: scaleFontSize(24),
+    fontWeight: 'bold',
     color: '#1C86FF',
-    marginRight: moderateScale(12),
+    textAlign: 'center',
+    marginBottom: moderateScale(8),
+    fontFamily: 'SFProBold',
+  },
+  categoryBadgeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    marginBottom: moderateScale(12),
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF3E0',
     paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(6),
+    paddingVertical: moderateScale(5),
     borderRadius: moderateScale(12),
     gap: moderateScale(4),
   },
@@ -873,104 +825,100 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FF9B79',
   },
-  descriptionPreview: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    lineHeight: moderateScale(19),
+  priceInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(20),
+    marginBottom: moderateScale(10),
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+  },
+  priceValue: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  durationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+  },
+  durationValue: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#1C86FF',
   },
 
-  // Quick Info Cards
-  quickInfoContainer: {
+  // Tab Navigation Styles
+  tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: wp(5),
-    marginTop: moderateScale(45),
-    marginBottom: moderateScale(20),
-    gap: moderateScale(10),
-  },
-  quickInfoCard: {
-    flex: 1,
+    marginHorizontal: wp(5),
+    marginTop: moderateScale(15),
+    marginBottom: moderateScale(15),
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
-    padding: moderateScale(12),
-    alignItems: 'center',
+    padding: moderateScale(4),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  iconCircle: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#F0F8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: moderateScale(8),
-  },
-  quickInfoLabel: {
-    fontSize: scaleFontSize(11),
-    color: '#999',
-    marginBottom: moderateScale(4),
-  },
-  quickInfoValue: {
-    fontSize: scaleFontSize(13),
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-
-  // Tab Pills Design
-  tabPillsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: wp(5),
-    marginBottom: moderateScale(16),
-    gap: moderateScale(12),
-  },
-  tabPill: {
+  tab: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(25),
-    backgroundColor: '#fff',
-    gap: moderateScale(6),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderRadius: moderateScale(10),
+    alignItems: 'center',
   },
-  activeTabPill: {
+  activeTab: {
     backgroundColor: '#1C86FF',
-    borderColor: '#1C86FF',
   },
-  tabPillText: {
+  tabText: {
     fontSize: scaleFontSize(14),
     fontWeight: '600',
     color: '#666',
   },
-  activeTabPillText: {
+  activeTabText: {
     color: '#fff',
   },
-  serviceCategory: {
-    fontSize: scaleFontSize(30),
-    color: '#FF9B79',
-    fontFamily:"SFProBold",
-  },
-  ratingContainer: {
+
+  // Status Badge Styles
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(16),
+    gap: moderateScale(6),
+    alignSelf: 'center',
   },
-  starsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: moderateScale(1),
+  statusOpen: {
+    backgroundColor: '#E8F5E9',
   },
-  ratingText: {
-    fontSize: scaleFontSize(14),
-    color: '#1C86FF',
-    marginLeft: moderateScale(8),
-    fontWeight: '500',
+  statusClosed: {
+    backgroundColor: '#FFEBEE',
   },
+  statusDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+  },
+  dotOpen: {
+    backgroundColor: '#4CAF50',
+  },
+  dotClosed: {
+    backgroundColor: '#F44336',
+  },
+  statusText: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#333',
+  },
+
   tabContent: {
     backgroundColor: '#fff',
     margin: wp(5),

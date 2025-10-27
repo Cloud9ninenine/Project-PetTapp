@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 
 const PaymentQRScreen = () => {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [qrCodes, setQrCodes] = useState([]);
@@ -24,6 +25,13 @@ const PaymentQRScreen = () => {
   const [businessId, setBusinessId] = useState(null);
 
   const { bookingId, businessName, amount } = params;
+
+  // Hide tab bar on this screen
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: { display: 'none' }
+    });
+  }, [navigation]);
 
   useEffect(() => {
     fetchQRCodes();

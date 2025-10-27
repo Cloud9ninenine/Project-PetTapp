@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
@@ -18,11 +18,19 @@ import apiClient from '@config/api';
 
 const UploadPaymentProofScreen = () => {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   const { bookingId } = params;
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  // Hide tab bar on this screen
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: { display: 'none' }
+    });
+  }, [navigation]);
 
   // Request permissions
   const requestPermissions = async () => {
