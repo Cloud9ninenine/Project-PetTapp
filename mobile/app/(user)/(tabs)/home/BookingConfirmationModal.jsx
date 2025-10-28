@@ -323,8 +323,8 @@ export default function BookingConfirmationModal({
                     {typeof bookingData.service.price === 'string' && bookingData.service.price.startsWith('₱')
                       ? bookingData.service.price
                       : typeof bookingData.service.price === 'object'
-                      ? `₱${bookingData.service.price.amount}`
-                      : `₱${bookingData.service.price}`}
+                      ? `${bookingData.service.price.amount}`
+                      : `${bookingData.service.price}`}
                   </Text>
                 )}
               </View>

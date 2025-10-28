@@ -169,16 +169,24 @@ export const fetchServiceById = async (serviceId) => {
       if (service.businessId && typeof service.businessId === 'object') {
         // Business data is already populated from the API
         const businessInfo = service.businessId;
+
+        // Format address string for display
+        const addressString = businessInfo.address?.street
+          ? `${businessInfo.address.street}, ${businessInfo.address.city || ''}, ${businessInfo.address.state || ''}`
+          : businessInfo.address?.fullAddress || 'No address available';
+
         businessData = {
           _id: businessInfo._id,
           name: businessInfo.businessName,
-          address: businessInfo.address?.street || businessInfo.address?.fullAddress || 'No address available',
+          address: businessInfo.address, // Keep full address object with coordinates
+          addressString: addressString.trim(), // Add formatted string for display
           contactNumber: businessInfo.contactInfo?.phone || businessInfo.contactInfo?.phoneNumber || 'No contact available',
           businessType: businessInfo.businessType,
           ratings: businessInfo.ratings,
           businessHours: businessInfo.businessHours,
           isActive: businessInfo.isActive,
           isVerified: businessInfo.isVerified,
+          logo: businessInfo.logo,
         };
       } else if (service.businessId && typeof service.businessId === 'string') {
         // If only ID is returned, fetch full business data
