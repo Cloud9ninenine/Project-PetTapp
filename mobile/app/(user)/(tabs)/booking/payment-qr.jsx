@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PaymentQRScreen = () => {
   const router = useRouter();
@@ -23,6 +25,7 @@ const PaymentQRScreen = () => {
   const [selectedQrIndex, setSelectedQrIndex] = useState(0);
   const [qrNotAvailable, setQrNotAvailable] = useState(false);
   const [businessId, setBusinessId] = useState(null);
+  const [authToken, setAuthToken] = useState(null);
 
   const { bookingId, businessName, amount } = params;
 
@@ -32,6 +35,19 @@ const PaymentQRScreen = () => {
       tabBarStyle: { display: 'none' }
     });
   }, [navigation]);
+
+  // Get auth token for image requests
+  useEffect(() => {
+    const getToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem('accessToken');
+        setAuthToken(token);
+      } catch (error) {
+        console.error('Error getting auth token:', error);
+      }
+    };
+    getToken();
+  }, []);
 
   useEffect(() => {
     fetchQRCodes();
@@ -68,17 +84,42 @@ const PaymentQRScreen = () => {
         const fetchedQrCodes = qrResponse.data.data.qrCodes;
 
         if (fetchedQrCodes.length > 0) {
-          // Process QR codes to ensure full URLs
-          const processedQrCodes = fetchedQrCodes.map(qr => ({
-            ...qr,
-            imageUrl: qr.imageUrl.startsWith('http')
-              ? qr.imageUrl
-              : `${apiClient.defaults.baseURL}${qr.imageUrl.startsWith('/') ? '' : '/'}${qr.imageUrl}`
-          }));
+          // Process QR codes to ensure proper URLs
+          const processedQrCodes = fetchedQrCodes.map(qr => {
+            let imageUrl = qr.imageUrl;
+
+            // Debug: Log original URL
+            console.log('Original QR imageUrl:', imageUrl);
+
+            // If it's already a full URL, use it as-is
+            if (imageUrl && imageUrl.startsWith('http')) {
+              console.log('Using full URL:', imageUrl);
+              return {
+                ...qr,
+                imageUrl: imageUrl
+              };
+            }
+
+            // If it's a relative path, construct the full URL
+            // Remove any leading slashes for consistency
+            const cleanPath = imageUrl?.replace(/^\/+/, '') || '';
+
+            // Get base URL without trailing slash
+            const baseURL = apiClient.defaults.baseURL?.replace(/\/+$/, '') || '';
+
+            // Construct full URL
+            const fullUrl = `${baseURL}/${cleanPath}`;
+            console.log('Constructed full URL:', fullUrl);
+
+            return {
+              ...qr,
+              imageUrl: fullUrl
+            };
+          });
 
           setQrCodes(processedQrCodes);
           setSelectedQrIndex(0);
-          console.log('Processed QR Codes:', processedQrCodes);
+          console.log('Final Processed QR Codes:', processedQrCodes);
         } else {
           // No QR codes available
           setQrNotAvailable(true);
@@ -258,9 +299,22 @@ const PaymentQRScreen = () => {
             <>
               <View style={styles.qrCodeWrapper}>
                 <Image
-                  source={{ uri: qrCodes[selectedQrIndex].imageUrl }}
+                  source={{
+                    uri: qrCodes[selectedQrIndex].imageUrl,
+                    headers: authToken ? {
+                      'Authorization': `Bearer ${authToken}`
+                    } : undefined
+                  }}
                   style={styles.qrCode}
                   resizeMode="contain"
+                  onError={(error) => {
+                    console.error('Image loading error:', error.nativeEvent.error);
+                    console.error('Failed to load QR image URL:', qrCodes[selectedQrIndex].imageUrl);
+                    console.error('Auth token present:', !!authToken);
+                  }}
+                  onLoad={() => {
+                    console.log('QR image loaded successfully:', qrCodes[selectedQrIndex].imageUrl);
+                  }}
                 />
               </View>
               {renderQrCodeDetails()}

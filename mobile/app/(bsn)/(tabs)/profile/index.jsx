@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   ImageBackground,
@@ -16,6 +15,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -143,34 +143,41 @@ export default function BusinessProfileScreen() {
     },
     {
       id: '3',
+      title: 'Ratings & Reviews',
+      icon: 'star',
+      color: '#FFD700',
+      route: '/(bsn)/(tabs)/profile/rating-review',
+    },
+    {
+      id: '4',
       title: 'Operating Hours',
       icon: 'time',
       color: '#FF9800',
       action: 'modal',
     },
     {
-      id: '4',
+      id: '5',
       title: 'Credentials',
       icon: 'ribbon',
       color: '#FF9B79',
       route: '/(bsn)/(tabs)/profile/credentials',
     },
     {
-      id: '5',
+      id: '6',
       title: 'Verification Document',
       icon: 'document-text',
       color: '#673AB7',
       route: '/(bsn)/(tabs)/profile/verification-documents',
     },
     {
-      id: '6',
+      id: '7',
       title: 'Payment QR Code',
       icon: 'qr-code',
       color: '#2196F3',
       route: '/(bsn)/(tabs)/profile/payment-gateways',
     },
     {
-      id: '7',
+      id: '8',
       title: 'Settings',
       icon: 'settings',
       color: '#607D8B',
@@ -713,7 +720,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(100),
+    paddingBottom: moderateScale(40),
   },
   businessCard: {
     backgroundColor: '#fff',

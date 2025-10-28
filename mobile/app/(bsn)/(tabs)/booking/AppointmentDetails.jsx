@@ -17,9 +17,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import { getOrCreateConversation } from '@services/api/messageApiService';
+import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { getConversationDetails } from '@utils/messageService';
 
 const AppointmentDetail = () => {
   const router = useRouter();
@@ -31,6 +35,7 @@ const AppointmentDetail = () => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectEditModal, setRejectEditModal] = useState(false);
   const [editRejectionReason, setEditRejectionReason] = useState('');
+  const [loadingChat, setLoadingChat] = useState(false);
 
   useEffect(() => {
     if (params.bookingId) {
@@ -231,6 +236,116 @@ const AppointmentDetail = () => {
       Linking.openURL(`tel:${contactNumber}`);
     } else {
       Alert.alert('No Contact', 'No contact number available for this customer');
+    }
+  };
+
+  const handleChatCustomer = async () => {
+    if (!bookingData || !bookingData.petOwnerId) {
+      Alert.alert('Error', 'Customer information not available');
+      return;
+    }
+
+    if (loadingChat) return;
+
+    try {
+      setLoadingChat(true);
+
+      // Step 1: Ensure Firebase authentication
+      console.log('🔐 Ensuring Firebase authentication...');
+      const isFirebaseAuth = await ensureFirebaseAuth();
+
+      if (!isFirebaseAuth) {
+        throw new Error('Failed to authenticate with messaging service');
+      }
+
+      console.log('✅ Firebase authentication successful');
+
+      // Step 2: Get customer ID from booking data
+      const petOwner = bookingData.petOwnerId;
+      const customerId = typeof petOwner === 'object' ? petOwner._id : petOwner;
+
+      if (!customerId) {
+        throw new Error('Could not find customer ID');
+      }
+
+      console.log('👤 Customer ID:', customerId);
+
+      // Step 3: Get or create conversation with customer (matches web's startConversationWithUser)
+      console.log('💬 Getting or creating conversation with customer...');
+      const conversationData = await getOrCreateConversation(customerId);
+
+      if (!conversationData || !conversationData.conversationId) {
+        throw new Error('Could not create conversation - no conversation ID returned');
+      }
+
+      console.log('✅ Conversation ready:', conversationData.conversationId);
+
+      // Step 4: Fetch participant details from Firestore
+      console.log('📋 Fetching participant details from Firestore...');
+      const conversationDetails = await getConversationDetails(conversationData.conversationId);
+
+      if (!conversationDetails) {
+        throw new Error('Could not fetch conversation details from Firestore');
+      }
+
+      // Get current user ID to identify the other participant
+      const currentUserId = await AsyncStorage.getItem('userId');
+      const currentFirebaseUid = `pettapp_${currentUserId}`;
+
+      // Find the other participant (customer)
+      const otherParticipantUid = conversationDetails.participants?.find(
+        uid => uid !== currentFirebaseUid
+      );
+
+      if (!otherParticipantUid) {
+        throw new Error('Could not find other participant in conversation');
+      }
+
+      // Get participant details from conversation's participantDetails field
+      const customerDetails = conversationDetails.participantDetails?.[otherParticipantUid];
+
+      console.log('✅ Customer details loaded:', {
+        participantUid: otherParticipantUid,
+        fullName: customerDetails?.fullName,
+        role: customerDetails?.role
+      });
+
+      // Step 5: Navigate to chat screen with participant details from Firestore
+      console.log('🚀 Navigating to chat...');
+      router.push({
+        pathname: '/(bsn)/(tabs)/messages/chat',
+        params: {
+          conversationId: conversationData.conversationId,
+          receiverId: customerDetails?.userId || customerId,
+          receiverName: customerDetails?.fullName || 'Customer',
+          receiverImage: customerDetails?.profileImage || '',
+        },
+      });
+    } catch (error) {
+      console.error('❌ Error starting conversation with customer:', error);
+      console.error('Error stack:', error.stack);
+
+      // Provide user-friendly error messages
+      let errorMessage = 'Could not start conversation with customer. Please try again.';
+      let errorTitle = 'Error';
+
+      if (error.message.includes('authenticate')) {
+        errorTitle = 'Authentication Error';
+        errorMessage = 'Failed to connect to messaging service. Please check your connection and try again.';
+      } else if (error.message.includes('conversation details') || error.message.includes('participant')) {
+        errorTitle = 'Connection Issue';
+        errorMessage = 'Could not load conversation details. Please wait a moment and try again.';
+      } else if (error.message.includes('network') || error.message.includes('timeout')) {
+        errorTitle = 'Network Error';
+        errorMessage = 'Please check your internet connection and try again.';
+      } else if (error.code === 'permission-denied') {
+        errorTitle = 'Permission Error';
+        errorMessage = 'Unable to access conversation. Please try again or contact support.';
+      }
+
+      Alert.alert(errorTitle, errorMessage, [{ text: 'OK' }]);
+    } finally {
+      setLoadingChat(false);
     }
   };
 
@@ -688,11 +803,28 @@ const AppointmentDetail = () => {
             <Text style={styles.dataLabel}>Email</Text>
             <Text style={styles.dataValue}>{ownerEmail}</Text>
           </View>
-          <View style={[styles.dataRow, styles.dataRowLast]}>
+          <View style={styles.dataRow}>
             <Text style={styles.dataLabel}>Contact</Text>
             <TouchableOpacity onPress={handleCallCustomer} style={styles.callButton}>
               <Ionicons name="call-outline" size={moderateScale(14)} color="#1C86FF" />
               <Text style={styles.callButtonText}>{ownerPhone}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.dataRow, styles.dataRowLast]}>
+            <Text style={styles.dataLabel}>Actions</Text>
+            <TouchableOpacity
+              onPress={handleChatCustomer}
+              style={[styles.chatButton, loadingChat && styles.chatButtonDisabled]}
+              disabled={loadingChat}
+            >
+              {loadingChat ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="chatbubble-outline" size={moderateScale(14)} color="#fff" />
+                  <Text style={styles.chatButtonText}>Chat with Customer</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -1117,6 +1249,24 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(13),
     color: '#1C86FF',
     fontWeight: '500',
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    backgroundColor: '#1C86FF',
+    borderRadius: moderateScale(8),
+    alignSelf: 'flex-end',
+  },
+  chatButtonDisabled: {
+    backgroundColor: '#B0BEC5',
+  },
+  chatButtonText: {
+    fontSize: scaleFontSize(13),
+    color: '#fff',
+    fontWeight: '600',
   },
   // Payment Proof Styles
   paymentProofImage: {

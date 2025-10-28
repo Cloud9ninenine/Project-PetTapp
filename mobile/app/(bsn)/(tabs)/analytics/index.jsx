@@ -72,6 +72,8 @@ export default function AnalyticsScreen() {
   const fetchAnalyticsData = async () => {
     try {
       const { startDate, endDate } = getDateRange();
+      console.log('Fetching analytics with date range:', { startDate, endDate });
+
       const response = await apiClient.get('/analytics', {
         params: {
           startDate,
@@ -79,12 +81,26 @@ export default function AnalyticsScreen() {
         }
       });
 
+      console.log('Analytics response:', response.data);
+
       if (response.data && response.data.success) {
         setAnalyticsData(response.data.data);
+      } else {
+        console.warn('Analytics API returned unsuccessful response');
+        setAnalyticsData(null);
       }
     } catch (error) {
       console.error('Error fetching analytics data:', error);
-      Alert.alert('Error', 'Failed to load analytics data');
+      console.error('Error details:', error.response?.data);
+
+      if (error.response?.status === 404) {
+        Alert.alert('Business Not Found', 'Please complete your business profile first.');
+      } else if (error.response?.status === 403) {
+        Alert.alert('Access Denied', 'You do not have permission to view analytics.');
+      } else {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to load analytics data. Please try again.');
+      }
+      setAnalyticsData(null);
     }
   };
 
@@ -168,6 +184,42 @@ export default function AnalyticsScreen() {
   }
 
   const { overview, topServices, customerStats, statusBreakdown, dayOfWeekDistribution } = analyticsData || {};
+
+  // Empty state when no data
+  if (!loading && !analyticsData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
+        <Header
+          backgroundColor="#1C86FF"
+          titleColor="#fff"
+          customTitle={renderTitle()}
+          showBack={false}
+        />
+        <ScrollView
+          contentContainerStyle={styles.emptyStateContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          <Ionicons name="analytics-outline" size={moderateScale(80)} color="#ccc" />
+          <Text style={styles.emptyStateTitle}>No Analytics Data</Text>
+          <Text style={styles.emptyStateText}>
+            Analytics data will appear here once you have bookings. Start by completing your business profile and receiving your first booking!
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Ionicons name="refresh" size={moderateScale(20)} color="#1C86FF" />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -668,5 +720,40 @@ const styles = StyleSheet.create({
   dayCount: {
     fontSize: scaleFontSize(12),
     color: '#666',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(10),
+    paddingVertical: moderateScale(60),
+  },
+  emptyStateTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(12),
+  },
+  emptyStateText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(20),
+    marginBottom: moderateScale(24),
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(8),
+  },
+  retryButtonText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#1C86FF',
   },
 });

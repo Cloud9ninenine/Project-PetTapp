@@ -22,7 +22,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
-import { firestore, auth } from '@config/firebase';
+import { db as firestore, auth } from '@config/firebase';
 import { signOut } from 'firebase/auth';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 import { debugAllConversations } from '@utils/debugFirestore';

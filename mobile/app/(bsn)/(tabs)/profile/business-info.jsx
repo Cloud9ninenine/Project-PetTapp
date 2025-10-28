@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -13,7 +12,9 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Switch,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +22,74 @@ import * as DocumentPicker from 'expo-document-picker';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
+
+const DaySchedule = ({ day, schedule, onUpdate }) => {
+  const [isOpen, setIsOpen] = useState(schedule.isOpen);
+  const [mode, setMode] = useState('time');
+  const [show, setShow] = useState(false);
+  const [isPickerFor, setIsPickerFor] = useState('open'); // 'open' or 'close'
+
+  const onChange = (event, selectedDate) => {
+    setShow(Platform.OS === 'ios');
+    if (selectedDate) {
+      const hour = selectedDate.getHours().toString().padStart(2, '0');
+      const minute = selectedDate.getMinutes().toString().padStart(2, '0');
+      const time = `${hour}:${minute}`;
+      const newSchedule = { ...schedule, [isPickerFor]: time, isOpen: true };
+      onUpdate(day, newSchedule);
+      if(!isOpen) setIsOpen(true);
+    }
+  };
+
+  const showTimepicker = (pickerFor) => {
+    setIsPickerFor(pickerFor);
+    setShow(true);
+  };
+
+  const formatTime = (timeStr) => {
+    if (!timeStr) return "HH:MM";
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return "HH:MM";
+    return timeStr;
+  }
+
+  return (
+    <View style={styles.dayContainer}>
+      <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+      <Switch
+        value={isOpen}
+        onValueChange={(value) => {
+          setIsOpen(value);
+          onUpdate(day, { ...schedule, isOpen: value });
+        }}
+      />
+      <View style={styles.timeInputContainer}>
+        <TouchableOpacity onPress={() => showTimepicker('open')} disabled={!isOpen}>
+          <View style={[styles.timeInput, !isOpen && styles.disabledInput]}>
+            <Text style={styles.timeText}>{formatTime(schedule.open)}</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.timeSeparator}>-</Text>
+        <TouchableOpacity onPress={() => showTimepicker('close')} disabled={!isOpen}>
+          <View style={[styles.timeInput, !isOpen && styles.disabledInput]}>
+            <Text style={styles.timeText}>{formatTime(schedule.close)}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      {show && (
+        <DateTimePicker
+          testID="dateTimePicker"
+          value={new Date()} // You might want to parse schedule.open/close to initialize this
+          mode="time"
+          is24Hour={true}
+          display="default"
+          onChange={onChange}
+        />
+      )}
+    </View>
+  );
+};
 
 export default function BusinessInformationScreen() {
   const router = useRouter();
@@ -37,7 +106,28 @@ export default function BusinessInformationScreen() {
       phone: '',
       website: '',
     },
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'Philippines',
+    },
     logo: null,
+    businessHours: {
+      monday: { isOpen: false, open: '09:00', close: '17:00' },
+      tuesday: { isOpen: false, open: '09:00', close: '17:00' },
+      wednesday: { isOpen: false, open: '09:00', close: '17:00' },
+      thursday: { isOpen: false, open: '09:00', close: '17:00' },
+      friday: { isOpen: false, open: '09:00', close: '17:00' },
+      saturday: { isOpen: false, open: '09:00', close: '17:00' },
+      sunday: { isOpen: false, open: '09:00', close: '17:00' },
+    },
+    credentials: {
+      licenseNumber: '',
+      certifications: [],
+      insuranceInfo: '',
+    },
   });
 
   const [showBusinessTypeDropdown, setShowBusinessTypeDropdown] = useState(false);
@@ -73,7 +163,16 @@ export default function BusinessInformationScreen() {
             phone: business.contactInfo?.phone || '',
             website: business.contactInfo?.website || '',
           },
+          address: {
+            street: business.address?.street || '',
+            city: business.address?.city || '',
+            state: business.address?.state || '',
+            zipCode: business.address?.zipCode || '',
+            country: business.address?.country || 'Philippines',
+          },
           logo: business.images?.logo || business.logo || null,
+          businessHours: business.businessHours || businessInfo.businessHours,
+          credentials: business.credentials || businessInfo.credentials,
         });
       }
     } catch (error) {
@@ -142,6 +241,14 @@ export default function BusinessInformationScreen() {
 
       // Append complex fields as JSON strings
       formData.append('contactInfo', JSON.stringify(businessInfo.contactInfo));
+      formData.append('address', JSON.stringify(businessInfo.address));
+      formData.append('businessHours', JSON.stringify(businessInfo.businessHours));
+      formData.append('credentials', JSON.stringify({
+        ...businessInfo.credentials,
+        certifications: typeof businessInfo.credentials.certifications === 'string'
+          ? businessInfo.credentials.certifications.split(',').map(c => c.trim())
+          : businessInfo.credentials.certifications,
+      }));
 
       // Append logo if it's new
       if (businessInfo.logo && typeof businessInfo.logo === 'object' && businessInfo.logo.uri) {
@@ -402,6 +509,148 @@ export default function BusinessInformationScreen() {
           </View>
         </View>
 
+        {/* Address Section */}
+        <View style={styles.formSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="location-outline" size={moderateScale(24)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Address</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Street *</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={businessInfo.address.street}
+                onChangeText={(text) => setBusinessInfo({
+                  ...businessInfo,
+                  address: {...businessInfo.address, street: text}
+                })}
+                placeholder="Enter street address"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>City *</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={businessInfo.address.city}
+                onChangeText={(text) => setBusinessInfo({
+                  ...businessInfo,
+                  address: {...businessInfo.address, city: text}
+                })}
+                placeholder="Enter city"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>State / Province *</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={businessInfo.address.state}
+                onChangeText={(text) => setBusinessInfo({
+                  ...businessInfo,
+                  address: {...businessInfo.address, state: text}
+                })}
+                placeholder="Enter state or province"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Zip Code *</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={businessInfo.address.zipCode}
+                onChangeText={(text) => setBusinessInfo({
+                  ...businessInfo,
+                  address: {...businessInfo.address, zipCode: text}
+                })}
+                placeholder="Enter zip code"
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Business Hours Section */}
+        <View style={styles.formSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Business Hours</Text>
+          </View>
+          {Object.keys(businessInfo.businessHours).map(day => (
+            <DaySchedule
+              key={day}
+              day={day}
+              schedule={businessInfo.businessHours[day]}
+              onUpdate={(day, newSchedule) => {
+                setBusinessInfo(prev => ({...prev, businessHours: {...prev.businessHours, [day]: newSchedule}}));
+              }}
+            />
+          ))}
+        </View>
+
+        {/* Credentials Section */}
+        <View style={styles.formSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="ribbon-outline" size={moderateScale(24)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Credentials</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>License Number</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="card-outline" size={moderateScale(20)} color="#1C86FF" />
+              <TextInput
+                style={styles.input}
+                value={businessInfo.credentials.licenseNumber}
+                onChangeText={(text) => setBusinessInfo({ ...businessInfo, credentials: { ...businessInfo.credentials, licenseNumber: text } })}
+                placeholder="e.g., VET-12345"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Certifications (comma-separated)</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="medal-outline" size={moderateScale(20)} color="#1C86FF" />
+              <TextInput
+                style={styles.input}
+                value={Array.isArray(businessInfo.credentials.certifications) ? businessInfo.credentials.certifications.join(', ') : businessInfo.credentials.certifications}
+                onChangeText={(text) => setBusinessInfo({ ...businessInfo, credentials: { ...businessInfo.credentials, certifications: text } })}
+                placeholder="e.g., Certified Groomer, Pet First Aid"
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Insurance Information</Text>
+            <View style={styles.textAreaInputContainer}>
+              <Ionicons name="shield-checkmark-outline" size={moderateScale(20)} color="#1C86FF" style={{ marginTop: moderateScale(2) }}/>
+              <TextInput
+                style={styles.textAreaInput}
+                value={businessInfo.credentials.insuranceInfo}
+                onChangeText={(text) => setBusinessInfo({ ...businessInfo, credentials: { ...businessInfo.credentials, insuranceInfo: text } })}
+                placeholder="Details about your business insurance"
+                placeholderTextColor="#999"
+                multiline
+              />
+            </View>
+          </View>
+        </View>
+
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -446,7 +695,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(100),
+    paddingBottom: moderateScale(40),
   },
   formSection: {
     backgroundColor: '#fff',
@@ -515,10 +764,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
+  textAreaInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
   textArea: {
     fontSize: scaleFontSize(15),
     color: '#333',
     minHeight: moderateScale(80),
+  },
+  textAreaInput: {
+    flex: 1,
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    marginLeft: moderateScale(12),
+    minHeight: moderateScale(60),
+    textAlignVertical: 'top',
   },
   saveButton: {
     flexDirection: 'row',
@@ -644,5 +911,44 @@ const styles = StyleSheet.create({
   dropdownItemTextSelected: {
     color: '#1C86FF',
     fontWeight: '600',
+  },
+  dayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: moderateScale(10),
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  dayLabel: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '500',
+    width: '25%',
+  },
+  timeInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: moderateScale(8),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(8),
+    width: moderateScale(70),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timeText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    textAlign: 'center',
+  },
+  disabledInput: {
+    backgroundColor: '#f0f0f0',
+    color: '#999',
+  },
+  timeSeparator: {
+    marginHorizontal: moderateScale(5),
   },
 });

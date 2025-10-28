@@ -21,6 +21,10 @@ import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 import Header from '@components/Header';
 import { isBusinessOpen } from "@utils/businessHelpers";
+import { getBusinessOwner, getOrCreateConversation } from '@services/api/messageApiService';
+import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { getConversationDetails } from '@utils/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BusinessDetailsScreen() {
   const router = useRouter();
@@ -29,6 +33,7 @@ export default function BusinessDetailsScreen() {
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('about');
+  const [loadingMessage, setLoadingMessage] = useState(false);
 
   // Fetch business data from API
   useEffect(() => {
@@ -185,6 +190,125 @@ export default function BusinessDetailsScreen() {
         location: businessData?.location
       });
       Alert.alert('Location Not Available', 'This business has not set their location coordinates.');
+    }
+  };
+
+  const handleMessage = async () => {
+    if (!businessData || !businessData._id) {
+      Alert.alert('Error', 'Business information not available');
+      return;
+    }
+
+    if (loadingMessage) return;
+
+    try {
+      setLoadingMessage(true);
+
+      // Step 1: Ensure Firebase authentication is established FIRST
+      console.log('🔐 Ensuring Firebase authentication...');
+      const isFirebaseAuth = await ensureFirebaseAuth();
+
+      if (!isFirebaseAuth) {
+        throw new Error('Failed to authenticate with messaging service');
+      }
+
+      console.log('✅ Firebase authentication successful');
+
+      // Step 2: Get business owner ID
+      console.log('👤 Getting business owner for business:', businessData._id);
+      const ownerData = await getBusinessOwner(businessData._id);
+
+      if (!ownerData || !ownerData.ownerId) {
+        throw new Error('Could not find business owner');
+      }
+
+      console.log('✅ Business owner found:', ownerData.ownerId);
+
+      // Step 3: Get or create conversation with business owner
+      console.log('💬 Getting or creating conversation...');
+      const conversationData = await getOrCreateConversation(ownerData.ownerId);
+
+      if (!conversationData || !conversationData.conversationId) {
+        throw new Error('Could not create conversation - no conversation ID returned');
+      }
+
+      console.log('✅ Conversation ready:', conversationData.conversationId);
+
+      // Step 4: Fetch participant details from Firestore (matches web version approach)
+      console.log('📋 Fetching participant details from Firestore...');
+      const conversationDetails = await getConversationDetails(conversationData.conversationId);
+
+      if (!conversationDetails) {
+        throw new Error('Could not fetch conversation details from Firestore');
+      }
+
+      // Get current user ID to identify the other participant
+      const currentUserId = await AsyncStorage.getItem('userId');
+      const currentFirebaseUid = `pettapp_${currentUserId}`;
+
+      // Find the other participant (not current user)
+      const otherParticipantUid = conversationDetails.participants?.find(
+        uid => uid !== currentFirebaseUid
+      );
+
+      if (!otherParticipantUid) {
+        throw new Error('Could not find other participant in conversation');
+      }
+
+      // Get participant details from conversation's participantDetails field
+      const otherParticipantDetails = conversationDetails.participantDetails?.[otherParticipantUid];
+
+      console.log('✅ Participant details loaded:', {
+        participantUid: otherParticipantUid,
+        fullName: otherParticipantDetails?.fullName,
+        role: otherParticipantDetails?.role
+      });
+
+      // Step 5: Navigate to chat screen with participant details from Firestore
+      console.log('🚀 Navigating to chat...');
+      router.push({
+        pathname: '/(user)/(tabs)/messages/chat',
+        params: {
+          conversationId: conversationData.conversationId,
+          receiverId: otherParticipantDetails?.userId || ownerData.ownerId,
+          receiverName: otherParticipantDetails?.fullName || 'Business Owner',
+          receiverImage: otherParticipantDetails?.profileImage || '',
+        },
+      });
+    } catch (error) {
+      console.error('❌ Error starting conversation:', error);
+      console.error('Error stack:', error.stack);
+
+      // Provide user-friendly error messages based on the error
+      let errorMessage = 'Could not start conversation. Please try again.';
+      let errorTitle = 'Error';
+
+      if (error.message.includes('authenticate')) {
+        errorTitle = 'Authentication Error';
+        errorMessage = 'Failed to connect to messaging service. Please check your connection and try again.';
+      } else if (error.message.includes('business owner')) {
+        errorTitle = 'Business Not Available';
+        errorMessage = 'Could not find the business owner. They may have removed their account.';
+      } else if (error.message.includes('conversation details') || error.message.includes('participant')) {
+        errorTitle = 'Connection Issue';
+        errorMessage = 'Could not load conversation details. Please wait a moment and try again.';
+      } else if (error.message.includes('not available in Firestore')) {
+        errorTitle = 'Connection Issue';
+        errorMessage = 'The messaging service is taking longer than expected. Please wait a moment and try again.';
+      } else if (error.message.includes('network') || error.message.includes('timeout')) {
+        errorTitle = 'Network Error';
+        errorMessage = 'Please check your internet connection and try again.';
+      } else if (error.response?.status === 400 && error.response?.data?.message?.includes('different roles')) {
+        errorTitle = 'Cannot Message';
+        errorMessage = 'You cannot message other pet owners. You can only message businesses.';
+      } else if (error.code === 'permission-denied') {
+        errorTitle = 'Permission Error';
+        errorMessage = 'Unable to access conversation. Please try again or contact support.';
+      }
+
+      Alert.alert(errorTitle, errorMessage, [{ text: 'OK' }]);
+    } finally {
+      setLoadingMessage(false);
     }
   };
 
@@ -512,6 +636,22 @@ export default function BusinessDetailsScreen() {
                 );
               })()}
             </View>
+
+            {/* Chat Button */}
+            <TouchableOpacity
+              style={[styles.chatButton, loadingMessage && styles.chatButtonDisabled]}
+              onPress={handleMessage}
+              disabled={loadingMessage}
+            >
+              {loadingMessage ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="chatbubbles-outline" size={moderateScale(20)} color="#fff" />
+                  <Text style={styles.chatButtonText}>Chat with Business</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -988,5 +1128,31 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(15),
     fontWeight: '600',
     fontFamily: 'SFProSB',
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1C86FF',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(20),
+    borderRadius: moderateScale(10),
+    marginTop: moderateScale(15),
+    gap: moderateScale(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    width: '100%',
+  },
+  chatButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    fontFamily: 'SFProSB',
+  },
+  chatButtonDisabled: {
+    opacity: 0.7,
   },
 });

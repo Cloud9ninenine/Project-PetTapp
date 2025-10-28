@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,6 +25,10 @@ const UploadPaymentProofScreen = () => {
 
   const [selectedImage, setSelectedImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [booking, setBooking] = useState(null);
+  const [isLoadingBooking, setIsLoadingBooking] = useState(true);
+  const [alreadyUploaded, setAlreadyUploaded] = useState(false);
+  const [canReupload, setCanReupload] = useState(false);
 
   // Hide tab bar on this screen
   useEffect(() => {
@@ -31,6 +36,40 @@ const UploadPaymentProofScreen = () => {
       tabBarStyle: { display: 'none' }
     });
   }, [navigation]);
+
+  // Fetch booking details to check payment proof status
+  useEffect(() => {
+    if (bookingId) {
+      fetchBookingDetails();
+    }
+  }, [bookingId]);
+
+  const fetchBookingDetails = async () => {
+    try {
+      setIsLoadingBooking(true);
+      const response = await apiClient.get(`/bookings/${bookingId}`);
+
+      if (response.data.success) {
+        const bookingData = response.data.data;
+        setBooking(bookingData);
+
+        // Check if payment proof already exists
+        if (bookingData.paymentProof && bookingData.paymentProof.imageUrl) {
+          setAlreadyUploaded(true);
+
+          // Allow re-upload only if payment was rejected (failed status)
+          if (bookingData.paymentStatus === 'failed') {
+            setCanReupload(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching booking details:', error);
+      Alert.alert('Error', 'Failed to load booking details. Please try again.');
+    } finally {
+      setIsLoadingBooking(false);
+    }
+  };
 
   // Request permissions
   const requestPermissions = async () => {
@@ -117,13 +156,17 @@ const UploadPaymentProofScreen = () => {
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      formData.append('paymentProof', {
+      // Backend expects field name 'image' (see uploadSingleImage middleware)
+      formData.append('image', {
         uri: Platform.OS === 'ios' ? uri.replace('file://', '') : uri,
         name: filename || 'payment-proof.jpg',
         type,
       });
 
       // Upload to API
+      console.log('Uploading payment proof for booking:', bookingId);
+      console.log('File info:', { name: filename, type });
+
       const response = await apiClient.post(
         `/bookings/${bookingId}/payment-proof`,
         formData,
@@ -134,10 +177,17 @@ const UploadPaymentProofScreen = () => {
         }
       );
 
+      console.log('Upload response:', response.status, response.data);
+
       if (response.status === 200 || response.status === 201) {
+        // Refresh booking details to update status
+        await fetchBookingDetails();
+
         Alert.alert(
           'Success',
-          'Payment proof uploaded successfully. Your booking will be reviewed shortly.',
+          canReupload
+            ? 'Payment proof re-uploaded successfully. Your booking will be reviewed again shortly.'
+            : 'Payment proof uploaded successfully. Your booking will be reviewed shortly.',
           [
             {
               text: 'OK',
@@ -152,6 +202,7 @@ const UploadPaymentProofScreen = () => {
       }
     } catch (error) {
       console.error('Error uploading payment proof:', error);
+      console.error('Error response:', error.response?.data);
       Alert.alert(
         'Upload Failed',
         error.response?.data?.message || 'Failed to upload payment proof. Please try again.'
@@ -168,44 +219,96 @@ const UploadPaymentProofScreen = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={moderateScale(24)} color="#1C86FF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upload Payment Proof</Text>
+        <Text style={styles.headerTitle}>
+          {canReupload ? 'Re-upload Payment Proof' : 'Upload Payment Proof'}
+        </Text>
         <View style={styles.backButton} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
-          <Text style={styles.infoText}>
-            Upload a clear screenshot or photo of your payment confirmation from GCash, PayMaya, or your bank app.
-          </Text>
+      {/* Loading State */}
+      {isLoadingBooking ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C86FF" />
+          <Text style={styles.loadingText}>Loading booking details...</Text>
         </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Already Uploaded Alert - Cannot Re-upload */}
+          {alreadyUploaded && !canReupload && (
+            <View style={styles.alreadyUploadedCard}>
+              <Ionicons name="checkmark-circle" size={moderateScale(60)} color="#4CAF50" />
+              <Text style={styles.alreadyUploadedTitle}>Payment Proof Already Submitted</Text>
+              <Text style={styles.alreadyUploadedText}>
+                You have already uploaded your payment proof. The business owner is currently reviewing it.
+              </Text>
+              <Text style={styles.alreadyUploadedSubtext}>
+                Payment Status: <Text style={styles.statusHighlight}>
+                  {booking?.paymentStatus === 'proof-uploaded' ? 'Under Review' :
+                   booking?.paymentStatus === 'paid' ? 'Verified' : 'Processing'}
+                </Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.backToBookingButton}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.backToBookingButtonText}>Back to Booking Details</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-        {/* Image Preview or Placeholder */}
-        {selectedImage ? (
-          <View style={styles.imagePreviewContainer}>
-            <Image
-              source={{ uri: selectedImage.uri }}
-              style={styles.imagePreview}
-              resizeMode="contain"
-            />
-            <TouchableOpacity style={styles.removeImageButton} onPress={handleRemoveImage}>
-              <Ionicons name="close-circle" size={moderateScale(32)} color="#FF6B6B" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <Ionicons name="image-outline" size={moderateScale(80)} color="#ccc" />
-            <Text style={styles.placeholderText}>No image selected</Text>
-          </View>
-        )}
+          {/* Re-upload Info - Payment Rejected */}
+          {alreadyUploaded && canReupload && (
+            <View style={styles.reuploadInfoCard}>
+              <Ionicons name="alert-circle" size={moderateScale(24)} color="#FF9B79" />
+              <Text style={styles.reuploadInfoText}>
+                Your previous payment proof was rejected. Please upload a new, clearer screenshot.
+              </Text>
+              {booking?.paymentRejectionReason && (
+                <View style={styles.rejectionReasonBox}>
+                  <Text style={styles.rejectionReasonLabel}>Rejection Reason:</Text>
+                  <Text style={styles.rejectionReasonText}>{booking.paymentRejectionReason}</Text>
+                </View>
+              )}
+            </View>
+          )}
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
+          {/* Info Card - Only show if can upload */}
+          {(!alreadyUploaded || canReupload) && (
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
+              <Text style={styles.infoText}>
+                Upload a clear screenshot or photo of your payment confirmation from GCash, PayMaya, or your bank app.
+              </Text>
+            </View>
+          )}
+
+          {/* Image Preview or Placeholder - Only show if can upload */}
+          {(!alreadyUploaded || canReupload) && (
+            <>
+              {selectedImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image
+                    source={{ uri: selectedImage.uri }}
+                    style={styles.imagePreview}
+                    resizeMode="contain"
+                  />
+                  <TouchableOpacity style={styles.removeImageButton} onPress={handleRemoveImage}>
+                    <Ionicons name="close-circle" size={moderateScale(32)} color="#FF6B6B" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={moderateScale(80)} color="#ccc" />
+                  <Text style={styles.placeholderText}>No image selected</Text>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.actionButtonsContainer}>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={handlePickImage}
@@ -223,82 +326,86 @@ const UploadPaymentProofScreen = () => {
             <Ionicons name="camera-outline" size={moderateScale(24)} color="#1C86FF" />
             <Text style={styles.actionButtonText}>Take Photo</Text>
           </TouchableOpacity>
-        </View>
+              </View>
 
-        {/* Requirements */}
-        <View style={styles.requirementsCard}>
-          <Text style={styles.requirementsTitle}>Image Requirements</Text>
+              {/* Requirements */}
+              <View style={styles.requirementsCard}>
+                <Text style={styles.requirementsTitle}>Image Requirements</Text>
 
-          <View style={styles.requirementItem}>
-            <View style={styles.bulletPoint}>
-              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.requirementText}>Screenshot must be clear and readable</Text>
-          </View>
+                <View style={styles.requirementItem}>
+                  <View style={styles.bulletPoint}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.requirementText}>Screenshot must be clear and readable</Text>
+                </View>
 
-          <View style={styles.requirementItem}>
-            <View style={styles.bulletPoint}>
-              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.requirementText}>
-              Payment confirmation should show transaction ID and amount
-            </Text>
-          </View>
+                <View style={styles.requirementItem}>
+                  <View style={styles.bulletPoint}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.requirementText}>
+                    Payment confirmation should show transaction ID and amount
+                  </Text>
+                </View>
 
-          <View style={styles.requirementItem}>
-            <View style={styles.bulletPoint}>
-              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.requirementText}>
-              Ensure the payment date and time are visible
-            </Text>
-          </View>
+                <View style={styles.requirementItem}>
+                  <View style={styles.bulletPoint}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.requirementText}>
+                    Ensure the payment date and time are visible
+                  </Text>
+                </View>
 
-          <View style={styles.requirementItem}>
-            <View style={styles.bulletPoint}>
-              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.requirementText}>File size should not exceed 5MB</Text>
-          </View>
+                <View style={styles.requirementItem}>
+                  <View style={styles.bulletPoint}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.requirementText}>File size should not exceed 5MB</Text>
+                </View>
 
-          <View style={styles.requirementItem}>
-            <View style={styles.bulletPoint}>
-              <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
-            </View>
-            <Text style={styles.requirementText}>
-              Supported formats: JPG, PNG, JPEG
-            </Text>
-          </View>
-        </View>
+                <View style={styles.requirementItem}>
+                  <View style={styles.bulletPoint}>
+                    <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.requirementText}>
+                    Supported formats: JPG, PNG, JPEG
+                  </Text>
+                </View>
+              </View>
 
-        {/* Warning Card */}
-        <View style={styles.warningCard}>
-          <Ionicons name="alert-circle-outline" size={moderateScale(20)} color="#FF9B79" />
-          <Text style={styles.warningText}>
-            Your payment will be verified by the business. Please ensure the screenshot is authentic and matches your booking details.
-          </Text>
-        </View>
+              {/* Warning Card */}
+              <View style={styles.warningCard}>
+                <Ionicons name="alert-circle-outline" size={moderateScale(20)} color="#FF9B79" />
+                <Text style={styles.warningText}>
+                  Your payment will be verified by the business. Please ensure the screenshot is authentic and matches your booking details.
+                </Text>
+              </View>
 
-        {/* Example Section */}
-        <View style={styles.exampleCard}>
-          <Text style={styles.exampleTitle}>Example of Good Payment Proof</Text>
-          <View style={styles.exampleImagePlaceholder}>
-            <Ionicons name="receipt-outline" size={moderateScale(60)} color="#1C86FF" />
-            <Text style={styles.exampleText}>
-              Screenshot should clearly show:
-            </Text>
-            <Text style={styles.exampleBullet}>• Payment method logo (GCash, PayMaya, etc.)</Text>
-            <Text style={styles.exampleBullet}>• Transaction ID or reference number</Text>
-            <Text style={styles.exampleBullet}>• Amount paid</Text>
-            <Text style={styles.exampleBullet}>• Recipient/Business name</Text>
-            <Text style={styles.exampleBullet}>• Date and time of transaction</Text>
-            <Text style={styles.exampleBullet}>• "Successful" or "Completed" status</Text>
-          </View>
-        </View>
-      </ScrollView>
+              {/* Example Section */}
+              <View style={styles.exampleCard}>
+                <Text style={styles.exampleTitle}>Example of Good Payment Proof</Text>
+                <View style={styles.exampleImagePlaceholder}>
+                  <Ionicons name="receipt-outline" size={moderateScale(60)} color="#1C86FF" />
+                  <Text style={styles.exampleText}>
+                    Screenshot should clearly show:
+                  </Text>
+                  <Text style={styles.exampleBullet}>• Payment method logo (GCash, PayMaya, etc.)</Text>
+                  <Text style={styles.exampleBullet}>• Transaction ID or reference number</Text>
+                  <Text style={styles.exampleBullet}>• Amount paid</Text>
+                  <Text style={styles.exampleBullet}>• Recipient/Business name</Text>
+                  <Text style={styles.exampleBullet}>• Date and time of transaction</Text>
+                  <Text style={styles.exampleBullet}>• "Successful" or "Completed" status</Text>
+                </View>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      )}
 
-      {/* Upload Button */}
-      <View style={styles.bottomContainer}>
+      {/* Upload Button - Only show if can upload */}
+      {!isLoadingBooking && (!alreadyUploaded || canReupload) && (
+        <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={[
             styles.uploadButton,
@@ -315,11 +422,14 @@ const UploadPaymentProofScreen = () => {
           ) : (
             <>
               <Ionicons name="cloud-upload-outline" size={moderateScale(24)} color="#fff" />
-              <Text style={styles.uploadButtonText}>Upload Payment Proof</Text>
+              <Text style={styles.uploadButtonText}>
+                {canReupload ? 'Re-upload Payment Proof' : 'Upload Payment Proof'}
+              </Text>
             </>
           )}
         </TouchableOpacity>
-      </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -566,6 +676,106 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(16),
     fontWeight: '700',
     marginLeft: moderateScale(8),
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: moderateScale(40),
+  },
+  loadingText: {
+    marginTop: moderateScale(12),
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
+  alreadyUploadedCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(24),
+    alignItems: 'center',
+    marginBottom: hp(2),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  alreadyUploadedTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  alreadyUploadedText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(20),
+    marginBottom: moderateScale(16),
+  },
+  alreadyUploadedSubtext: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    marginBottom: moderateScale(20),
+  },
+  statusHighlight: {
+    fontWeight: 'bold',
+    color: '#1C86FF',
+  },
+  backToBookingButton: {
+    backgroundColor: '#1C86FF',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(8),
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backToBookingButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+  },
+  reuploadInfoCard: {
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: hp(2),
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9B79',
+  },
+  reuploadInfoText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+    marginLeft: moderateScale(12),
+    marginTop: moderateScale(4),
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginTop: moderateScale(12),
+    width: '100%',
+  },
+  rejectionReasonLabel: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '600',
+    color: '#FF6B6B',
+    marginBottom: moderateScale(6),
+  },
+  rejectionReasonText: {
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    lineHeight: scaleFontSize(18),
   },
 });
 

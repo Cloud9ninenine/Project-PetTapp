@@ -18,6 +18,8 @@ import Header from '@components/Header';
 import BookingConfirmationModal from '../home/BookingConfirmationModal';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import { fetchServiceById } from '@services/api';
+import { getBusinessOwner, getOrCreateConversation } from '@services/api/messageApiService';
+import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 
 export default function ServiceDetailsScreen() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function ServiceDetailsScreen() {
   const [businessData, setBusinessData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [loadingMessage, setLoadingMessage] = useState(false);
 
   // Fetch service data from API
   useEffect(() => {
@@ -66,14 +69,25 @@ export default function ServiceDetailsScreen() {
     return `PHP ${price.amount?.toLocaleString() || 0}.00`;
   };
 
-  // Format duration
+  // Format duration - returns object with value and unit separated
   const formatDuration = (duration) => {
-    if (!duration) return 'N/A';
+    if (!duration) return { value: 'N/A', unit: '' };
     const hours = Math.floor(duration / 60);
     const minutes = duration % 60;
-    if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${duration}min`;
+
+    if (hours > 0 && minutes > 0) {
+      return { value: `${hours}h ${minutes}`, unit: 'mins' };
+    }
+    if (hours > 0) {
+      return { value: hours, unit: 'hours' };
+    }
+    return { value: duration, unit: 'mins' };
+  };
+
+  // Format duration as string (for booking data)
+  const formatDurationString = (duration) => {
+    const formatted = formatDuration(duration);
+    return formatted.unit ? `${formatted.value} ${formatted.unit}` : formatted.value;
   };
 
   // Get category color
@@ -103,6 +117,43 @@ export default function ServiceDetailsScreen() {
     });
   };
 
+  // Format business hours
+  const formatBusinessHours = () => {
+    if (!businessData?.businessHours || typeof businessData.businessHours !== 'object') {
+      return null;
+    }
+
+    const daysOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const hours = businessData.businessHours;
+
+    const formatTime = (time) => {
+      if (!time) return '';
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 || 12;
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
+
+    return daysOrder.map(day => {
+      const dayHours = hours[day];
+      if (!dayHours) return null;
+
+      const dayName = day.charAt(0).toUpperCase() + day.slice(1, 3);
+
+      // Check if the day is closed using isOpen property
+      if (dayHours.isOpen === false || !dayHours.open || !dayHours.close) {
+        return { day: dayName, hours: 'Closed', closed: true };
+      }
+
+      return {
+        day: dayName,
+        hours: `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`,
+        closed: false
+      };
+    }).filter(Boolean);
+  };
+
   // Create booking data for confirmation modal
   const getBookingData = () => {
     if (!service) return null;
@@ -123,7 +174,7 @@ export default function ServiceDetailsScreen() {
         category: service.category,
         imageUrl: service.imageUrl,
         price: formatPrice(service.price),
-        duration: formatDuration(service.duration),
+        duration: formatDurationString(service.duration),
       },
       business: businessData ? {
         id: businessData._id || businessData.id,
@@ -189,28 +240,69 @@ export default function ServiceDetailsScreen() {
   };
 
   // Handle message button - navigate to messages/chat
-  const handleMessage = () => {
+  const handleMessage = async () => {
     if (!businessData || !businessData._id) {
       Alert.alert('Error', 'Business information not available');
       return;
     }
 
-    // Navigate to messages screen with business owner
-    // For now, show alert that feature is coming
-    Alert.alert(
-      'Message Business',
-      'Chat functionality will be available soon. You will be able to message the business directly.',
-      [{ text: 'OK' }]
-    );
+    if (loadingMessage) return;
 
-    // TODO: When messages screen is ready:
-    // router.push({
-    //   pathname: '/(user)/(tabs)/messages',
-    //   params: {
-    //     businessId: businessData._id,
-    //     businessName: businessData.name,
-    //   },
-    // });
+    try {
+      setLoadingMessage(true);
+
+      // Step 1: Ensure Firebase authentication is established FIRST
+      console.log('Ensuring Firebase authentication...');
+      const isFirebaseAuth = await ensureFirebaseAuth();
+
+      if (!isFirebaseAuth) {
+        throw new Error('Failed to authenticate with messaging service');
+      }
+
+      console.log('Firebase authentication successful');
+
+      // Step 2: Get business owner ID
+      console.log('Getting business owner for business:', businessData._id);
+      const ownerData = await getBusinessOwner(businessData._id);
+
+      if (!ownerData || !ownerData.ownerId) {
+        throw new Error('Could not find business owner');
+      }
+
+      console.log('Business owner found:', ownerData.ownerId);
+
+      // Step 3: Get or create conversation with business owner
+      const conversationData = await getOrCreateConversation(ownerData.ownerId);
+
+      if (!conversationData || !conversationData.conversationId) {
+        throw new Error('Could not create conversation');
+      }
+
+      console.log('Conversation ready:', conversationData.conversationId);
+
+      // Step 4: Navigate to chat screen
+      router.push({
+        pathname: '/(user)/(tabs)/messages/chat',
+        params: {
+          conversationId: conversationData.conversationId,
+          receiverId: ownerData.ownerId,
+          receiverName: ownerData.ownerName || businessData.name || 'Business Owner',
+          receiverImage: ownerData.ownerImage || businessData.images?.logo || '',
+        },
+      });
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+
+      let errorMessage = 'Could not start conversation. Please try again later.';
+
+      if (error.message.includes('authenticate')) {
+        errorMessage = 'Failed to connect to messaging service. Please check your connection and try again.';
+      }
+
+      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+    } finally {
+      setLoadingMessage(false);
+    }
   };
 
   // Handle business provider card press - navigate to business details
@@ -445,6 +537,40 @@ export default function ServiceDetailsScreen() {
             )}
           </View>
 
+                    {/* Location and Contact Section */}
+          {(businessData?.address || businessData?.addressString || businessData?.contactNumber) && (
+            <View style={styles.section}>
+              <View style={styles.locationContactRow}>
+                {/* Location */}
+                {(businessData?.address || businessData?.addressString) && (
+                  <View style={styles.locationContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons name="location-outline" size={moderateScale(20)} color="#FF9B79" />
+                      <Text style={styles.sectionTitle}>Location</Text>
+                    </View>
+                    {/* See on Maps Button */}
+                    <TouchableOpacity style={styles.mapButton} onPress={handleSeeOnMaps}>
+                      <Ionicons name="map" size={moderateScale(18)} color="#1C86FF" />
+                      <Text style={styles.mapButtonText}>See Maps</Text>
+                      <Ionicons name="chevron-forward" size={moderateScale(16)} color="#1C86FF" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Contact */}
+                {businessData?.contactNumber && (
+                  <View style={styles.contactContainer}>
+                    <View style={styles.sectionHeader}>
+                      <Ionicons name="call-outline" size={moderateScale(20)} color="#4CAF50" />
+                      <Text style={styles.sectionTitle}>Contact</Text>
+                    </View>
+                    <Text style={styles.contactText}>{businessData.contactNumber}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Price and Duration - Inline Design */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Price and Duration</Text>
@@ -461,7 +587,10 @@ export default function ServiceDetailsScreen() {
               <View style={styles.infoItem}>
                 <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
                 <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoValue}>{formatDuration(service.duration)}</Text>
+                  <View style={styles.durationContainer}>
+                    <Text style={styles.durationValue}>{formatDuration(service.duration).value}</Text>
+                    <Text style={styles.durationUnit}>{formatDuration(service.duration).unit}</Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -474,81 +603,29 @@ export default function ServiceDetailsScreen() {
               <Ionicons name="calendar-outline" size={moderateScale(20)} color="#1C86FF" />
               <Text style={styles.sectionTitle}>Availability</Text>
             </View>
-            <Text style={styles.availabilityText}>Not specified</Text>
-            <Text style={styles.availabilityNote}>
-              Service availability follows business operating hours
-            </Text>
-          </View>
-
-          {/* Location Section */}
-          {(businessData?.address || businessData?.addressString) && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="location-outline" size={moderateScale(20)} color="#FF9B79" />
-                <Text style={styles.sectionTitle}>Location</Text>
-              </View>
-              <Text style={styles.locationText}>
-                {businessData.addressString || businessData.address}
-              </Text>
-
-              {/* See on Maps Button */}
-              <TouchableOpacity style={styles.mapButton} onPress={handleSeeOnMaps}>
-                <Ionicons name="map" size={moderateScale(18)} color="#1C86FF" />
-                <Text style={styles.mapButtonText}>See on Maps</Text>
-                <Ionicons name="chevron-forward" size={moderateScale(16)} color="#1C86FF" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Contact Section */}
-          {businessData?.contactNumber && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="call-outline" size={moderateScale(20)} color="#4CAF50" />
-                <Text style={styles.sectionTitle}>Contact</Text>
-              </View>
-              <Text style={styles.contactText}>{businessData.contactNumber}</Text>
-            </View>
-          )}
-
-          {/* Business Provider Section - Clickable */}
-          {businessData && (
-            <View style={styles.businessProviderSection}>
-              <View style={styles.businessProviderHeader}>
-                <Ionicons name="business" size={moderateScale(20)} color="#1C86FF" />
-                <Text style={styles.businessProviderTitle}>Service Provided By</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.businessProviderCard}
-                onPress={handleBusinessPress}
-                activeOpacity={0.7}
-              >
-                {businessData.logo ? (
-                  <Image source={{ uri: businessData.logo }} style={styles.businessLogo} />
-                ) : (
-                  <View style={styles.businessLogoPlaceholder}>
-                    <Ionicons name="business-outline" size={moderateScale(30)} color="#1C86FF" />
+            {formatBusinessHours() ? (
+              <View style={styles.businessHoursContainer}>
+                {formatBusinessHours().map((daySchedule, index) => (
+                  <View key={index} style={styles.businessHoursRow}>
+                    <Text style={styles.businessHoursDay}>{daySchedule.day}</Text>
+                    <Text style={[
+                      styles.businessHoursTime,
+                      daySchedule.closed && styles.businessHoursClosed
+                    ]}>
+                      {daySchedule.hours}
+                    </Text>
                   </View>
-                )}
-                <View style={styles.businessProviderInfo}>
-                  <Text style={styles.businessProviderName}>{businessData.name}</Text>
-                  {businessData.businessType && (
-                    <Text style={styles.businessProviderType}>{businessData.businessType}</Text>
-                  )}
-                  {businessData.ratings?.average > 0 && (
-                    <View style={styles.businessRatingRow}>
-                      <Ionicons name="star" size={moderateScale(14)} color="#FFD700" />
-                      <Text style={styles.businessRatingText}>
-                        {businessData.ratings.average.toFixed(1)} ({businessData.ratings.count} reviews)
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <Ionicons name="chevron-forward" size={moderateScale(20)} color="#999" />
-              </TouchableOpacity>
-            </View>
-          )}
-
+                ))}
+              </View>
+            ) : (
+              <>
+                <Text style={styles.availabilityText}>Not specified</Text>
+                <Text style={styles.availabilityNote}>
+                  Service availability follows business operating hours
+                </Text>
+              </>
+            )}
+          </View>
 
           {/* Bottom Spacing */}
           <View style={{ height: hp(6) }} />
@@ -557,8 +634,16 @@ export default function ServiceDetailsScreen() {
 
       {/* Floating Action Buttons */}
       <View style={styles.floatingButtonContainer}>
-        <TouchableOpacity style={styles.floatingMessageButton} onPress={handleMessage}>
-          <Ionicons name="chatbubble" size={moderateScale(22)} color="#1C86FF" />
+        <TouchableOpacity
+          style={[styles.floatingBusinessButton, loadingMessage && styles.floatingBusinessButtonDisabled]}
+          onPress={handleBusinessPress}
+          disabled={loadingMessage}
+        >
+          {businessData.images?.logo || businessData.logo ? (
+            <Image source={{ uri: businessData.images?.logo || businessData.logo }} style={styles.floatingBusinessLogo} />
+          ) : (
+            <Ionicons name="business-outline" size={moderateScale(22)} color="#1C86FF" />
+          )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.floatingBookButton} onPress={handleBooking}>
           <Ionicons name="calendar" size={moderateScale(20)} color="#fff" />
@@ -829,7 +914,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   infoTextContainer: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flex: 1,
     minWidth: 0,
   },
@@ -844,6 +929,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     flexWrap: 'wrap',
+  },
+  durationContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  durationValue: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  durationUnit: {
+    fontSize: scaleFontSize(11),
+    color: '#666',
+    marginTop: moderateScale(2),
+    textAlign: 'center',
   },
   infoDivider: {
     width: 1.5,
@@ -861,6 +962,44 @@ const styles = StyleSheet.create({
     color: '#999',
     fontStyle: 'italic',
   },
+  businessHoursContainer: {
+    marginTop: moderateScale(8),
+  },
+  businessHoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    backgroundColor: '#F8F9FA',
+    marginBottom: moderateScale(6),
+    borderRadius: moderateScale(8),
+  },
+  businessHoursDay: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#333',
+  },
+  businessHoursTime: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '500',
+  },
+  businessHoursClosed: {
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  locationContactRow: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    alignItems: 'flex-start',
+  },
+  locationContainer: {
+    flex: 1,
+  },
+  contactContainer: {
+    flex: 1,
+  },
   locationText: {
     fontSize: scaleFontSize(14),
     color: '#555',
@@ -872,25 +1011,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#E3F2FD',
-    paddingVertical: moderateScale(12),
-    paddingHorizontal: moderateScale(16),
-    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(4),
+    borderRadius: moderateScale(5),
     borderWidth: 1,
     borderColor: '#1C86FF',
-    gap: moderateScale(8),
-    marginTop: moderateScale(8),
+    gap: moderateScale(4),
   },
   mapButtonText: {
     color: '#1C86FF',
     fontSize: scaleFontSize(14),
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
   },
   contactText: {
     fontSize: scaleFontSize(14),
     color: '#4CAF50',
     fontWeight: '600',
+    textAlign: 'center',
   },
   requirementGroup: {
     marginBottom: moderateScale(14),
@@ -976,12 +1114,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: moderateScale(10),
   },
-  floatingMessageButton: {
+  floatingBusinessButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
-    paddingVertical: moderateScale(16),
+    paddingVertical: moderateScale(10),
     borderRadius: moderateScale(14),
     borderWidth: 2,
     borderColor: '#1C86FF',
@@ -990,6 +1128,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  floatingBusinessButtonDisabled: {
+    opacity: 0.6,
+  },
+  floatingBusinessLogo: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
   },
   floatingBookButton: {
     flex: 3,

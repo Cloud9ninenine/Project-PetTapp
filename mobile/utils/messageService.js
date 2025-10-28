@@ -13,7 +13,7 @@ import {
   limit,
   startAfter
 } from 'firebase/firestore';
-import { firestore } from '@config/firebase';
+import { db as firestore, auth } from '@config/firebase';
 import apiClient from '@config/api';
 
 /**
@@ -147,7 +147,45 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
     console.log('Sender ID:', senderId);
     console.log('Firebase UID:', firebaseUid);
     console.log('Message:', messageText);
+    console.log('Firebase Auth User:', auth.currentUser?.uid);
+    console.log('UIDs Match:', auth.currentUser?.uid === firebaseUid);
     console.log('============================');
+
+    // Check if Firebase user is authenticated
+    if (!auth.currentUser) {
+      throw new Error('Not authenticated with Firebase');
+    }
+
+    if (auth.currentUser.uid !== firebaseUid) {
+      throw new Error(`Firebase UID mismatch: authenticated as ${auth.currentUser.uid}, trying to send as ${firebaseUid}`);
+    }
+
+    // Verify conversation exists and user is a participant
+    const conversationRef = doc(firestore, 'conversations', conversationId);
+    const conversationSnap = await getDoc(conversationRef);
+
+    if (!conversationSnap.exists()) {
+      throw new Error(`Conversation ${conversationId} does not exist in Firestore`);
+    }
+
+    const conversationData = conversationSnap.data();
+    const participants = conversationData.participants || [];
+
+    console.log('📊 Conversation Document Data:');
+    console.log('  - ID:', conversationId);
+    console.log('  - Participants:', JSON.stringify(participants));
+    console.log('  - ParticipantDetails:', JSON.stringify(conversationData.participantDetails));
+    console.log('  - BookingId:', conversationData.bookingId);
+    console.log('  - CreatedAt:', conversationData.createdAt);
+
+    console.log('🔍 Participant Check:');
+    console.log('  - Current Firebase UID:', firebaseUid);
+    console.log('  - Is in participants array?', participants.includes(firebaseUid));
+    console.log('  - All participants:', participants.join(', '));
+
+    if (!participants.includes(firebaseUid)) {
+      throw new Error(`User ${firebaseUid} is not a participant in conversation. Participants: ${participants.join(', ')}`);
+    }
 
     const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
 
@@ -164,23 +202,38 @@ export const sendMessage = async (conversationId, senderId, messageText, senderI
       isRead: false,
     };
 
+    console.log('📝 Message data to be sent:', JSON.stringify(messageData, null, 2));
+    console.log('🔐 Security check:');
+    console.log('  - request.auth.uid:', auth.currentUser?.uid);
+    console.log('  - messageData.senderId:', messageData.senderId);
+    console.log('  - UIDs match:', auth.currentUser?.uid === messageData.senderId);
+
+    console.log('Adding message to Firestore...');
     const docRef = await addDoc(messagesRef, messageData);
+    console.log('✅ Message added to Firestore with ID:', docRef.id);
 
     // Update conversation's last message
-    const conversationRef = doc(firestore, 'conversations', conversationId);
-    await updateDoc(conversationRef, {
-      lastMessage: {
-        text: messageText, // FIXED: Use 'text' instead of 'message'
-        senderId: firebaseUid, // Use Firebase UID format
-        timestamp: now.toISOString(), // Use ISO string for last message
-      },
-      updatedAt: now, // Use actual timestamp
-      [`unreadCount.${firebaseUid}`]: 0, // Reset sender's unread count using Firebase UID
-    });
+    console.log('Updating conversation last message...');
+    try {
+      await updateDoc(conversationRef, {
+        lastMessage: {
+          text: messageText, // FIXED: Use 'text' instead of 'message'
+          senderId: firebaseUid, // Use Firebase UID format
+          timestamp: now.toISOString(), // Use ISO string for last message
+        },
+        updatedAt: now, // Use actual timestamp
+        [`unreadCount.${firebaseUid}`]: 0, // Reset sender's unread count using Firebase UID
+      });
+      console.log('✅ Conversation updated successfully');
+    } catch (updateError) {
+      console.error('⚠️ Failed to update conversation (message still sent):', updateError);
+      // Don't throw - message was sent successfully
+    }
 
     return {
       id: docRef.id,
       ...messageData,
+      createdAt: now, // For compatibility
       createdAt: now, // For compatibility
       timestamp: now, // Match Firestore field
     };

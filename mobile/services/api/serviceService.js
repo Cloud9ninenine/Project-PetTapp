@@ -186,7 +186,8 @@ export const fetchServiceById = async (serviceId) => {
           businessHours: businessInfo.businessHours,
           isActive: businessInfo.isActive,
           isVerified: businessInfo.isVerified,
-          logo: businessInfo.logo,
+          images: businessInfo.images, // Full images object with logo
+          logo: businessInfo.logo, // Add top-level logo for direct access if available
         };
       } else if (service.businessId && typeof service.businessId === 'string') {
         // If only ID is returned, fetch full business data

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   Image,
@@ -11,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +22,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
-import { firestore, auth } from '@config/firebase';
+import { db as firestore, auth } from '@config/firebase';
 import { signOut } from 'firebase/auth';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 import { debugAllConversations } from '@utils/debugFirestore';

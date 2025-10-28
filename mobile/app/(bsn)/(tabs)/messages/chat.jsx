@@ -26,6 +26,7 @@ import {
 } from '@utils/messageService';
 import { auth } from '@config/firebase';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { debugConversation } from '@utils/debugConversation';
 
 /**
  * Convert user ID to Firebase UID format
@@ -95,6 +96,11 @@ export default function ChatScreen() {
 
           setFirebaseAuthenticated(true);
           console.log('Firebase authenticated for chat. UID:', auth.currentUser?.uid);
+
+          // DEBUG: Check conversation setup
+          console.log('\n🔍 Running conversation diagnostics...');
+          await debugConversation(conversationId);
+          
         } catch (firebaseError) {
           console.error('Error initializing Firebase auth:', firebaseError);
           setLoading(false);

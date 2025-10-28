@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TextInput,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from "@components/Header";
@@ -26,6 +26,7 @@ import {
 } from '@utils/messageService';
 import { auth } from '@config/firebase';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { debugConversation } from '@utils/debugConversation';
 
 /**
  * Convert user ID to Firebase UID format
@@ -95,6 +96,11 @@ export default function ChatScreen() {
 
           setFirebaseAuthenticated(true);
           console.log('Firebase authenticated for chat. UID:', auth.currentUser?.uid);
+
+          // DEBUG: Check conversation setup
+          console.log('\n🔍 Running conversation diagnostics...');
+          await debugConversation(conversationId);
+
         } catch (firebaseError) {
           console.error('Error initializing Firebase auth:', firebaseError);
           setLoading(false);
@@ -167,17 +173,36 @@ export default function ChatScreen() {
     setSendingMessage(true);
 
     try {
+      console.log('📤 Sending message:', {
+        conversationId,
+        currentUserId,
+        firebaseUid: `pettapp_${currentUserId}`,
+        authUid: auth.currentUser?.uid,
+        firebaseAuthenticated,
+        messagePreview: textToSend.substring(0, 20)
+      });
+
       await sendMessage(conversationId, currentUserId, textToSend, {
         name: currentUserName,
         image: currentUserImage,
       });
+
+      console.log('✅ Message sent successfully');
 
       // Auto-scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        conversationId,
+        currentUserId,
+        firebaseUid: `pettapp_${currentUserId}`,
+        authUid: auth.currentUser?.uid
+      });
       Alert.alert('Error', 'Could not send message. Please try again.');
       // Restore message text if send failed
       setMessageText(textToSend);
