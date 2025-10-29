@@ -19,47 +19,33 @@ import apiClient from "@config/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RevenueScreen() {
-  const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [businessId, setBusinessId] = useState(null);
   const [revenueData, setRevenueData] = useState(null);
-
-  // Fetch business ID from AsyncStorage
-  const fetchBusinessId = async () => {
-    try {
-      const storedBusinessId = await AsyncStorage.getItem('businessId');
-      if (storedBusinessId) {
-        setBusinessId(storedBusinessId);
-        return storedBusinessId;
-      } else {
-        // Try to fetch from API
-        const response = await apiClient.get('/businesses');
-        if (response.data && response.data.data && response.data.data.length > 0) {
-          const business = response.data.data[0];
-          await AsyncStorage.setItem('businessId', business._id);
-          setBusinessId(business._id);
-          return business._id;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching business ID:', error);
-      return null;
-    }
-  };
 
   // Calculate date range based on selected period
   const getDateRange = () => {
+    // For "all" period, return undefined to fetch all data
+    if (selectedPeriod === 'all') {
+      return {
+        startDate: undefined,
+        endDate: undefined
+      };
+    }
+
     const endDate = new Date();
+    // Extend end date to 30 days in the future to include future bookings
+    endDate.setDate(endDate.getDate() + 30);
+
     const startDate = new Date();
 
     if (selectedPeriod === 'week') {
-      startDate.setDate(endDate.getDate() - 7);
+      startDate.setDate(startDate.getDate() - 7);
     } else if (selectedPeriod === 'month') {
-      startDate.setMonth(endDate.getMonth() - 1);
+      startDate.setMonth(startDate.getMonth() - 1);
     } else if (selectedPeriod === 'year') {
-      startDate.setFullYear(endDate.getFullYear() - 1);
+      startDate.setFullYear(startDate.getFullYear() - 1);
     }
 
     return {
@@ -69,12 +55,12 @@ export default function RevenueScreen() {
   };
 
   // Fetch revenue data from API
-  const fetchRevenueData = async (bId) => {
+  const fetchRevenueData = async () => {
     try {
       const { startDate, endDate } = getDateRange();
+
       const response = await apiClient.get('/revenue', {
         params: {
-          businessId: bId,
           startDate,
           endDate
         }
@@ -93,13 +79,7 @@ export default function RevenueScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const bId = businessId || await fetchBusinessId();
-
-      if (bId) {
-        await fetchRevenueData(bId);
-      } else {
-        Alert.alert('Business Required', 'Please set up your business profile first.');
-      }
+      await fetchRevenueData();
     } catch (error) {
       console.error('Error loading revenue data:', error);
       Alert.alert('Error', 'Failed to load revenue data');
@@ -122,10 +102,8 @@ export default function RevenueScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (businessId) {
-        loadData();
-      }
-    }, [businessId, selectedPeriod])
+      loadData();
+    }, [selectedPeriod])
   );
 
   const renderTitle = () => (
@@ -220,6 +198,22 @@ export default function RevenueScreen() {
 
         {/* Period Selector */}
         <View style={styles.periodSelector}>
+          <TouchableOpacity
+            style={[
+              styles.periodButton,
+              selectedPeriod === "all" && styles.periodButtonActive,
+            ]}
+            onPress={() => setSelectedPeriod("all")}
+          >
+            <Text
+              style={[
+                styles.periodButtonText,
+                selectedPeriod === "all" && styles.periodButtonTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.periodButton,
@@ -334,21 +328,21 @@ export default function RevenueScreen() {
         <View style={styles.transactionsSection}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
           {revenueData?.transactions && revenueData.transactions.length > 0 ? (
-            revenueData.transactions.slice(0, 10).map((transaction) => (
-              <View key={transaction._id} style={styles.transactionCard}>
+            revenueData.transactions.slice(0, 10).map((transaction, index) => (
+              <View key={transaction._id || index} style={styles.transactionCard}>
                 <View style={styles.transactionIcon}>
                   <Ionicons
-                    name={getPaymentMethodIcon(transaction.paymentDetails?.method)}
+                    name={getPaymentMethodIcon(transaction.paymentMethod)}
                     size={moderateScale(28)}
                     color="#1C86FF"
                   />
                 </View>
                 <View style={styles.transactionInfo}>
                   <Text style={styles.transactionCustomer} numberOfLines={1}>
-                    {transaction.userId?.firstName} {transaction.userId?.lastName}
+                    {transaction.petOwner?.firstName} {transaction.petOwner?.lastName}
                   </Text>
                   <Text style={styles.transactionService} numberOfLines={1}>
-                    {transaction.serviceId?.name || 'Service'}
+                    {transaction.service?.name || 'Service'}
                   </Text>
                   <Text style={styles.transactionDate}>
                     {formatDate(transaction.appointmentDateTime)}
@@ -356,14 +350,14 @@ export default function RevenueScreen() {
                 </View>
                 <View style={styles.transactionRight}>
                   <Text style={styles.transactionAmount}>
-                    {formatCurrency(transaction.totalPrice)}
+                    {formatCurrency(transaction.totalAmount?.amount || 0)}
                   </Text>
                   <View style={[
                     styles.statusBadge,
-                    transaction.paymentDetails?.status === 'paid' && styles.statusBadgePaid
+                    transaction.paymentStatus === 'paid' && styles.statusBadgePaid
                   ]}>
                     <Text style={styles.statusBadgeText}>
-                      {transaction.paymentDetails?.status === 'paid' ? 'Paid' : 'Pending'}
+                      {transaction.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
                     </Text>
                   </View>
                 </View>

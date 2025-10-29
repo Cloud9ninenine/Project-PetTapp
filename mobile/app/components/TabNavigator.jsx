@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions, K
 import { useRouter, usePathname } from "expo-router";
 import { moderateScale, scaleFontSize } from "@utils/responsive";
 import { useState, useEffect } from "react";
+import { useUnreadMessages } from "@_hooks/useUnreadMessages";
 
 const userTabs = [
   {
@@ -10,6 +11,12 @@ const userTabs = [
     route: "/(user)/(tabs)/home",
     label: "Home",
     icon: require("@assets/images/service_icon/home icon.png"),
+  },
+  {
+    name: "services",
+    route: "/(user)/(tabs)/services",
+    label: "Services",
+    icon: require("@assets/images/service_icon/pet-house.png"),
   },
   {
     name: "messages",
@@ -24,17 +31,12 @@ const userTabs = [
     label: "My Pets",
     icon: require("@assets/images/service_icon/Pet Icon.png"),
   },
+
   {
     name: "booking",
     route: "/(user)/(tabs)/booking",
     label: "Booking",
     icon: require("@assets/images/service_icon/calendar icon.png"),
-  },
-  {
-    name: "profile",
-    route: "/(user)/(tabs)/profile",
-    label: "Profile",
-    icon: require("@assets/images/service_icon/user icon.png"),
   },
 ];
 
@@ -76,6 +78,7 @@ export default function FooterTabs() {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const { totalUnread } = useUnreadMessages();
 
   // Determine if we're in business or user mode
   const isBusiness = pathname.includes("/(bsn)");
@@ -113,6 +116,8 @@ export default function FooterTabs() {
     <View style={styles.container}>
       {tabs.map((tab) => {
         const isFocused = pathname.includes(tab.name);
+        // Use dynamic unread count for messages tab
+        const badgeCount = tab.name === 'messages' ? totalUnread : tab.badge;
 
         return (
           <TouchableOpacity
@@ -134,10 +139,10 @@ export default function FooterTabs() {
                   { tintColor: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
                 ]}
               />
-              {tab.badge !== undefined && tab.badge > 0 && (
+              {badgeCount !== undefined && badgeCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {tab.badge > 99 ? '99+' : tab.badge}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </Text>
                 </View>
               )}

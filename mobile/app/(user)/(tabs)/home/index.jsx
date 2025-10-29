@@ -19,11 +19,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { Calendar } from 'react-native-calendars';
 import SearchHeader from "@components/SearchHeader";
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 import { fetchCarouselServices, fetchNearbyServices } from "@services/api/serviceService";
+import { fetchUserBookings } from "@services/api/bookingService";
 import apiClient from "@config/api";
 import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";
@@ -40,6 +42,11 @@ export default function HomeScreen() {
   const [featuredBusinesses, setFeaturedBusinesses] = useState([]);
   const [loadingBusinesses, setLoadingBusinesses] = useState(true);
   const [userName, setUserName] = useState('');
+
+  // Appointments states
+  const [allAppointments, setAllAppointments] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loadingAppointments, setLoadingAppointments] = useState(true);
 
   // Carousel states
   const [carouselImages, setCarouselImages] = useState([]);
@@ -229,7 +236,7 @@ export default function HomeScreen() {
     {
       id: 5,
       title: "Pet Supplies",
-      icon: require("@assets/images/service_icon/10.png"),
+      icon: require("@assets/images/service_icon/14.png"),
       color: "#6C5CE7",
       category: "pet-supplies",
     },
@@ -364,6 +371,30 @@ export default function HomeScreen() {
     loadFeaturedBusinesses();
   }, []);
 
+  // Fetch appointments
+  useEffect(() => {
+    const loadAppointments = async () => {
+      try {
+        setLoadingAppointments(true);
+        const bookings = await fetchUserBookings({ status: 'confirmed,pending' });
+
+        // Sort by appointment time
+        bookings.sort((a, b) => {
+          return new Date(a.appointmentDateTime) - new Date(b.appointmentDateTime);
+        });
+
+        setAllAppointments(bookings);
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        setAllAppointments([]);
+      } finally {
+        setLoadingAppointments(false);
+      }
+    };
+
+    loadAppointments();
+  }, []);
+
   const handleServicePress = (service) => {
     // Check if profile is complete before allowing access
     if (!isProfileComplete) {
@@ -429,6 +460,55 @@ export default function HomeScreen() {
     });
   };
 
+
+  // Create marked dates object for calendar
+  const getMarkedDates = () => {
+    const marked = {};
+    const today = new Date().toISOString().split('T')[0];
+
+    // Mark dates with appointments
+    allAppointments.forEach(appointment => {
+      if (appointment.appointmentDateTime) {
+        const dateStr = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
+        if (!marked[dateStr]) {
+          marked[dateStr] = { marked: true, dotColor: '#FF9B79' };
+        }
+      }
+    });
+
+    // Mark selected date
+    if (marked[selectedDate]) {
+      marked[selectedDate] = {
+        ...marked[selectedDate],
+        selected: true,
+        selectedColor: '#1C86FF',
+      };
+    } else {
+      marked[selectedDate] = {
+        selected: true,
+        selectedColor: '#1C86FF',
+      };
+    }
+
+    // Mark today (if not selected)
+    if (today !== selectedDate) {
+      if (marked[today]) {
+        marked[today] = {
+          ...marked[today],
+          today: true,
+        };
+      } else {
+        marked[today] = {
+          today: true,
+        };
+      }
+    }
+
+    return marked;
+  };
+
+  const markedDates = getMarkedDates();
+
   return (
     <SafeAreaView style={styles.container}>
       <SearchHeader
@@ -446,7 +526,7 @@ export default function HomeScreen() {
             {/* Welcome Message */}
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>
-                Welcome back, <Text style={styles.welcomeName}>{userName || 'User'}!</Text>
+                Pet care and wellness, one tap away
               </Text>
             </View>
 
@@ -494,6 +574,67 @@ export default function HomeScreen() {
                   />
                 ))}
               </View>
+            </View>
+
+            {/* Appointments Calendar Section */}
+            <View style={styles.appointmentSection}>
+              <View style={styles.appointmentHeader}>
+                <Text style={styles.appointmentTitle}>My Appointments</Text>
+                <TouchableOpacity onPress={() => router.push('/(user)/(tabs)/booking')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+
+              {loadingAppointments ? (
+                <View style={styles.appointmentLoadingContainer}>
+                  <ActivityIndicator size="small" color="#1C86FF" />
+                  <Text style={styles.appointmentLoadingText}>Loading calendar...</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Calendar */}
+                  <View style={styles.calendarContainer}>
+                    <Calendar
+                      markedDates={markedDates}
+                      onDayPress={(day) => {
+                        setSelectedDate(day.dateString);
+                        // Check if the selected date has appointments
+                        const hasAppointments = allAppointments.some(appointment => {
+                          if (!appointment.appointmentDateTime) return false;
+                          const appointmentDate = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
+                          return appointmentDate === day.dateString;
+                        });
+
+                        // Navigate to booking tab if there are appointments
+                        if (hasAppointments) {
+                          router.push('/(user)/(tabs)/booking');
+                        }
+                      }}
+                      theme={{
+                        backgroundColor: '#ffffff',
+                        calendarBackground: '#ffffff',
+                        textSectionTitleColor: '#666',
+                        selectedDayBackgroundColor: '#1C86FF',
+                        selectedDayTextColor: '#ffffff',
+                        todayTextColor: '#1C86FF',
+                        dayTextColor: '#333',
+                        textDisabledColor: '#d9e1e8',
+                        dotColor: '#FF9B79',
+                        selectedDotColor: '#ffffff',
+                        arrowColor: '#1C86FF',
+                        monthTextColor: '#1C86FF',
+                        indicatorColor: '#1C86FF',
+                        textDayFontFamily: 'SFProReg',
+                        textMonthFontFamily: 'SFProBold',
+                        textDayHeaderFontFamily: 'SFProSB',
+                        textDayFontSize: scaleFontSize(14),
+                        textMonthFontSize: scaleFontSize(18),
+                        textDayHeaderFontSize: scaleFontSize(12),
+                      }}
+                    />
+                  </View>
+                </>
+              )}
             </View>
 
             {/* Categories Label */}
@@ -658,32 +799,39 @@ const styles = StyleSheet.create({
   mainContent: {
     alignItems: "center",
     paddingHorizontal: wp(4),
-    paddingBottom: moderateScale(20),
+    paddingBottom: moderateScale(10),
   },
   welcomeContainer: {
     width: "100%",
-    paddingVertical: moderateScale(15),
-    paddingHorizontal: 0,
+    paddingTop: moderateScale(10),
+    paddingBottom: moderateScale(5),
   },
   welcomeText: {
-    fontSize: scaleFontSize(20),
-    color: "#666",
-    fontFamily: "SFProReg",
-  },
-  welcomeName: {
-    fontSize: scaleFontSize(20),
-    fontWeight: "bold",
+    fontSize: scaleFontSize(24),
     color: "#1C86FF",
     fontFamily: "SFProBold",
+    lineHeight: scaleFontSize(50),
+  },
+  // Calendar Styles
+  calendarContainer: {
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    overflow: "hidden",
+    paddingBottom: moderateScale(10),
+    marginBottom: moderateScale(8),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   categoriesLabel: {
     fontSize: scaleFontSize(20),
-    fontWeight: "bold",
     color: "#1C86FF",
     fontFamily: "SFProBold",
     alignSelf: "flex-start",
-    marginBottom: moderateScale(12),
-    marginTop: moderateScale(10),
+    marginBottom: moderateScale(18),
+    marginTop: moderateScale(5),
   },
   servicesScroll: {
     width: "100%",
@@ -697,7 +845,7 @@ const styles = StyleSheet.create({
     position: "relative",
     height: hp(28),
     width: "100%",
-    marginTop: moderateScale(5),
+    marginTop: 0,
     marginBottom: moderateScale(15),
     overflow: "hidden",
   },
@@ -719,9 +867,8 @@ const styles = StyleSheet.create({
   },
   featuredTitle: {
     fontSize: scaleFontSize(20),
-    fontWeight: "bold",
+    fontFamily: "SFProBold",
     color: "#fff",
-    marginBottom: moderateScale(4),
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
@@ -729,6 +876,7 @@ const styles = StyleSheet.create({
   featuredSubtitle: {
     fontSize: scaleFontSize(14),
     color: "#fff",
+    fontFamily: "SFProReg",
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 4,
@@ -750,10 +898,40 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     width: moderateScale(24),
   },
+    // Today's Appointment Styles
+  appointmentSection: {
+    width: "100%",
+    marginBottom: moderateScale(10),
+  },
+  appointmentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: moderateScale(12),
+  },
+  appointmentTitle: {
+    fontSize: scaleFontSize(20),
+    fontFamily: "SFProBold",
+    color: "#1C86FF",
+  },
+  appointmentLoadingContainer: {
+    paddingVertical: moderateScale(30),
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    marginBottom: moderateScale(5),
+  },
+  appointmentLoadingText: {
+    marginTop: moderateScale(10),
+    fontSize: scaleFontSize(13),
+    color: "#666",
+    fontFamily: "SFProReg",
+  },
   serviceCard: {
     alignItems: "center",
-    marginRight: moderateScale(8),
-    width: moderateScale(75),
+    marginRight: moderateScale(4),
+    width: moderateScale(70),
   },
   serviceIconContainer: {
     width: moderateScale(65),
@@ -777,7 +955,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(11),
     color: "#333",
     textAlign: "center",
-    fontWeight: "600",
+    fontFamily: "SFProSB",
     lineHeight: scaleFontSize(14),
   },
   sectionHeader: {
@@ -789,7 +967,7 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(10),
   },
   sectionTitle: {
-    fontSize: scaleFontSize(18),
+    fontSize: scaleFontSize(20),
     fontFamily: "SFProBold",
     color: "#1C86FF",
   },
@@ -833,7 +1011,7 @@ const styles = StyleSheet.create({
   },
   nearbyName: {
     fontSize: scaleFontSize(13),
-    fontWeight: "600",
+    fontFamily: "SFProBold",
     color: "#1C86FF",
     textAlign: "center",
     marginBottom: moderateScale(4),
@@ -852,7 +1030,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: scaleFontSize(14),
     color: "#1C86FF",
-    fontWeight: "600",
+    fontFamily: "SFProBold",
   },
   emptyContainer: {
     width: "100%",
@@ -863,7 +1041,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: scaleFontSize(16),
     color: "#666",
-    fontWeight: "600",
+    fontFamily: "SFProBold",
     marginTop: moderateScale(12),
   },
   emptySubtext: {

@@ -41,6 +41,22 @@ export const fetchAnalytics = async (params = {}) => {
 };
 
 /**
+ * Get analytics for today
+ * @returns {Promise} Analytics data
+ */
+export const fetchTodayAnalytics = async () => {
+  const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
+  const endDate = new Date();
+  endDate.setHours(23, 59, 59, 999);
+
+  return fetchAnalytics({
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  });
+};
+
+/**
  * Get analytics for the last 30 days
  * @returns {Promise} Analytics data
  */
@@ -83,4 +99,57 @@ export const fetchCurrentMonthAnalytics = async () => {
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
   });
+};
+
+/**
+ * Get analytics for the last month
+ * @returns {Promise} Analytics data
+ */
+export const fetchLastMonthAnalytics = async () => {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+
+  return fetchAnalytics({
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  });
+};
+
+/**
+ * Get analytics for the last 3 months
+ * @returns {Promise} Analytics data
+ */
+export const fetchLast3MonthsAnalytics = async () => {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 3);
+
+  return fetchAnalytics({
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  });
+};
+
+/**
+ * Get analytics for the current year
+ * @returns {Promise} Analytics data
+ */
+export const fetchThisYearAnalytics = async () => {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), 0, 1);
+  const endDate = new Date(now.getFullYear(), 11, 31);
+
+  return fetchAnalytics({
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+  });
+};
+
+/**
+ * Get all-time analytics (no date filter)
+ * @returns {Promise} Analytics data
+ */
+export const fetchAllTimeAnalytics = async () => {
+  return fetchAnalytics({});
 };

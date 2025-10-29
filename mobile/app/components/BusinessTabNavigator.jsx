@@ -3,6 +3,7 @@ import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions, K
 import { useRouter, usePathname } from "expo-router";
 import { moderateScale, scaleFontSize } from "@utils/responsive";
 import { useState, useEffect } from "react";
+import { useUnreadMessages } from "@_hooks/useUnreadMessages";
 
 const businessTabs = [
   {
@@ -43,6 +44,7 @@ export default function BusinessTabNavigator() {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const { totalUnread } = useUnreadMessages();
 
   // Determine if screen is very narrow (slim phone)
   const isVeryNarrow = width < 360;
@@ -76,6 +78,8 @@ export default function BusinessTabNavigator() {
     <View style={styles.container}>
       {businessTabs.map((tab) => {
         const isFocused = pathname.includes(tab.name);
+        // Use dynamic unread count for messages tab
+        const badgeCount = tab.name === 'messages' ? totalUnread : tab.badge;
 
         return (
           <TouchableOpacity
@@ -97,10 +101,10 @@ export default function BusinessTabNavigator() {
                   { tintColor: isFocused ? "#1C86FF" : "rgba(255,255,255,0.6)" },
                 ]}
               />
-              {tab.badge !== undefined && tab.badge > 0 && (
+              {badgeCount !== undefined && badgeCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {tab.badge > 99 ? '99+' : tab.badge}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </Text>
                 </View>
               )}

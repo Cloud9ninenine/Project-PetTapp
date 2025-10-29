@@ -9,86 +9,84 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
-import apiClient from "@config/api";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  fetchTodayAnalytics,
+  fetchLast7DaysAnalytics,
+  fetchLast30DaysAnalytics,
+  fetchCurrentMonthAnalytics,
+  fetchLastMonthAnalytics,
+  fetchLast3MonthsAnalytics,
+  fetchThisYearAnalytics,
+  fetchAllTimeAnalytics,
+} from '../profile/analytics/analyticsService';
+import PaymentBreakdown from './components/PaymentBreakdown';
+import TimeDistribution from './components/TimeDistribution';
+import RatingsDisplay from './components/RatingsDisplay';
+import RevenueTrend from './components/RevenueTrend';
 
 export default function AnalyticsScreen() {
-  const [selectedPeriod, setSelectedPeriod] = useState("month");
+  const [selectedPeriod, setSelectedPeriod] = useState("allTime");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [businessId, setBusinessId] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
+  const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  // Fetch business ID from AsyncStorage
-  const fetchBusinessId = async () => {
-    try {
-      const storedBusinessId = await AsyncStorage.getItem('businessId');
-      if (storedBusinessId) {
-        setBusinessId(storedBusinessId);
-        return storedBusinessId;
-      } else {
-        // Try to fetch from API
-        const response = await apiClient.get('/businesses');
-        if (response.data && response.data.data && response.data.data.length > 0) {
-          const business = response.data.data[0];
-          await AsyncStorage.setItem('businessId', business._id);
-          setBusinessId(business._id);
-          return business._id;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching business ID:', error);
-      return null;
-    }
-  };
+  // Period options
+  const periodOptions = [
+    { value: 'today', label: 'Today' },
+    { value: 'last7Days', label: 'Last 7 Days' },
+    { value: 'last30Days', label: 'Last 30 Days' },
+    { value: 'thisMonth', label: 'This Month' },
+    { value: 'lastMonth', label: 'Last Month' },
+    { value: 'last3Months', label: 'Last 3 Months' },
+    { value: 'thisYear', label: 'This Year' },
+    { value: 'allTime', label: 'All Time' },
+  ];
 
-  // Calculate date range based on selected period
-  const getDateRange = () => {
-    const endDate = new Date();
-    const startDate = new Date();
-
-    if (selectedPeriod === 'week') {
-      startDate.setDate(endDate.getDate() - 7);
-    } else if (selectedPeriod === 'month') {
-      startDate.setMonth(endDate.getMonth() - 1);
-    } else if (selectedPeriod === 'year') {
-      startDate.setFullYear(endDate.getFullYear() - 1);
-    }
-
-    return {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString()
-    };
-  };
-
-  // Fetch analytics data from API
+  // Fetch analytics data using service layer
   const fetchAnalyticsData = async () => {
     try {
-      const { startDate, endDate } = getDateRange();
-      console.log('Fetching analytics with date range:', { startDate, endDate });
+      console.log('Fetching analytics for period:', selectedPeriod);
 
-      const response = await apiClient.get('/analytics', {
-        params: {
-          startDate,
-          endDate
-        }
-      });
-
-      console.log('Analytics response:', response.data);
-
-      if (response.data && response.data.success) {
-        setAnalyticsData(response.data.data);
-      } else {
-        console.warn('Analytics API returned unsuccessful response');
-        setAnalyticsData(null);
+      let data;
+      switch (selectedPeriod) {
+        case 'today':
+          data = await fetchTodayAnalytics();
+          break;
+        case 'last7Days':
+          data = await fetchLast7DaysAnalytics();
+          break;
+        case 'last30Days':
+          data = await fetchLast30DaysAnalytics();
+          break;
+        case 'thisMonth':
+          data = await fetchCurrentMonthAnalytics();
+          break;
+        case 'lastMonth':
+          data = await fetchLastMonthAnalytics();
+          break;
+        case 'last3Months':
+          data = await fetchLast3MonthsAnalytics();
+          break;
+        case 'thisYear':
+          data = await fetchThisYearAnalytics();
+          break;
+        case 'allTime':
+          data = await fetchAllTimeAnalytics();
+          break;
+        default:
+          data = await fetchAllTimeAnalytics();
       }
+
+      console.log('Analytics data received:', data);
+      setAnalyticsData(data);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
       console.error('Error details:', error.response?.data);
@@ -108,13 +106,7 @@ export default function AnalyticsScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const bId = businessId || await fetchBusinessId();
-
-      if (bId) {
-        await fetchAnalyticsData();
-      } else {
-        Alert.alert('Business Required', 'Please set up your business profile first.');
-      }
+      await fetchAnalyticsData();
     } catch (error) {
       console.error('Error loading analytics data:', error);
       Alert.alert('Error', 'Failed to load analytics data');
@@ -137,10 +129,8 @@ export default function AnalyticsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (businessId) {
-        loadData();
-      }
-    }, [businessId, selectedPeriod])
+      loadData();
+    }, [selectedPeriod])
   );
 
   const renderTitle = () => (
@@ -183,7 +173,17 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const { overview, topServices, customerStats, statusBreakdown, dayOfWeekDistribution } = analyticsData || {};
+  const {
+    overview,
+    topServices,
+    customerStats,
+    statusBreakdown,
+    dayOfWeekDistribution,
+    paymentMethodBreakdown,
+    timeOfDayDistribution,
+    ratings,
+    revenueTrend
+  } = analyticsData || {};
 
   // Empty state when no data
   if (!loading && !analyticsData) {
@@ -243,57 +243,69 @@ export default function AnalyticsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "week" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("week")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "week" && styles.periodButtonTextActive,
-              ]}
-            >
-              Week
+        {/* Period Selector Dropdown */}
+        <TouchableOpacity
+          style={styles.dropdownButton}
+          onPress={() => setDropdownVisible(true)}
+        >
+          <View style={styles.dropdownButtonContent}>
+            <Ionicons name="calendar" size={moderateScale(20)} color="#1C86FF" />
+            <Text style={styles.dropdownButtonText}>
+              {periodOptions.find(opt => opt.value === selectedPeriod)?.label || 'Select Period'}
             </Text>
-          </TouchableOpacity>
+            <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+          </View>
+        </TouchableOpacity>
+
+        {/* Dropdown Modal */}
+        <Modal
+          visible={dropdownVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setDropdownVisible(false)}
+        >
           <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "month" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("month")}
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setDropdownVisible(false)}
           >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "month" && styles.periodButtonTextActive,
-              ]}
-            >
-              Month
-            </Text>
+            <View style={styles.dropdownModal}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownHeaderText}>Select Time Period</Text>
+                <TouchableOpacity onPress={() => setDropdownVisible(false)}>
+                  <Ionicons name="close" size={moderateScale(24)} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.dropdownList}>
+                {periodOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.dropdownOption,
+                      selectedPeriod === option.value && styles.dropdownOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedPeriod(option.value);
+                      setDropdownVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        selectedPeriod === option.value && styles.dropdownOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {selectedPeriod === option.value && (
+                      <Ionicons name="checkmark" size={moderateScale(24)} color="#1C86FF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "year" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("year")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "year" && styles.periodButtonTextActive,
-              ]}
-            >
-              Year
-            </Text>
-          </TouchableOpacity>
-        </View>
+        </Modal>
 
         {/* Key Metrics Grid */}
         <View style={styles.metricsGrid}>
@@ -452,6 +464,18 @@ export default function AnalyticsScreen() {
               ))}
           </View>
         )}
+
+        {/* Revenue Trend */}
+        <RevenueTrend data={revenueTrend} formatCurrency={formatCurrency} />
+
+        {/* Time of Day Distribution */}
+        <TimeDistribution data={timeOfDayDistribution} />
+
+        {/* Payment Method Breakdown */}
+        <PaymentBreakdown data={paymentMethodBreakdown} formatCurrency={formatCurrency} />
+
+        {/* Customer Ratings */}
+        <RatingsDisplay data={ratings} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -495,29 +519,77 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(20),
     paddingBottom: moderateScale(40),
   },
-  periodSelector: {
-    flexDirection: "row",
-    backgroundColor: "#F5F5F5",
+  dropdownButton: {
+    backgroundColor: '#fff',
     borderRadius: moderateScale(12),
-    padding: moderateScale(4),
+    padding: moderateScale(16),
     marginBottom: moderateScale(20),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  periodButton: {
+  dropdownButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
+  },
+  dropdownButtonText: {
     flex: 1,
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(8),
-    alignItems: "center",
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
   },
-  periodButtonActive: {
-    backgroundColor: "#1C86FF",
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
   },
-  periodButtonText: {
-    fontSize: scaleFontSize(14),
-    fontWeight: "600",
-    color: "#666",
+  dropdownModal: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    width: '100%',
+    maxWidth: moderateScale(400),
+    maxHeight: '70%',
+    overflow: 'hidden',
   },
-  periodButtonTextActive: {
-    color: "#fff",
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(20),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownHeaderText: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  dropdownList: {
+    maxHeight: moderateScale(400),
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#E3F2FD',
+  },
+  dropdownOptionText: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
+  },
+  dropdownOptionTextSelected: {
+    fontWeight: '600',
+    color: '#1C86FF',
   },
   metricsGrid: {
     flexDirection: 'row',

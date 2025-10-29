@@ -149,15 +149,6 @@ export default function MyPetsScreen() {
     </View>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyStateContainer}>
-      <Ionicons name="paw" size={moderateScale(60)} color="#ccc" />
-      <Text style={styles.emptyStateTitle}>No Pets Yet</Text>
-      <Text style={styles.emptyStateText}>
-        Add your first pet to get started with PetTapp services
-      </Text>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -187,13 +178,7 @@ export default function MyPetsScreen() {
                 {pets.map(renderPetCard)}
               </View>
             )}
-            
-            {pets.length === 0 && (
-              <View style={styles.emptyStateWrapper}>
-                {renderEmptyState()}
-              </View>
-            )}
-            
+
             {renderAddPetCard()}
           </>
         )}
@@ -340,28 +325,5 @@ const styles = StyleSheet.create({
     marginTop: moderateScale(16),
     fontSize: scaleFontSize(16),
     color: '#666',
-  },
-  emptyStateWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: moderateScale(60),
-  },
-  emptyStateContainer: {
-    alignItems: 'center',
-    paddingHorizontal: wp(8),
-  },
-  emptyStateTitle: {
-    fontSize: scaleFontSize(20),
-    fontWeight: '600',
-    color: '#333',
-    marginTop: moderateScale(16),
-    marginBottom: moderateScale(8),
-  },
-  emptyStateText: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: moderateScale(20),
   },
 });

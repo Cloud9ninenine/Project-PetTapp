@@ -207,6 +207,7 @@ export default function MapPicker({ initialLocation, onLocationSelect, onBack, a
         style={styles.map}
         onMessage={handleMessage}
         javaScriptEnabled={true}
+        geolocationEnabled={true}
       />
 
       <View style={styles.footer}>

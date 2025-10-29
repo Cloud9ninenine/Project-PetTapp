@@ -577,20 +577,16 @@ export default function ServiceDetailsScreen() {
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
                 <Ionicons name="cash-outline" size={moderateScale(24)} color="#4CAF50" />
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoValue}>{formatPrice(service.price)}</Text>
-                </View>
+                <Text style={styles.infoValue}>{formatPrice(service.price)}</Text>
               </View>
 
               <View style={styles.infoDivider} />
 
               <View style={styles.infoItem}>
                 <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
-                <View style={styles.infoTextContainer}>
-                  <View style={styles.durationContainer}>
-                    <Text style={styles.durationValue}>{formatDuration(service.duration).value}</Text>
-                    <Text style={styles.durationUnit}>{formatDuration(service.duration).unit}</Text>
-                  </View>
+                <View style={styles.durationTextContainer}>
+                  <Text style={styles.durationValue}>{formatDuration(service.duration).value} </Text>
+                  <Text style={styles.durationUnit}>{formatDuration(service.duration).unit}</Text>
                 </View>
               </View>
             </View>
@@ -806,7 +802,7 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(12),
   },
   sectionTitle: {
-    fontSize: scaleFontSize(17),
+    fontSize: scaleFontSize(20),
     fontWeight: 'bold',
     color: '#1C86FF',
   },
@@ -890,11 +886,11 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-evenly',
+    justifyContent: 'space-around',
     backgroundColor: '#F8F9FA',
     borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(20),
-    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(18),
+    paddingHorizontal: moderateScale(16),
     marginTop: moderateScale(10),
     marginBottom: moderateScale(10),
     borderWidth: 1,
@@ -908,15 +904,13 @@ const styles = StyleSheet.create({
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(8),
+    gap: moderateScale(10),
     flex: 1,
-    justifyContent: 'center',
-    minWidth: 0,
+    paddingHorizontal: moderateScale(8),
   },
   infoTextContainer: {
-    alignItems: 'center',
-    flex: 1,
-    minWidth: 0,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   infoLabel: {
     fontSize: scaleFontSize(11),
@@ -925,32 +919,34 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(3),
   },
   infoValue: {
-    fontSize: scaleFontSize(13),
+    fontSize: scaleFontSize(14),
     fontWeight: 'bold',
     color: '#333',
-    flexWrap: 'wrap',
+  },
+  durationTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'flex-start',
   },
   durationContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'flex-start',
   },
   durationValue: {
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
     color: '#333',
-    textAlign: 'center',
   },
   durationUnit: {
     fontSize: scaleFontSize(11),
     color: '#666',
-    marginTop: moderateScale(2),
-    textAlign: 'center',
   },
   infoDivider: {
     width: 1.5,
-    height: moderateScale(45),
+    height: moderateScale(40),
     backgroundColor: '#D0D0D0',
-    marginHorizontal: moderateScale(4),
+    marginHorizontal: moderateScale(8),
   },
   availabilityText: {
     fontSize: scaleFontSize(14),
@@ -995,10 +991,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   locationContainer: {
-    flex: 1,
+    width: '48%',
+    alignItems: "center",
   },
   contactContainer: {
-    flex: 1,
+    width: '48%',
+    alignItems: "center",
   },
   locationText: {
     fontSize: scaleFontSize(14),

@@ -18,11 +18,30 @@
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+    const [profilePicture, setProfilePicture] = useState(null);
     const searchTimeoutRef = useRef(null);
     const abortControllerRef = useRef(null);
 
     // Use custom hook for notification count
     const { unreadCount: unreadNotificationsCount } = useNotificationCount(showNotificationBadge);
+
+    // Fetch user profile on mount
+    useEffect(() => {
+      const fetchUserProfile = async () => {
+        try {
+          const response = await apiClient.get('/users/profile');
+          console.log('Profile response:', response.data);
+          if (response.data?.success && response.data?.data?.user?.images?.profile) {
+            setProfilePicture(response.data.data.user.images.profile);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      };
+
+      fetchUserProfile();
+    }, []);
 
     // Search both businesses and services with debounce
     useEffect(() => {
@@ -170,6 +189,33 @@
       }
     };
 
+    const handleProfilePress = () => {
+      setShowProfileDropdown(!showProfileDropdown);
+    };
+
+    const handleProfileMenuPress = () => {
+      setShowProfileDropdown(false);
+      router.push('/(user)/(tabs)/profile');
+    };
+
+    const handleNotificationPress = () => {
+      setShowProfileDropdown(false);
+      if (onNotifPress) {
+        onNotifPress();
+      }
+    };
+
+    const handleLogoutPress = async () => {
+      setShowProfileDropdown(false);
+      try {
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('userType');
+        router.replace('/login');
+      } catch (error) {
+        console.error('Error during logout:', error);
+      }
+    };
+
     const renderSearchItem = ({ item }) => {
       const isService = item.type === 'service';
       const iconName = isService ? 'briefcase-outline' : 'business-outline';
@@ -247,9 +293,17 @@
             )}
           </View>
 
-          {/* Notification bell */}
-          <TouchableOpacity style={styles.bellContainer} onPress={onNotifPress}>
-            <Ionicons name="notifications-outline" size={moderateScale(26)} color="#fff" />
+          {/* Profile icon */}
+          <TouchableOpacity style={styles.bellContainer} onPress={handleProfilePress}>
+            {profilePicture ? (
+              <Image
+                source={{ uri: profilePicture }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="person-circle-outline" size={moderateScale(28)} color="#fff" />
+            )}
             {showNotificationBadge && unreadNotificationsCount > 0 && (
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>
@@ -279,6 +333,49 @@
                 <Text style={styles.noResultsSubtext}>Try different keywords</Text>
               </View>
             )}
+          </View>
+        )}
+
+        {/* Profile Dropdown Menu */}
+        {showProfileDropdown && (
+          <View style={styles.profileDropdownContainer}>
+            <TouchableOpacity
+              style={styles.profileDropdownItem}
+              onPress={handleProfileMenuPress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-outline" size={moderateScale(20)} color="#333" />
+              <Text style={styles.profileDropdownText}>Profile</Text>
+            </TouchableOpacity>
+
+            <View style={styles.profileDropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.profileDropdownItem}
+              onPress={handleNotificationPress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="notifications-outline" size={moderateScale(20)} color="#333" />
+              <Text style={styles.profileDropdownText}>Notifications</Text>
+              {unreadNotificationsCount > 0 && (
+                <View style={styles.profileBadge}>
+                  <Text style={styles.profileBadgeText}>
+                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.profileDropdownDivider} />
+
+            <TouchableOpacity
+              style={styles.profileDropdownItem}
+              onPress={handleLogoutPress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="log-out-outline" size={moderateScale(20)} color="#FF3B30" />
+              <Text style={[styles.profileDropdownText, { color: '#FF3B30' }]}>Logout</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -329,6 +426,13 @@
       height: moderateScale(44),
       justifyContent: 'center',
       alignItems: 'center',
+      overflow: 'hidden',
+    },
+    profileImage: {
+      width: moderateScale(44),
+      height: moderateScale(44),
+      borderRadius: moderateScale(22),
+      backgroundColor: '#fff',
     },
     badgeContainer: {
       position: 'absolute',
@@ -447,6 +551,57 @@
       fontSize: scaleFontSize(13),
       color: '#999',
       marginTop: moderateScale(6),
+      textAlign: 'center',
+    },
+    profileDropdownContainer: {
+      position: 'absolute',
+      top: moderateScale(85),
+      right: wp(5),
+      backgroundColor: '#fff',
+      borderRadius: moderateScale(12),
+      marginTop: moderateScale(5),
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 999,
+      overflow: 'hidden',
+      minWidth: moderateScale(180),
+    },
+    profileDropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: moderateScale(14),
+      paddingHorizontal: moderateScale(16),
+      backgroundColor: '#fff',
+    },
+    profileDropdownText: {
+      fontSize: scaleFontSize(15),
+      fontWeight: '500',
+      color: '#333',
+      marginLeft: moderateScale(12),
+      flex: 1,
+    },
+    profileDropdownDivider: {
+      height: 1,
+      backgroundColor: '#F5F5F5',
+      marginHorizontal: moderateScale(16),
+    },
+    profileBadge: {
+      backgroundColor: '#FF3B30',
+      borderRadius: moderateScale(10),
+      minWidth: moderateScale(20),
+      height: moderateScale(20),
+      paddingHorizontal: moderateScale(5),
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: moderateScale(8),
+    },
+    profileBadgeText: {
+      color: '#fff',
+      fontSize: scaleFontSize(10),
+      fontWeight: 'bold',
       textAlign: 'center',
     },
   });

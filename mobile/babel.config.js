@@ -18,6 +18,7 @@ module.exports = function (api) {
             "@auth": "./app/(auth)",
             "@user": "./app/(user)",
             "@bsn": "./app/(bsn)",
+            "@_hooks": "./app/_hooks",
           },
           extensions: [
             ".js",

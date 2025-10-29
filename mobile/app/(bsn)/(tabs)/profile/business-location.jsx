@@ -341,6 +341,14 @@ export default function BusinessLocationScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Info Card */}
+        <View style={styles.infoCard}>
+          <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
+          <Text style={styles.infoText}>
+            Adding map coordinates helps customers find your business more easily. The location will be shown on your business profile and in search results.
+          </Text>
+        </View>
+        
         {/* Map Section */}
         <View style={styles.mapSection}>
           <View style={styles.sectionHeader}>
@@ -462,14 +470,6 @@ export default function BusinessLocationScreen() {
           </View>
         </View>
 
-        {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
-          <Text style={styles.infoText}>
-            Adding map coordinates helps customers find your business more easily. The location will be shown on your business profile and in search results.
-          </Text>
-        </View>
-
         {/* Save Button */}
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(100),
+    paddingBottom: moderateScale(20),
   },
   mapSection: {
     backgroundColor: '#fff',
