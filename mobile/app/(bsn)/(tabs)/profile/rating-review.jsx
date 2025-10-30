@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +28,7 @@ export default function RatingReviewScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [businessId, setBusinessId] = useState(null);
   const [bookingsWithRatings, setBookingsWithRatings] = useState([]);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   useEffect(() => {
     fetchBusinessIdAndRatings();
@@ -237,73 +239,129 @@ export default function RatingReviewScreen() {
         showBack={true}
       />
 
-      {/* Statistics Cards */}
+      {/* Unified Statistics Card */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{statistics.averageRating}</Text>
-          <Text style={styles.statLabel}>Avg Rating</Text>
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Ionicons
-                key={star}
-                name={star <= Math.floor(statistics.averageRating) ? 'star' : 'star-outline'}
-                size={moderateScale(14)}
-                color="#FFD700"
-              />
-            ))}
+        <View style={styles.unifiedStatCard}>
+          <View style={styles.statLeft}>
+            <Text style={styles.bigRatingValue}>{statistics.averageRating}</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name={star <= Math.floor(statistics.averageRating) ? 'star' : 'star-outline'}
+                  size={moderateScale(18)}
+                  color="#FFD700"
+                />
+              ))}
+            </View>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statRight}>
+            <Text style={styles.totalReviewsValue}>{statistics.totalReviews}</Text>
+            <Text style={styles.totalReviewsLabel}>Total Reviews</Text>
           </View>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{statistics.totalReviews}</Text>
-          <Text style={styles.statLabel}>Total Reviews</Text>
+      </View>
+
+      {/* Search Bar and Filter */}
+      <View style={styles.searchFilterRow}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={moderateScale(20)} color="#999" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search reviews..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={moderateScale(20)} color="#999" />
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Filter Dropdown Button */}
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowFilterDropdown(true)}
+        >
+          <Ionicons name="filter" size={moderateScale(20)} color="#1C86FF" />
+          {selectedStarFilter !== 'all' && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>1</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={moderateScale(20)} color="#999" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search reviews by customer, pet, or service..."
-          placeholderTextColor="#999"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={moderateScale(20)} color="#999" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Star Rating Filter Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterTabsContainer}
-        contentContainerStyle={styles.filterTabsContent}
+      {/* Filter Dropdown Modal */}
+      <Modal
+        visible={showFilterDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFilterDropdown(false)}
       >
         <TouchableOpacity
-          style={[styles.filterTab, selectedStarFilter === 'all' && styles.filterTabActive]}
-          onPress={() => setSelectedStarFilter('all')}
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFilterDropdown(false)}
         >
-          <Text style={[styles.filterTabText, selectedStarFilter === 'all' && styles.filterTabTextActive]}>
-            All ({allReviews.length})
-          </Text>
+          <View style={styles.dropdownContainer}>
+            <View style={styles.dropdownHeader}>
+              <Text style={styles.dropdownTitle}>Filter by Rating</Text>
+              <TouchableOpacity onPress={() => setShowFilterDropdown(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.dropdownItem, selectedStarFilter === 'all' && styles.dropdownItemActive]}
+              onPress={() => {
+                setSelectedStarFilter('all');
+                setShowFilterDropdown(false);
+              }}
+            >
+              <Text style={[styles.dropdownItemText, selectedStarFilter === 'all' && styles.dropdownItemTextActive]}>
+                All Reviews ({allReviews.length})
+              </Text>
+              {selectedStarFilter === 'all' && (
+                <Ionicons name="checkmark" size={moderateScale(20)} color="#1C86FF" />
+              )}
+            </TouchableOpacity>
+
+            {[5, 4, 3, 2, 1].map((starCount) => (
+              <TouchableOpacity
+                key={starCount}
+                style={[styles.dropdownItem, selectedStarFilter === starCount.toString() && styles.dropdownItemActive]}
+                onPress={() => {
+                  setSelectedStarFilter(starCount.toString());
+                  setShowFilterDropdown(false);
+                }}
+              >
+                <View style={styles.dropdownItemLeft}>
+                  <View style={styles.dropdownStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={star <= starCount ? 'star' : 'star-outline'}
+                        size={moderateScale(14)}
+                        color="#FFD700"
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.dropdownItemText, selectedStarFilter === starCount.toString() && styles.dropdownItemTextActive]}>
+                    ({countByStar(starCount)})
+                  </Text>
+                </View>
+                {selectedStarFilter === starCount.toString() && (
+                  <Ionicons name="checkmark" size={moderateScale(20)} color="#1C86FF" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </TouchableOpacity>
-        {[5, 4, 3, 2, 1].map((starCount) => (
-          <TouchableOpacity
-            key={starCount}
-            style={[styles.filterTab, selectedStarFilter === starCount.toString() && styles.filterTabActive]}
-            onPress={() => setSelectedStarFilter(starCount.toString())}
-          >
-            <Ionicons name="star" size={moderateScale(14)} color={selectedStarFilter === starCount.toString() ? '#FFD700' : '#999'} />
-            <Text style={[styles.filterTabText, selectedStarFilter === starCount.toString() && styles.filterTabTextActive]}>
-              {starCount} ({countByStar(starCount)})
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      </Modal>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -355,40 +413,64 @@ const styles = StyleSheet.create({
     opacity: 0.1,
   },
   statsContainer: {
-    flexDirection: 'row',
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(15),
-    gap: moderateScale(10),
   },
-  statCard: {
-    flex: 1,
+  unifiedStatCard: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(15),
+    borderRadius: moderateScale(16),
+    padding: moderateScale(20),
+    flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
-  statValue: {
-    fontSize: scaleFontSize(24),
+  statLeft: {
+    flex: 1,
+    alignItems: 'center',
+    paddingRight: moderateScale(15),
+  },
+  bigRatingValue: {
+    fontSize: scaleFontSize(42),
     fontWeight: 'bold',
     color: '#1C86FF',
+    marginBottom: moderateScale(8),
+  },
+  statDivider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: '#E0E0E0',
+  },
+  statRight: {
+    flex: 1,
+    alignItems: 'center',
+    paddingLeft: moderateScale(15),
+  },
+  totalReviewsValue: {
+    fontSize: scaleFontSize(32),
+    fontWeight: 'bold',
+    color: '#FF9B79',
     marginBottom: moderateScale(4),
   },
-  statLabel: {
-    fontSize: scaleFontSize(12),
+  totalReviewsLabel: {
+    fontSize: scaleFontSize(13),
     color: '#666',
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  searchFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: wp(5),
+    marginBottom: moderateScale(10),
+    gap: moderateScale(10),
   },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    marginHorizontal: wp(5),
-    marginVertical: moderateScale(10),
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(10),
     borderRadius: moderateScale(12),
@@ -399,42 +481,100 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     gap: moderateScale(8),
   },
+  filterButton: {
+    width: moderateScale(48),
+    height: moderateScale(48),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    position: 'relative',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: moderateScale(6),
+    right: moderateScale(6),
+    backgroundColor: '#FF5252',
+    borderRadius: moderateScale(8),
+    width: moderateScale(16),
+    height: moderateScale(16),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeText: {
+    fontSize: scaleFontSize(10),
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   searchInput: {
     flex: 1,
     fontSize: scaleFontSize(14),
     color: '#333',
     paddingVertical: 0,
   },
-  filterTabsContainer: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(5),
+  },
+  dropdownContainer: {
     backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    width: '100%',
+    maxWidth: moderateScale(400),
+    maxHeight: '70%',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(16),
     borderBottomWidth: 1,
     borderBottomColor: '#E0E0E0',
   },
-  filterTabsContent: {
-    paddingHorizontal: wp(5),
-    paddingVertical: moderateScale(10),
-    gap: moderateScale(8),
+  dropdownTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
   },
-  filterTab: {
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#E3F2FD',
+  },
+  dropdownItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#F8F9FA',
-    gap: moderateScale(6),
+    gap: moderateScale(10),
   },
-  filterTabActive: {
-    backgroundColor: '#E3F2FD',
-    borderWidth: 1,
-    borderColor: '#1C86FF',
+  dropdownStars: {
+    flexDirection: 'row',
+    gap: moderateScale(2),
   },
-  filterTabText: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
+  dropdownItemText: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
     fontWeight: '500',
   },
-  filterTabTextActive: {
+  dropdownItemTextActive: {
     color: '#1C86FF',
     fontWeight: '700',
   },

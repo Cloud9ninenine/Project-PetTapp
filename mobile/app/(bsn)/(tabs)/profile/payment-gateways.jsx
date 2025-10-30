@@ -31,6 +31,13 @@ export default function PaymentQRScreen() {
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
 
+  // Payment Options State
+  const [paymentTiming, setPaymentTiming] = useState('both');
+  const [savingOptions, setSavingOptions] = useState(false);
+
+  // Dropdown State
+  const [showPaymentTypeDropdown, setShowPaymentTypeDropdown] = useState(false);
+
   useEffect(() => {
     fetchBusinessAndQR();
   }, []);
@@ -55,6 +62,17 @@ export default function PaymentQRScreen() {
         } catch (qrError) {
           // QR codes not found is not an error, just means none uploaded yet
           console.log('No payment QR codes found');
+        }
+
+        // Fetch payment options
+        try {
+          const optionsRes = await apiClient.get(`/businesses/${business._id}/payment-options`);
+          if (optionsRes.data && optionsRes.data.data) {
+            const timing = optionsRes.data.data.paymentOptions?.timing || 'both';
+            setPaymentTiming(timing);
+          }
+        } catch (optionsError) {
+          console.log('No payment options found, using default');
         }
       }
     } catch (error) {
@@ -103,11 +121,6 @@ export default function PaymentQRScreen() {
       return;
     }
 
-    if (!accountName.trim()) {
-      Alert.alert('Error', 'Please enter account name');
-      return;
-    }
-
     try {
       setUploading(true);
 
@@ -126,7 +139,9 @@ export default function PaymentQRScreen() {
       });
 
       formData.append('type', paymentType);
-      formData.append('accountName', accountName);
+      if (accountName.trim()) {
+        formData.append('accountName', accountName);
+      }
       if (accountNumber.trim()) {
         formData.append('accountNumber', accountNumber);
       }
@@ -156,6 +171,38 @@ export default function PaymentQRScreen() {
       );
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSavePaymentOptions = async () => {
+    if (!businessId) {
+      Alert.alert('Error', 'Business information not found');
+      return;
+    }
+
+    try {
+      setSavingOptions(true);
+
+      const response = await apiClient.put(
+        `/businesses/${businessId}/payment-options`,
+        {
+          paymentOptions: {
+            timing: paymentTiming,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        Alert.alert('Success', 'Payment options updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error updating payment options:', error);
+      Alert.alert(
+        'Update Failed',
+        error.response?.data?.message || 'Failed to update payment options'
+      );
+    } finally {
+      setSavingOptions(false);
     }
   };
 
@@ -206,7 +253,7 @@ export default function PaymentQRScreen() {
         <Header
           backgroundColor="#1C86FF"
           titleColor="#fff"
-          title="Payment QR Code"
+          title="Payment Gateways"
           showBack={true}
         />
         <View style={styles.loadingContainer}>
@@ -228,7 +275,7 @@ export default function PaymentQRScreen() {
       <Header
         backgroundColor="#1C86FF"
         titleColor="#fff"
-        title="Payment QR Code"
+        title="Payment Settings"
         showBack={true}
       />
 
@@ -237,8 +284,129 @@ export default function PaymentQRScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="information-circle" size={moderateScale(24)} color="#1C86FF" />
           <Text style={styles.infoText}>
-            Upload your payment QR code so customers can easily pay for your services via GCash, PayMaya, or bank transfer.
+            Configure when customers should pay and upload payment QR codes for easy transactions.
           </Text>
+        </View>
+
+        {/* Payment Options Section */}
+        <View style={styles.uploadCard}>
+          <Text style={styles.sectionTitle}>Payment Timing</Text>
+          <Text style={styles.sectionDescription}>
+            Choose when customers should make payment for your services
+          </Text>
+
+          <View style={styles.paymentTimingContainer}>
+            <TouchableOpacity
+              style={[
+                styles.timingOption,
+                paymentTiming === 'payment-first' && styles.timingOptionActive,
+              ]}
+              onPress={() => setPaymentTiming('payment-first')}
+            >
+              <View style={styles.timingOptionHeader}>
+                <Ionicons
+                  name="card"
+                  size={moderateScale(24)}
+                  color={paymentTiming === 'payment-first' ? '#1C86FF' : '#666'}
+                />
+                <View style={styles.radioButton}>
+                  {paymentTiming === 'payment-first' && (
+                    <View style={styles.radioButtonInner} />
+                  )}
+                </View>
+              </View>
+              <Text style={[
+                styles.timingOptionTitle,
+                paymentTiming === 'payment-first' && styles.timingOptionTitleActive,
+              ]}>
+                Payment First
+              </Text>
+              <Text style={styles.timingOptionDescription}>
+                Customer pays before receiving service
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.timingOption,
+                paymentTiming === 'payment-after' && styles.timingOptionActive,
+              ]}
+              onPress={() => setPaymentTiming('payment-after')}
+            >
+              <View style={styles.timingOptionHeader}>
+                <Ionicons
+                  name="time"
+                  size={moderateScale(24)}
+                  color={paymentTiming === 'payment-after' ? '#1C86FF' : '#666'}
+                />
+                <View style={styles.radioButton}>
+                  {paymentTiming === 'payment-after' && (
+                    <View style={styles.radioButtonInner} />
+                  )}
+                </View>
+              </View>
+              <Text style={[
+                styles.timingOptionTitle,
+                paymentTiming === 'payment-after' && styles.timingOptionTitleActive,
+              ]}>
+                Payment After
+              </Text>
+              <Text style={styles.timingOptionDescription}>
+                Customer pays after receiving service
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.timingOption,
+                paymentTiming === 'both' && styles.timingOptionActive,
+              ]}
+              onPress={() => setPaymentTiming('both')}
+            >
+              <View style={styles.timingOptionHeader}>
+                <Ionicons
+                  name="swap-horizontal"
+                  size={moderateScale(24)}
+                  color={paymentTiming === 'both' ? '#1C86FF' : '#666'}
+                />
+                <View style={styles.radioButton}>
+                  {paymentTiming === 'both' && (
+                    <View style={styles.radioButtonInner} />
+                  )}
+                </View>
+              </View>
+              <Text style={[
+                styles.timingOptionTitle,
+                paymentTiming === 'both' && styles.timingOptionTitleActive,
+              ]}>
+                Both Options
+              </Text>
+              <Text style={styles.timingOptionDescription}>
+                Accept payment before or after service
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.saveOptionsButton,
+              savingOptions && styles.uploadButtonDisabled,
+            ]}
+            onPress={handleSavePaymentOptions}
+            disabled={savingOptions}
+          >
+            {savingOptions ? (
+              <>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.uploadButtonText}>Saving...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#fff" />
+                <Text style={styles.uploadButtonText}>Save Payment Options</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Current QR Codes */}
@@ -299,33 +467,99 @@ export default function PaymentQRScreen() {
 
         {/* Upload New QR */}
         <View style={styles.uploadCard}>
-          <Text style={styles.sectionTitle}>
-            {paymentQRCodes.length > 0 ? 'Add Another Payment QR Code' : 'Upload Payment QR Code'}
+          <Text style={styles.sectionTitle}>Payment QR Codes</Text>
+          <Text style={styles.sectionDescription}>
+            {paymentQRCodes.length > 0
+              ? 'Upload QR codes for GCash, PayMaya, or bank transfer'
+              : 'Upload your first payment QR code for customers to scan and pay'}
           </Text>
 
           {/* Payment Type Selection */}
-          <Text style={styles.label}>Payment Method</Text>
-          <View style={styles.typeGrid}>
-            {paymentTypes.map((type) => (
-              <TouchableOpacity
-                key={type.value}
-                style={[
-                  styles.typeCard,
-                  paymentType === type.value && styles.typeCardActive,
-                ]}
-                onPress={() => setPaymentType(type.value)}
-              >
-                <View style={[styles.typeIcon, { backgroundColor: type.color }]}>
-                  <Ionicons name={type.icon} size={moderateScale(20)} color="#fff" />
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Payment Method</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setShowPaymentTypeDropdown(!showPaymentTypeDropdown)}
+            >
+              <View style={styles.dropdownSelected}>
+                <View style={styles.dropdownIconContainer}>
+                  <View
+                    style={[
+                      styles.dropdownIconCircle,
+                      {
+                        backgroundColor: paymentTypes.find((t) => t.value === paymentType)
+                          ?.color,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        paymentTypes.find((t) => t.value === paymentType)?.icon ||
+                        'wallet'
+                      }
+                      size={moderateScale(18)}
+                      color="#fff"
+                    />
+                  </View>
+                  <Text style={styles.dropdownText}>
+                    {paymentTypes.find((t) => t.value === paymentType)?.label ||
+                      'Select payment type'}
+                  </Text>
                 </View>
-                <Text style={styles.typeLabel}>{type.label}</Text>
-              </TouchableOpacity>
-            ))}
+                <Ionicons
+                  name={showPaymentTypeDropdown ? 'chevron-up' : 'chevron-down'}
+                  size={moderateScale(20)}
+                  color="#666"
+                />
+              </View>
+            </TouchableOpacity>
+
+            {showPaymentTypeDropdown && (
+              <View style={styles.dropdownList}>
+                {paymentTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type.value}
+                    style={[
+                      styles.dropdownItem,
+                      paymentType === type.value && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => {
+                      setPaymentType(type.value);
+                      setShowPaymentTypeDropdown(false);
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.dropdownItemIconCircle,
+                        { backgroundColor: type.color },
+                      ]}
+                    >
+                      <Ionicons name={type.icon} size={moderateScale(18)} color="#fff" />
+                    </View>
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        paymentType === type.value && styles.dropdownItemTextActive,
+                      ]}
+                    >
+                      {type.label}
+                    </Text>
+                    {paymentType === type.value && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={moderateScale(20)}
+                        color="#1C86FF"
+                      />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Account Name Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Account Name *</Text>
+            <Text style={styles.label}>Account Name (Optional)</Text>
             <TextInput
               style={styles.input}
               value={accountName}
@@ -377,10 +611,10 @@ export default function PaymentQRScreen() {
           <TouchableOpacity
             style={[
               styles.uploadButton,
-              (!selectedImage || !accountName.trim() || uploading) && styles.uploadButtonDisabled,
+              (!selectedImage || uploading) && styles.uploadButtonDisabled,
             ]}
             onPress={handleUploadQR}
-            disabled={!selectedImage || !accountName.trim() || uploading}
+            disabled={!selectedImage || uploading}
           >
             {uploading ? (
               <>
@@ -445,7 +679,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(100),
+    paddingBottom: moderateScale(20),
   },
   loadingContainer: {
     flex: 1,
@@ -568,38 +802,76 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: moderateScale(8),
   },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: moderateScale(10),
-    marginBottom: moderateScale(20),
-  },
-  typeCard: {
-    width: '22%',
+  dropdown: {
     backgroundColor: '#F8F9FA',
     borderRadius: moderateScale(12),
-    padding: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  dropdownSelected: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: moderateScale(12),
   },
-  typeCardActive: {
-    borderColor: '#1C86FF',
-    backgroundColor: '#E3F2FD',
+  dropdownIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
   },
-  typeIcon: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
+  dropdownIconCircle: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: moderateScale(6),
   },
-  typeLabel: {
-    fontSize: scaleFontSize(11),
+  dropdownText: {
+    fontSize: scaleFontSize(15),
     color: '#333',
-    textAlign: 'center',
     fontWeight: '500',
+  },
+  dropdownList: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    marginTop: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(15),
+    paddingVertical: moderateScale(12),
+    gap: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#E3F2FD',
+  },
+  dropdownItemIconCircle: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   inputGroup: {
     marginBottom: moderateScale(16),
@@ -705,5 +977,75 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(13),
     color: '#666',
     lineHeight: scaleFontSize(18),
+  },
+  sectionDescription: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginBottom: moderateScale(16),
+    lineHeight: scaleFontSize(20),
+  },
+  paymentTimingContainer: {
+    gap: moderateScale(12),
+    marginBottom: moderateScale(20),
+  },
+  timingOption: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  timingOptionActive: {
+    borderColor: '#1C86FF',
+    backgroundColor: '#E3F2FD',
+  },
+  timingOptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
+  },
+  timingOptionTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(4),
+  },
+  timingOptionTitleActive: {
+    color: '#1C86FF',
+  },
+  timingOptionDescription: {
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    lineHeight: scaleFontSize(18),
+  },
+  radioButton: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonInner: {
+    width: moderateScale(12),
+    height: moderateScale(12),
+    borderRadius: moderateScale(6),
+    backgroundColor: '#1C86FF',
+  },
+  saveOptionsButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: moderateScale(12),
+    paddingVertical: moderateScale(14),
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });

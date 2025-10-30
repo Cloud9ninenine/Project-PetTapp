@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ImageBackground,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -44,6 +45,10 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [firebaseAuthenticated, setFirebaseAuthenticated] = useState(false);
+
+  const handleBackPress = () => {
+    router.push('/(bsn)/(tabs)/home');
+  };
 
   useEffect(() => {
     let unsubscribeConversations = null;
@@ -426,11 +431,18 @@ export default function MessagesScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <ImageBackground
+          source={require("@assets/images/PetTapp pattern.png")}
+          style={styles.backgroundimg}
+          imageStyle={styles.backgroundImageStyle}
+          resizeMode="repeat"
+        />
         <Header
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -442,11 +454,18 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
       <Header
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={handleBackPress}
       />
 
       {conversations.length === 0 ? (
@@ -481,6 +500,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+  backgroundImageStyle: {
+    opacity: 0.1,
   },
   titleContainer: {
     flex: 1,

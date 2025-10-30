@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ImageBackground,
   Alert,
   ActivityIndicator,
 } from 'react-native';
@@ -443,6 +444,12 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <ImageBackground
+        source={require("@assets/images/PetTapp pattern.png")}
+        style={styles.backgroundimg}
+        imageStyle={styles.backgroundImageStyle}
+        resizeMode="repeat"
+      />
       <Header
         backgroundColor="#1C86FF"
         titleColor="#fff"
@@ -514,6 +521,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  backgroundimg: {
+    ...StyleSheet.absoluteFillObject,
+    transform: [{ scale: 1.5 }],
+  },
+  backgroundImageStyle: {
+    opacity: 0.5,
   },
   headerTitleContainer: {
     flexDirection: 'row',

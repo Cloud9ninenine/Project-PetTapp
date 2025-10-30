@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import {
@@ -25,18 +25,23 @@ import {
   fetchLast3MonthsAnalytics,
   fetchThisYearAnalytics,
   fetchAllTimeAnalytics,
-} from '../profile/analytics/analyticsService';
+} from './analyticsService';
 import PaymentBreakdown from './components/PaymentBreakdown';
 import TimeDistribution from './components/TimeDistribution';
 import RatingsDisplay from './components/RatingsDisplay';
 import RevenueTrend from './components/RevenueTrend';
 
 export default function AnalyticsScreen() {
+  const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState("allTime");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+
+  const handleBackPress = () => {
+    router.push('/(bsn)/(tabs)/home');
+  };
 
   // Period options
   const periodOptions = [
@@ -163,7 +168,8 @@ export default function AnalyticsScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -199,7 +205,8 @@ export default function AnalyticsScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <ScrollView
           contentContainerStyle={styles.emptyStateContainer}
@@ -233,7 +240,8 @@ export default function AnalyticsScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={handleBackPress}
       />
 
       <ScrollView

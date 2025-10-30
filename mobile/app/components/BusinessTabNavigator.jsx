@@ -15,6 +15,12 @@ const businessTabs = [
     icon: require("@assets/images/service_icon/home icon.png"),
   },
   {
+    name: "analytics",
+    route: "/(bsn)/(tabs)/analytics",
+    label: "Analytics",
+    icon: require("@assets/images/service_icon/donut-chart.png"),
+  },
+  {
     name: "messages",
     route: "/(bsn)/(tabs)/messages",
     label: "Messages",
@@ -33,12 +39,7 @@ const businessTabs = [
     label: "Booking",
     icon: require("@assets/images/service_icon/calendar icon.png"),
   },
-  {
-    name: "profile",
-    route: "/(bsn)/(tabs)/profile",
-    label: "Profile",
-    icon: require("@assets/images/service_icon/user icon.png"),
-  },
+
 ];
 
 export default function BusinessTabNavigator() {
@@ -110,8 +111,8 @@ export default function BusinessTabNavigator() {
 
   // Handle tab navigation with profile check
   const handleTabPress = async (tab) => {
-    // Allow navigation to profile tab even if profile is incomplete
-    if (tab.name === 'profile' || pathname.includes('business-info')) {
+    // Allow navigation if currently on business-info page (profile editing)
+    if (pathname.includes('business-info')) {
       router.replace(tab.route);
       return;
     }
@@ -119,7 +120,7 @@ export default function BusinessTabNavigator() {
     // Re-check profile status before allowing navigation
     const profileComplete = await checkBusinessProfile();
 
-    // Check if profile is complete for other tabs
+    // Check if profile is complete for all tabs
     if (!profileComplete) {
       setShowWarningModal(true);
       return;

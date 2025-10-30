@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
@@ -29,6 +29,10 @@ export default function BusinessProfileScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [businessId, setBusinessId] = useState(null);
+
+  const handleBackPress = () => {
+    router.push('/(bsn)/(tabs)/home');
+  };
   const [businessData, setBusinessData] = useState(null);
   const [operatingHoursModal, setOperatingHoursModal] = useState(false);
   const [operatingHours, setOperatingHours] = useState({
@@ -45,10 +49,20 @@ export default function BusinessProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [currentTimePicker, setCurrentTimePicker] = useState(null); // { day: 'monday', field: 'start' }
+  const [editingDay, setEditingDay] = useState(null);
+  const [showDayTimeModal, setShowDayTimeModal] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   useEffect(() => {
     fetchBusinessData();
   }, []);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchBusinessData();
+    }, [])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -108,9 +122,25 @@ export default function BusinessProfileScreen() {
       daycare: 'Pet Daycare',
       training: 'Pet Training',
       'pet-shop': 'Pet Shop',
+      accommodation: 'Accommodation',
       other: 'Other',
     };
-    return typeLabels[type] || type;
+    // If not in predefined labels, capitalize first letter
+    return typeLabels[type] || type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getBusinessTypeStyle = (type) => {
+    const typeStyles = {
+      veterinary: { bg: '#E3F2FD', icon: '#1976D2' },      // Blue
+      grooming: { bg: '#FCE4EC', icon: '#C2185B' },         // Pink
+      boarding: { bg: '#F3E5F5', icon: '#7B1FA2' },         // Purple
+      daycare: { bg: '#FFF3E0', icon: '#F57C00' },          // Orange
+      training: { bg: '#E8F5E9', icon: '#388E3C' },         // Green
+      'pet-shop': { bg: '#FFF9C4', icon: '#F9A825' },       // Yellow
+      accommodation: { bg: '#E0F2F1', icon: '#00897B' },    // Teal
+      other: { bg: '#ECEFF1', icon: '#546E7A' },            // Blue Grey
+    };
+    return typeStyles[type] || { bg: '#E3F2FD', icon: '#1976D2' };
   };
 
   const openMap = () => {
@@ -192,8 +222,15 @@ export default function BusinessProfileScreen() {
     }));
   };
 
-  const openTimePicker = (day, field) => {
-    setCurrentTimePicker({ day, field });
+  const openDayTimeEdit = (day) => {
+    if (operatingHours[day].open) {
+      setEditingDay(day);
+      setShowDayTimeModal(true);
+    }
+  };
+
+  const openTimePicker = (field) => {
+    setCurrentTimePicker({ day: editingDay, field });
     setShowTimePicker(true);
   };
 
@@ -216,8 +253,8 @@ export default function BusinessProfileScreen() {
       }));
 
       if (Platform.OS === 'ios') {
-        // On iOS, we'll keep the picker open until they tap outside
-        // So we don't clear currentTimePicker here
+        setShowTimePicker(false);
+        setCurrentTimePicker(null);
       } else {
         setCurrentTimePicker(null);
       }
@@ -225,6 +262,11 @@ export default function BusinessProfileScreen() {
       setShowTimePicker(false);
       setCurrentTimePicker(null);
     }
+  };
+
+  const closeDayTimeModal = () => {
+    setShowDayTimeModal(false);
+    setEditingDay(null);
   };
 
   const getTimeForPicker = (timeString) => {
@@ -275,8 +317,10 @@ export default function BusinessProfileScreen() {
     }
   };
 
-  const handleShortcutPress = (action, route) => {
+  const handleShortcutPress = async (action, route) => {
     if (action === 'modal') {
+      // Refresh data before opening modal to ensure we have latest operating hours
+      await fetchBusinessData();
       setOperatingHoursModal(true);
     } else if (route) {
       router.push(route);
@@ -296,7 +340,8 @@ export default function BusinessProfileScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -319,7 +364,8 @@ export default function BusinessProfileScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.emptyContainer}>
           <Ionicons name="business-outline" size={moderateScale(80)} color="#ccc" />
@@ -353,7 +399,8 @@ export default function BusinessProfileScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={handleBackPress}
       />
 
       <ScrollView
@@ -373,6 +420,12 @@ export default function BusinessProfileScreen() {
           onPress={() => router.push('/(bsn)/(tabs)/profile/business-info')}
           activeOpacity={0.7}
         >
+          {/* Edit Icon - Top Right */}
+          <View style={styles.editIconContainer}>
+            <Ionicons name="create-outline" size={moderateScale(24)} color="#1C86FF" />
+          </View>
+
+          {/* Logo - Centered at Top */}
           <View style={styles.profileHeader}>
             <View style={styles.profilePicContainer}>
               {(businessData.images?.logo || businessData.logo) ? (
@@ -382,7 +435,7 @@ export default function BusinessProfileScreen() {
                 />
               ) : (
                 <View style={styles.profilePicPlaceholder}>
-                  <Ionicons name="storefront" size={moderateScale(40)} color="#1C86FF" />
+                  <Ionicons name="storefront" size={moderateScale(45)} color="#1C86FF" />
                 </View>
               )}
               {businessData.isVerified && (
@@ -391,48 +444,85 @@ export default function BusinessProfileScreen() {
                 </View>
               )}
             </View>
+          </View>
 
-            <View style={styles.profileInfo}>
-              <Text style={styles.businessName} numberOfLines={2}>
-                {businessData.businessName || 'Business Name'}
-              </Text>
+          {/* Business Name - Centered Below Logo */}
+          <Text style={styles.businessName} numberOfLines={2}>
+            {businessData.businessName || 'Business Name'}
+          </Text>
 
-              {/* Status Tags */}
-              <View style={styles.tagsContainer}>
-                {/* Service Type Tag */}
-                <View style={[styles.tag, styles.serviceTag]}>
-                  <Ionicons name="pricetag" size={moderateScale(12)} color="#2196F3" />
-                  <Text style={styles.tagText}>
-                    {getBusinessTypeLabel(businessData.businessType)}
-                  </Text>
-                </View>
+          {/* Status Tags - Bento Style Layout */}
+          <View style={styles.tagsContainer}>
+            {/* Service Type Tags - Handle multiple business types */}
+            {(() => {
+              // Handle businessType as array, comma-separated string, or single value
+              let businessTypes = [];
+              if (Array.isArray(businessData.businessType)) {
+                businessTypes = businessData.businessType;
+              } else if (typeof businessData.businessType === 'string') {
+                businessTypes = businessData.businessType.includes(',')
+                  ? businessData.businessType.split(',').map(type => type.trim())
+                  : [businessData.businessType];
+              }
 
-                {/* Verified Tag */}
-                {businessData.isVerified && (
-                  <View style={[styles.tag, styles.verifiedTag]}>
-                    <Ionicons name="checkmark-circle" size={moderateScale(12)} color="#4CAF50" />
-                    <Text style={styles.tagText}>Verified</Text>
+              return businessTypes.map((type, index) => {
+                const typeStyle = getBusinessTypeStyle(type);
+                return (
+                  <View
+                    key={`business-type-${index}`}
+                    style={[styles.tag, { backgroundColor: typeStyle.bg }]}
+                  >
+                    <Ionicons name="pricetag" size={moderateScale(14)} color={typeStyle.icon} />
+                    <Text style={styles.tagText}>
+                      {getBusinessTypeLabel(type)}
+                    </Text>
                   </View>
-                )}
+                );
+              });
+            })()}
 
-                {/* Active Tag */}
-                <View style={[styles.tag, businessData.isActive ? styles.activeTag : styles.inactiveTag]}>
-                  <View style={[styles.statusDot, businessData.isActive ? styles.activeDot : styles.inactiveDot]} />
-                  <Text style={styles.tagText}>
-                    {businessData.isActive ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
+            {/* Verified Tag */}
+            {businessData.isVerified && (
+              <View style={[styles.tag, styles.verifiedTag]}>
+                <Ionicons name="checkmark-circle" size={moderateScale(14)} color="#4CAF50" />
+                <Text style={styles.tagText}>Verified</Text>
               </View>
-            </View>
+            )}
 
-            <Ionicons name="create-outline" size={moderateScale(24)} color="#1C86FF" />
+            {/* Active Tag */}
+            <View style={[styles.tag, businessData.isActive ? styles.activeTag : styles.inactiveTag]}>
+              <View style={[styles.statusDot, businessData.isActive ? styles.activeDot : styles.inactiveDot]} />
+              <Text style={styles.tagText}>
+                {businessData.isActive ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
           </View>
 
           {/* Description */}
           {businessData.description && (
-            <Text style={styles.description} numberOfLines={3}>
-              {businessData.description}
-            </Text>
+            <View style={styles.descriptionContainer}>
+              <Text
+                style={styles.description}
+                numberOfLines={descriptionExpanded ? undefined : 3}
+              >
+                {businessData.description}
+              </Text>
+              {businessData.description.length > 100 && (
+                <TouchableOpacity
+                  style={styles.seeMoreButton}
+                  onPress={() => setDescriptionExpanded(!descriptionExpanded)}
+                >
+                  <Text style={styles.seeMoreText}>
+                    {descriptionExpanded ? 'See less' : 'See more'}
+                  </Text>
+                  <Ionicons
+                    name={descriptionExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={moderateScale(16)}
+                    color="#1C86FF"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           {/* Contact Details */}
@@ -587,47 +677,45 @@ export default function BusinessProfileScreen() {
             <ScrollView style={styles.modalBody}>
               {Object.keys(operatingHours).map((day) => (
                 <View key={day} style={styles.dayContainer}>
-                  <View style={styles.dayHeader}>
-                    <Text style={styles.dayName}>
-                      {day.charAt(0).toUpperCase() + day.slice(1)}
-                    </Text>
-                    <Switch
-                      value={operatingHours[day].open}
-                      onValueChange={() => toggleDayOpen(day)}
-                      trackColor={{ false: '#ccc', true: '#1C86FF' }}
-                      thumbColor="#fff"
-                    />
-                  </View>
-
-                  {operatingHours[day].open ? (
-                    <View style={styles.timePickersRow}>
-                      <View style={styles.timePickerContainer}>
-                        <Text style={styles.timeLabel}>Open</Text>
-                        <TouchableOpacity
-                          style={styles.timeButton}
-                          onPress={() => openTimePicker(day, 'start')}
-                        >
-                          <Ionicons name="time-outline" size={moderateScale(16)} color="#1C86FF" />
-                          <Text style={styles.timeText}>{operatingHours[day].start}</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      <Text style={styles.timeSeparator}>to</Text>
-
-                      <View style={styles.timePickerContainer}>
-                        <Text style={styles.timeLabel}>Close</Text>
-                        <TouchableOpacity
-                          style={styles.timeButton}
-                          onPress={() => openTimePicker(day, 'end')}
-                        >
-                          <Ionicons name="time-outline" size={moderateScale(16)} color="#1C86FF" />
-                          <Text style={styles.timeText}>{operatingHours[day].end}</Text>
-                        </TouchableOpacity>
-                      </View>
+                  <View style={styles.dayRowContent}>
+                    <View style={styles.dayLeftSection}>
+                      <Text style={styles.dayName}>
+                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                      </Text>
+                      <Switch
+                        value={operatingHours[day].open}
+                        onValueChange={() => toggleDayOpen(day)}
+                        trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
+                        thumbColor={operatingHours[day].open ? '#1C86FF' : '#f4f3f4'}
+                      />
                     </View>
-                  ) : (
-                    <Text style={styles.dayClosed}>Closed</Text>
-                  )}
+
+                    <TouchableOpacity
+                      style={styles.timeDisplayContainer}
+                      onPress={() => openDayTimeEdit(day)}
+                      disabled={!operatingHours[day].open}
+                    >
+                      <View style={[
+                        styles.timeDisplay,
+                        !operatingHours[day].open && styles.timeDisplayDisabled
+                      ]}>
+                        <Ionicons
+                          name="time-outline"
+                          size={moderateScale(16)}
+                          color={operatingHours[day].open ? "#1C86FF" : "#999"}
+                        />
+                        <Text style={[
+                          styles.timeText,
+                          !operatingHours[day].open && styles.timeTextDisabled
+                        ]}>
+                          {operatingHours[day].start} - {operatingHours[day].end}
+                        </Text>
+                        {operatingHours[day].open && (
+                          <Ionicons name="pencil" size={moderateScale(14)} color="#1C86FF" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </ScrollView>
@@ -643,6 +731,82 @@ export default function BusinessProfileScreen() {
                 <Text style={styles.saveButtonText}>Save Changes</Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Day Time Edit Modal */}
+      <Modal
+        visible={showDayTimeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeDayTimeModal}
+      >
+        <View style={styles.timeModalOverlay}>
+          <View style={styles.timeModalContent}>
+            {/* Header */}
+            <View style={styles.timeModalHeader}>
+              <View style={styles.timeModalTitleRow}>
+                <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
+                <Text style={styles.timeModalTitle}>
+                  Set Hours for {editingDay && editingDay.charAt(0).toUpperCase() + editingDay.slice(1)}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={closeDayTimeModal}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Time Pickers */}
+            <View style={styles.timeModalBody}>
+              {/* Opening Time */}
+              <View style={styles.timePickerGroup}>
+                <Text style={styles.timePickerLabel}>Opening Time</Text>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => openTimePicker('start')}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerButtonText}>
+                    {editingDay && operatingHours[editingDay].start}
+                  </Text>
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#1C86FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Closing Time */}
+              <View style={styles.timePickerGroup}>
+                <Text style={styles.timePickerLabel}>Closing Time</Text>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => openTimePicker('end')}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerButtonText}>
+                    {editingDay && operatingHours[editingDay].end}
+                  </Text>
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#1C86FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Info Box */}
+              <View style={styles.timeInfoBox}>
+                <Ionicons name="information-circle-outline" size={moderateScale(18)} color="#1C86FF" />
+                <Text style={styles.timeInfoText}>
+                  Set the operating hours for this day. Times are displayed in 24-hour format.
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.timeModalActions}>
+              <TouchableOpacity
+                style={styles.timeCancelButton}
+                onPress={closeDayTimeModal}
+              >
+                <Text style={styles.timeCancelButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -732,31 +896,37 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    position: 'relative',
+  },
+  editIconContainer: {
+    position: 'absolute',
+    top: moderateScale(20),
+    right: moderateScale(20),
+    zIndex: 10,
   },
   profileHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: moderateScale(15),
+    justifyContent: 'center',
+    marginBottom: moderateScale(12),
   },
   profilePicContainer: {
     position: 'relative',
-    marginRight: moderateScale(15),
   },
   profilePic: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
-    borderWidth: 2,
+    width: moderateScale(90),
+    height: moderateScale(90),
+    borderRadius: moderateScale(45),
+    borderWidth: 3,
     borderColor: '#1C86FF',
   },
   profilePicPlaceholder: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
+    width: moderateScale(90),
+    height: moderateScale(90),
+    borderRadius: moderateScale(45),
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#1C86FF',
   },
   verifiedBadge: {
@@ -771,24 +941,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   businessName: {
-    fontSize: scaleFontSize(20),
+    fontSize: scaleFontSize(22),
     fontWeight: 'bold',
     color: '#1C86FF',
-    marginBottom: moderateScale(8),
+    textAlign: 'center',
+    marginBottom: moderateScale(4),
+    paddingHorizontal: moderateScale(10),
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: moderateScale(6),
-    marginTop: moderateScale(4),
+    gap: moderateScale(8),
+    marginTop: moderateScale(12),
+    marginBottom: moderateScale(20),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(12),
-    gap: moderateScale(4),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(16),
+    gap: moderateScale(5),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   serviceTag: {
     backgroundColor: '#E3F2FD',
@@ -803,14 +985,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFEBEE',
   },
   tagText: {
-    fontSize: scaleFontSize(11),
+    fontSize: scaleFontSize(12),
     color: '#333',
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   statusDot: {
-    width: moderateScale(6),
-    height: moderateScale(6),
-    borderRadius: moderateScale(3),
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
   },
   activeDot: {
     backgroundColor: '#4CAF50',
@@ -818,11 +1001,26 @@ const styles = StyleSheet.create({
   inactiveDot: {
     backgroundColor: '#F44336',
   },
+  descriptionContainer: {
+    marginBottom: moderateScale(15),
+  },
   description: {
     fontSize: scaleFontSize(14),
     color: '#666',
     lineHeight: scaleFontSize(20),
-    marginBottom: moderateScale(15),
+  },
+  seeMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: moderateScale(8),
+    paddingVertical: moderateScale(6),
+    gap: moderateScale(4),
+  },
+  seeMoreText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   contactDetails: {
     borderTopWidth: 1,
@@ -961,63 +1159,54 @@ const styles = StyleSheet.create({
     padding: moderateScale(20),
   },
   dayContainer: {
-    paddingVertical: moderateScale(15),
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(4),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  dayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: moderateScale(10),
-  },
-  dayName: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '600',
-    color: '#333',
-  },
-  timePickersRow: {
+  dayRowContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: moderateScale(8),
   },
-  timePickerContainer: {
+  dayLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
     flex: 1,
   },
-  timeLabel: {
-    fontSize: scaleFontSize(12),
-    color: '#666',
-    marginBottom: moderateScale(4),
-    fontWeight: '500',
+  dayName: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    width: moderateScale(85),
   },
-  timeButton: {
+  timeDisplayContainer: {
+    flex: 1,
+  },
+  timeDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: moderateScale(8),
+    borderRadius: moderateScale(10),
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(10),
     borderWidth: 1,
-    borderColor: '#1C86FF',
+    borderColor: '#E0E0E0',
     gap: moderateScale(8),
+  },
+  timeDisplayDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E8E8E8',
   },
   timeText: {
     fontSize: scaleFontSize(14),
     color: '#333',
-    fontWeight: '600',
-  },
-  timeSeparator: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    marginHorizontal: moderateScale(8),
     fontWeight: '500',
+    flex: 1,
   },
-  dayClosed: {
-    fontSize: scaleFontSize(13),
+  timeTextDisabled: {
     color: '#999',
-    fontStyle: 'italic',
-    marginTop: moderateScale(8),
   },
   saveButton: {
     backgroundColor: '#1C86FF',
@@ -1098,5 +1287,111 @@ const styles = StyleSheet.create({
   timePicker: {
     width: '100%',
     height: moderateScale(200),
+  },
+  // Day Time Edit Modal Styles
+  timeModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  timeModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    maxHeight: '70%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+  },
+  timeModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(24),
+    paddingTop: moderateScale(24),
+    paddingBottom: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  timeModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
+    flex: 1,
+  },
+  timeModalTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  timeModalBody: {
+    padding: moderateScale(24),
+  },
+  timePickerGroup: {
+    marginBottom: moderateScale(20),
+  },
+  timePickerLabel: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(10),
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(16),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    gap: moderateScale(12),
+  },
+  timePickerButtonText: {
+    fontSize: scaleFontSize(18),
+    fontWeight: '600',
+    color: '#1C86FF',
+    flex: 1,
+  },
+  timeInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    padding: moderateScale(14),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(10),
+    marginTop: moderateScale(10),
+  },
+  timeInfoText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    flex: 1,
+    lineHeight: scaleFontSize(18),
+  },
+  timeModalActions: {
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(20),
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  timeCancelButton: {
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  timeCancelButtonText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#fff',
   },
 });

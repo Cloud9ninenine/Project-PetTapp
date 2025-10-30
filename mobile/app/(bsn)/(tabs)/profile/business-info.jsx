@@ -22,77 +22,131 @@ import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
-import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-const DaySchedule = ({ day, schedule, onUpdate }) => {
+const DaySchedule = ({ day, schedule, onUpdate, onEdit }) => {
   const [isOpen, setIsOpen] = useState(schedule.isOpen);
-  const [mode, setMode] = useState('time');
-  const [show, setShow] = useState(false);
-  const [isPickerFor, setIsPickerFor] = useState('open'); // 'open' or 'close'
-
-  const onChange = (event, selectedDate) => {
-    setShow(Platform.OS === 'ios');
-    if (selectedDate) {
-      const hour = selectedDate.getHours().toString().padStart(2, '0');
-      const minute = selectedDate.getMinutes().toString().padStart(2, '0');
-      const time = `${hour}:${minute}`;
-      const newSchedule = { ...schedule, [isPickerFor]: time, isOpen: true };
-      onUpdate(day, newSchedule);
-      if(!isOpen) setIsOpen(true);
-    }
-  };
-
-  const showTimepicker = (pickerFor) => {
-    setIsPickerFor(pickerFor);
-    setShow(true);
-  };
 
   const formatTime = (timeStr) => {
     if (!timeStr) return "HH:MM";
     const parts = timeStr.split(':');
     if (parts.length !== 2) return "HH:MM";
     return timeStr;
-  }
+  };
 
   return (
     <View style={styles.dayContainer}>
-      <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
-      <Switch
-        value={isOpen}
-        onValueChange={(value) => {
-          setIsOpen(value);
-          onUpdate(day, { ...schedule, isOpen: value });
-        }}
-      />
-      <View style={styles.timeInputContainer}>
-        <TouchableOpacity onPress={() => showTimepicker('open')} disabled={!isOpen}>
-          <View style={[styles.timeInput, !isOpen && styles.disabledInput]}>
-            <Text style={styles.timeText}>{formatTime(schedule.open)}</Text>
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.timeSeparator}>-</Text>
-        <TouchableOpacity onPress={() => showTimepicker('close')} disabled={!isOpen}>
-          <View style={[styles.timeInput, !isOpen && styles.disabledInput]}>
-            <Text style={styles.timeText}>{formatTime(schedule.close)}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-      {show && (
-        <DateTimePicker
-          testID="dateTimePicker"
-          value={new Date()} // You might want to parse schedule.open/close to initialize this
-          mode="time"
-          is24Hour={true}
-          display="default"
-          onChange={onChange}
+      <View style={styles.dayLeftSection}>
+        <Text style={styles.dayLabel}>{day.charAt(0).toUpperCase() + day.slice(1)}</Text>
+        <Switch
+          value={isOpen}
+          onValueChange={(value) => {
+            setIsOpen(value);
+            onUpdate(day, { ...schedule, isOpen: value });
+          }}
+          trackColor={{ false: "#D1D5DB", true: "#93C5FD" }}
+          thumbColor={isOpen ? "#1C86FF" : "#f4f3f4"}
         />
-      )}
+      </View>
+      <TouchableOpacity
+        style={styles.timeInputContainer}
+        onPress={() => isOpen && onEdit(day)}
+        disabled={!isOpen}
+      >
+        <View style={[styles.timeDisplay, !isOpen && styles.disabledInput]}>
+          <Ionicons name="time-outline" size={moderateScale(16)} color={isOpen ? "#1C86FF" : "#999"} />
+          <Text style={[styles.timeText, !isOpen && styles.disabledText]}>
+            {formatTime(schedule.open)} - {formatTime(schedule.close)}
+          </Text>
+          {isOpen && (
+            <Ionicons name="pencil" size={moderateScale(14)} color="#1C86FF" />
+          )}
+        </View>
+      </TouchableOpacity>
     </View>
   );
+};
+
+// Generate Leaflet map HTML
+const getMapHTML = (latitude, longitude) => {
+  const defaultLat = latitude !== null ? latitude : 14.5995;
+  const defaultLng = longitude !== null ? longitude : 120.9842;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          body { margin: 0; padding: 0; }
+          #map { width: 100%; height: 100vh; }
+          .info-box {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+            text-align: center;
+            font-size: 11px;
+            color: #666;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="info-box" id="coords">${defaultLat.toFixed(6)}, ${defaultLng.toFixed(6)}</div>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map', { zoomControl: false }).setView([${defaultLat}, ${defaultLng}], 15);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap',
+            maxZoom: 19
+          }).addTo(map);
+
+          L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+          var customIcon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background-color: #1C86FF; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4);"><div style="width: 10px; height: 10px; background-color: white; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(45deg);"></div></div>',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30]
+          });
+
+          var marker = L.marker([${defaultLat}, ${defaultLng}], {
+            icon: customIcon,
+            draggable: true
+          }).addTo(map);
+
+          function updateCoords(lat, lng) {
+            document.getElementById('coords').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              latitude: lat,
+              longitude: lng
+            }));
+          }
+
+          marker.on('dragend', function(e) {
+            var position = marker.getLatLng();
+            updateCoords(position.lat, position.lng);
+          });
+
+          map.on('click', function(e) {
+            marker.setLatLng(e.latlng);
+            updateCoords(e.latlng.lat, e.latlng.lng);
+          });
+        </script>
+      </body>
+    </html>
+  `;
 };
 
 export default function BusinessInformationScreen() {
@@ -105,9 +159,16 @@ export default function BusinessInformationScreen() {
   // Modal state for preventing navigation without profile completion
   const [showWarningModal, setShowWarningModal] = useState(false);
 
+  // Operating hours modal state
+  const [showHoursModal, setShowHoursModal] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [tempSchedule, setTempSchedule] = useState({ open: '09:00', close: '17:00' });
+  const [showOpenPicker, setShowOpenPicker] = useState(false);
+  const [showClosePicker, setShowClosePicker] = useState(false);
+
   const [businessInfo, setBusinessInfo] = useState({
     businessName: '',
-    businessType: '',
+    businessType: [],
     description: '',
     contactInfo: {
       email: '',
@@ -127,12 +188,12 @@ export default function BusinessInformationScreen() {
     },
     logo: null,
     businessHours: {
-      monday: { isOpen: false, open: '09:00', close: '17:00' },
-      tuesday: { isOpen: false, open: '09:00', close: '17:00' },
-      wednesday: { isOpen: false, open: '09:00', close: '17:00' },
-      thursday: { isOpen: false, open: '09:00', close: '17:00' },
-      friday: { isOpen: false, open: '09:00', close: '17:00' },
-      saturday: { isOpen: false, open: '09:00', close: '17:00' },
+      monday: { isOpen: true, open: '09:00', close: '17:00' },
+      tuesday: { isOpen: true, open: '09:00', close: '17:00' },
+      wednesday: { isOpen: true, open: '09:00', close: '17:00' },
+      thursday: { isOpen: true, open: '09:00', close: '17:00' },
+      friday: { isOpen: true, open: '09:00', close: '17:00' },
+      saturday: { isOpen: true, open: '09:00', close: '17:00' },
       sunday: { isOpen: false, open: '09:00', close: '17:00' },
     },
     credentials: {
@@ -141,8 +202,6 @@ export default function BusinessInformationScreen() {
       insuranceInfo: '',
     },
   });
-
-  const [showBusinessTypeDropdown, setShowBusinessTypeDropdown] = useState(false);
 
   // These values MUST match the backend model enum:
   // ['veterinary', 'grooming', 'accommodation', 'transport', 'pet-supplies']
@@ -153,6 +212,60 @@ export default function BusinessInformationScreen() {
     { value: 'transport', label: 'Pet Transport' },
     { value: 'pet-supplies', label: 'Pet Supplies' },
   ];
+
+  // Handle opening the hours modal
+  const handleEditHours = (day) => {
+    setSelectedDay(day);
+    setTempSchedule({
+      open: businessInfo.businessHours[day].open,
+      close: businessInfo.businessHours[day].close,
+    });
+    setShowHoursModal(true);
+  };
+
+  // Handle time changes in the modal
+  const handleTimeChange = (type, event, selectedDate) => {
+    if (Platform.OS === 'android') {
+      setShowOpenPicker(false);
+      setShowClosePicker(false);
+    }
+
+    if (selectedDate) {
+      const hour = selectedDate.getHours().toString().padStart(2, '0');
+      const minute = selectedDate.getMinutes().toString().padStart(2, '0');
+      const time = `${hour}:${minute}`;
+      setTempSchedule(prev => ({ ...prev, [type]: time }));
+    }
+  };
+
+  // Save the hours from modal
+  const handleSaveHours = () => {
+    if (selectedDay) {
+      setBusinessInfo(prev => ({
+        ...prev,
+        businessHours: {
+          ...prev.businessHours,
+          [selectedDay]: {
+            ...prev.businessHours[selectedDay],
+            open: tempSchedule.open,
+            close: tempSchedule.close,
+          }
+        }
+      }));
+    }
+    setShowHoursModal(false);
+    setShowOpenPicker(false);
+    setShowClosePicker(false);
+  };
+
+  // Parse time string to Date object
+  const parseTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const date = new Date();
+    date.setHours(hours);
+    date.setMinutes(minutes);
+    return date;
+  };
 
   // Check if business profile is complete
   const isBusinessProfileComplete = () => {
@@ -231,7 +344,7 @@ export default function BusinessInformationScreen() {
         const validTypes = ['veterinary', 'grooming', 'accommodation', 'transport', 'pet-supplies'];
 
         // Get businessType and validate it
-        let businessTypeValue = '';
+        let businessTypeValues = [];
         if (Array.isArray(business.businessType) && business.businessType.length > 0) {
           // Map old values to new valid ones
           const typeMapping = {
@@ -242,29 +355,63 @@ export default function BusinessInformationScreen() {
             'other': 'pet-supplies'
           };
 
-          const currentType = business.businessType[0];
-          // If it's already valid, use it; otherwise map it
-          businessTypeValue = validTypes.includes(currentType)
-            ? currentType
-            : (typeMapping[currentType] || 'veterinary');
+          let hasInvalidTypes = false;
+          const invalidTypes = [];
 
-          // Notify user if their business type was migrated
-          if (!validTypes.includes(currentType)) {
-            const oldTypeLabel = currentType.charAt(0).toUpperCase() + currentType.slice(1);
-            const newTypeLabel = businessTypes.find(t => t.value === businessTypeValue)?.label || businessTypeValue;
+          business.businessType.forEach(type => {
+            if (validTypes.includes(type)) {
+              businessTypeValues.push(type);
+            } else {
+              hasInvalidTypes = true;
+              invalidTypes.push(type);
+              const mappedType = typeMapping[type] || 'veterinary';
+              if (!businessTypeValues.includes(mappedType)) {
+                businessTypeValues.push(mappedType);
+              }
+            }
+          });
+
+          // Notify user if their business types were migrated
+          if (hasInvalidTypes) {
             setTimeout(() => {
               Alert.alert(
-                'Business Type Updated',
-                `Your business type "${oldTypeLabel}" has been automatically updated to "${newTypeLabel}" to match our current service categories. Please review and update if needed.`,
+                'Business Types Updated',
+                `Some of your business types have been automatically updated to match our current service categories. Please review and update if needed.`,
                 [{ text: 'OK' }]
               );
             }, 500);
           }
         }
 
+        // Process business hours to ensure clean data structure
+        const processedBusinessHours = {};
+        const defaultHours = {
+          monday: { isOpen: false, open: '09:00', close: '17:00' },
+          tuesday: { isOpen: false, open: '09:00', close: '17:00' },
+          wednesday: { isOpen: false, open: '09:00', close: '17:00' },
+          thursday: { isOpen: false, open: '09:00', close: '17:00' },
+          friday: { isOpen: false, open: '09:00', close: '17:00' },
+          saturday: { isOpen: false, open: '09:00', close: '17:00' },
+          sunday: { isOpen: false, open: '09:00', close: '17:00' },
+        };
+
+        Object.keys(defaultHours).forEach((day) => {
+          if (business.businessHours && business.businessHours[day]) {
+            // Clean the data - only extract what we need, ignore _id and other fields
+            const dayData = business.businessHours[day];
+            processedBusinessHours[day] = {
+              isOpen: dayData.isOpen || false,
+              open: dayData.open || '09:00',
+              close: dayData.close || '17:00',
+            };
+          } else {
+            processedBusinessHours[day] = defaultHours[day];
+          }
+        });
+
         setBusinessInfo({
           businessName: business.businessName || '',
-          businessType: businessTypeValue,
+          businessType: businessTypeValues,
           description: business.description || '',
           contactInfo: {
             email: business.contactInfo?.email || '',
@@ -277,15 +424,13 @@ export default function BusinessInformationScreen() {
             state: business.address?.state || '',
             zipCode: business.address?.zipCode || '',
             country: business.address?.country || 'Philippines',
-            coordinates: {
-              // Backend sends GeoJSON: { type: 'Point', coordinates: [lng, lat] }
-              // Convert to our format: { latitude, longitude }
-              latitude: business.address?.coordinates?.coordinates?.[1] || null,
-              longitude: business.address?.coordinates?.coordinates?.[0] || null,
+            coordinates: business.address?.coordinates || {
+              latitude: null,
+              longitude: null,
             },
           },
           logo: business.images?.logo || business.logo || null,
-          businessHours: business.businessHours || businessInfo.businessHours,
+          businessHours: processedBusinessHours,
           credentials: business.credentials || businessInfo.credentials,
         });
       }
@@ -348,19 +493,26 @@ export default function BusinessInformationScreen() {
     }
   };
 
-  // Handle map marker drag
-  const handleMapPress = (event) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    setBusinessInfo({
-      ...businessInfo,
-      address: {
-        ...businessInfo.address,
-        coordinates: {
-          latitude,
-          longitude,
-        },
-      },
-    });
+  // Handle map message from WebView
+  const handleMapMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.latitude && data.longitude) {
+        setBusinessInfo({
+          ...businessInfo,
+          address: {
+            ...businessInfo.address,
+            coordinates: {
+              latitude: data.latitude,
+              longitude: data.longitude,
+            },
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Error parsing map message:', error);
+    }
   };
 
 
@@ -370,8 +522,8 @@ export default function BusinessInformationScreen() {
       Alert.alert('Validation Error', 'Business name is required');
       return;
     }
-    if (!businessInfo.businessType) {
-      Alert.alert('Validation Error', 'Business type is required');
+    if (!businessInfo.businessType || businessInfo.businessType.length === 0) {
+      Alert.alert('Validation Error', 'At least one business type is required');
       return;
     }
     if (!businessInfo.contactInfo.email.trim()) {
@@ -406,8 +558,8 @@ export default function BusinessInformationScreen() {
       // Append simple fields
       formData.append('businessName', String(businessInfo.businessName));
 
-      // Backend expects businessType as an array, not a string
-      formData.append('businessType', JSON.stringify([businessInfo.businessType]));
+      // Backend expects businessType as an array
+      formData.append('businessType', JSON.stringify(businessInfo.businessType));
 
       if (businessInfo.description) {
         formData.append('description', String(businessInfo.description));
@@ -423,26 +575,32 @@ export default function BusinessInformationScreen() {
       };
 
       // Only add coordinates if both latitude and longitude are valid numbers
-      // Backend expects GeoJSON format: { type: 'Point', coordinates: [longitude, latitude] }
       if (
-        businessInfo.address.coordinates.latitude !== null &&
-        businessInfo.address.coordinates.longitude !== null &&
+        businessInfo.address.coordinates?.latitude !== null &&
+        businessInfo.address.coordinates?.longitude !== null &&
         !isNaN(businessInfo.address.coordinates.latitude) &&
         !isNaN(businessInfo.address.coordinates.longitude)
       ) {
         addressData.coordinates = {
-          type: 'Point',
-          coordinates: [
-            Number(businessInfo.address.coordinates.longitude),  // longitude FIRST
-            Number(businessInfo.address.coordinates.latitude)    // latitude SECOND
-          ]
+          latitude: Number(businessInfo.address.coordinates.latitude),
+          longitude: Number(businessInfo.address.coordinates.longitude)
         };
       }
+
+      // Clean business hours data before saving (remove any extra fields like _id)
+      const cleanBusinessHours = {};
+      Object.keys(businessInfo.businessHours).forEach((day) => {
+        cleanBusinessHours[day] = {
+          isOpen: businessInfo.businessHours[day].isOpen,
+          open: businessInfo.businessHours[day].open,
+          close: businessInfo.businessHours[day].close,
+        };
+      });
 
       // Append complex fields as JSON strings
       formData.append('contactInfo', JSON.stringify(businessInfo.contactInfo));
       formData.append('address', JSON.stringify(addressData));
-      formData.append('businessHours', JSON.stringify(businessInfo.businessHours));
+      formData.append('businessHours', JSON.stringify(cleanBusinessHours));
       formData.append('credentials', JSON.stringify({
         ...businessInfo.credentials,
         certifications: typeof businessInfo.credentials.certifications === 'string'
@@ -595,50 +753,39 @@ export default function BusinessInformationScreen() {
 
           {/* Business Type */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Business Type *</Text>
-            <TouchableOpacity
-              style={styles.dropdownContainer}
-              onPress={() => setShowBusinessTypeDropdown(!showBusinessTypeDropdown)}
-            >
-              <Ionicons name="pricetag" size={moderateScale(20)} color="#1C86FF" />
-              <Text style={[styles.dropdownText, !businessInfo.businessType && styles.dropdownPlaceholder]}>
-                {businessTypes.find(t => t.value === businessInfo.businessType)?.label || 'Select business type'}
-              </Text>
-              <Ionicons
-                name={showBusinessTypeDropdown ? "chevron-up" : "chevron-down"}
-                size={moderateScale(20)}
-                color="#666"
-              />
-            </TouchableOpacity>
-            {showBusinessTypeDropdown && (
-              <ScrollView style={styles.dropdownList} nestedScrollEnabled={true}>
-                {businessTypes.map((type, index) => (
-                  <Pressable
-                    key={type.value}
-                    style={({ pressed }) => [
-                      styles.dropdownItem,
-                      businessInfo.businessType === type.value && styles.dropdownItemSelected,
-                      pressed && styles.dropdownItemPressed,
-                      index === businessTypes.length - 1 && styles.dropdownItemLast,
-                    ]}
-                    onPress={() => {
-                      setBusinessInfo({ ...businessInfo, businessType: type.value });
-                      setShowBusinessTypeDropdown(false);
-                    }}
-                  >
-                    <Text style={[
-                      styles.dropdownItemText,
-                      businessInfo.businessType === type.value && styles.dropdownItemTextSelected
-                    ]}>
-                      {type.label}
-                    </Text>
-                    {businessInfo.businessType === type.value && (
-                      <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.label}>Business Type * (Select all that apply)</Text>
+            <View style={styles.checkboxContainer}>
+              {businessTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.value}
+                  style={styles.checkboxItem}
+                  onPress={() => {
+                    const isSelected = businessInfo.businessType.includes(type.value);
+                    if (isSelected) {
+                      setBusinessInfo({
+                        ...businessInfo,
+                        businessType: businessInfo.businessType.filter(t => t !== type.value)
+                      });
+                    } else {
+                      setBusinessInfo({
+                        ...businessInfo,
+                        businessType: [...businessInfo.businessType, type.value]
+                      });
+                    }
+                  }}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    businessInfo.businessType.includes(type.value) && styles.checkboxSelected
+                  ]}>
+                    {businessInfo.businessType.includes(type.value) && (
+                      <Ionicons name="checkmark" size={moderateScale(18)} color="#fff" />
                     )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>{type.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* Description */}
@@ -811,37 +958,20 @@ export default function BusinessInformationScreen() {
             </TouchableOpacity>
 
             <View style={styles.mapContainer}>
-              <MapView
-                style={styles.map}
-                initialRegion={{
-                  latitude: businessInfo.address.coordinates.latitude || 14.5995,
-                  longitude: businessInfo.address.coordinates.longitude || 120.9842,
-                  latitudeDelta: 0.0922,
-                  longitudeDelta: 0.0421,
+              <WebView
+                source={{
+                  html: getMapHTML(
+                    businessInfo.address.coordinates?.latitude,
+                    businessInfo.address.coordinates?.longitude
+                  )
                 }}
-                region={businessInfo.address.coordinates.latitude ? {
-                  latitude: businessInfo.address.coordinates.latitude,
-                  longitude: businessInfo.address.coordinates.longitude,
-                  latitudeDelta: 0.0922,
-                  longitudeDelta: 0.0421,
-                } : undefined}
-                onPress={handleMapPress}
-              >
-                {businessInfo.address.coordinates.latitude && businessInfo.address.coordinates.longitude && (
-                  <Marker
-                    coordinate={{
-                      latitude: businessInfo.address.coordinates.latitude,
-                      longitude: businessInfo.address.coordinates.longitude,
-                    }}
-                    title="Business Location"
-                    draggable
-                    onDragEnd={handleMapPress}
-                  />
-                )}
-              </MapView>
+                style={styles.map}
+                onMessage={handleMapMessage}
+                javaScriptEnabled={true}
+              />
             </View>
 
-            {businessInfo.address.coordinates.latitude && businessInfo.address.coordinates.longitude && (
+            {businessInfo.address.coordinates?.latitude !== null && businessInfo.address.coordinates?.longitude !== null && (
               <View style={styles.coordinatesDisplay}>
                 <Text style={styles.coordinatesText}>
                   Latitude: {businessInfo.address.coordinates.latitude.toFixed(6)}
@@ -868,6 +998,7 @@ export default function BusinessInformationScreen() {
               onUpdate={(day, newSchedule) => {
                 setBusinessInfo(prev => ({...prev, businessHours: {...prev.businessHours, [day]: newSchedule}}));
               }}
+              onEdit={handleEditHours}
             />
           ))}
         </View>
@@ -977,6 +1108,107 @@ export default function BusinessInformationScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Operating Hours Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showHoursModal}
+        onRequestClose={() => setShowHoursModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.hoursModalContainer}>
+            {/* Header */}
+            <View style={styles.hoursModalHeader}>
+              <View style={styles.hoursModalTitleRow}>
+                <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
+                <Text style={styles.hoursModalTitle}>
+                  Set Hours for {selectedDay && selectedDay.charAt(0).toUpperCase() + selectedDay.slice(1)}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowHoursModal(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Time Pickers */}
+            <View style={styles.hoursModalContent}>
+              {/* Opening Time */}
+              <View style={styles.timePickerGroup}>
+                <Text style={styles.timePickerLabel}>Opening Time</Text>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => setShowOpenPicker(true)}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerButtonText}>{tempSchedule.open}</Text>
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#1C86FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Closing Time */}
+              <View style={styles.timePickerGroup}>
+                <Text style={styles.timePickerLabel}>Closing Time</Text>
+                <TouchableOpacity
+                  style={styles.timePickerButton}
+                  onPress={() => setShowClosePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
+                  <Text style={styles.timePickerButtonText}>{tempSchedule.close}</Text>
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#1C86FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Info Text */}
+              <View style={styles.hoursInfoBox}>
+                <Ionicons name="information-circle-outline" size={moderateScale(18)} color="#1C86FF" />
+                <Text style={styles.hoursInfoText}>
+                  Set the operating hours for this day. Times are displayed in 24-hour format.
+                </Text>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.hoursModalActions}>
+              <TouchableOpacity
+                style={styles.hoursCancelButton}
+                onPress={() => setShowHoursModal(false)}
+              >
+                <Text style={styles.hoursCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.hoursSaveButton}
+                onPress={handleSaveHours}
+              >
+                <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
+                <Text style={styles.hoursSaveButtonText}>Save Hours</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Time Pickers */}
+        {showOpenPicker && (
+          <DateTimePicker
+            testID="openTimePicker"
+            value={parseTime(tempSchedule.open)}
+            mode="time"
+            is24Hour={true}
+            display="spinner"
+            onChange={(event, selectedDate) => handleTimeChange('open', event, selectedDate)}
+          />
+        )}
+        {showClosePicker && (
+          <DateTimePicker
+            testID="closeTimePicker"
+            value={parseTime(tempSchedule.close)}
+            mode="time"
+            is24Hour={true}
+            display="spinner"
+            onChange={(event, selectedDate) => handleTimeChange('close', event, selectedDate)}
+          />
+        )}
       </Modal>
     </SafeAreaView>
   );
@@ -1224,44 +1456,88 @@ const styles = StyleSheet.create({
     color: '#1C86FF',
     fontWeight: '600',
   },
+  // Checkbox Styles
+  checkboxContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  checkboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(8),
+  },
+  checkbox: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(6),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: moderateScale(12),
+    backgroundColor: '#fff',
+  },
+  checkboxSelected: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+  },
+  checkboxLabel: {
+    fontSize: scaleFontSize(15),
+    color: '#333',
+    flex: 1,
+    fontWeight: '500',
+  },
   dayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: moderateScale(10),
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(4),
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F0F0F0',
   },
-  dayLabel: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '500',
-    width: '25%',
-  },
-  timeInputContainer: {
+  dayLeftSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: moderateScale(12),
+    flex: 1,
   },
-  timeInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: moderateScale(8),
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(8),
-    width: moderateScale(70),
+  dayLabel: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    width: moderateScale(85),
+  },
+  timeInputContainer: {
+    flex: 1,
+  },
+  timeDisplay: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: moderateScale(8),
   },
   timeText: {
     fontSize: scaleFontSize(14),
     color: '#333',
-    textAlign: 'center',
+    fontWeight: '500',
+    flex: 1,
   },
   disabledInput: {
-    backgroundColor: '#f0f0f0',
-    color: '#999',
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E8E8E8',
   },
-  timeSeparator: {
-    marginHorizontal: moderateScale(5),
+  disabledText: {
+    color: '#999',
   },
   // Map Styles
   locationButton: {
@@ -1374,5 +1650,127 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     letterSpacing: 0.5,
+  },
+  // Operating Hours Modal Styles
+  hoursModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    width: '100%',
+    maxHeight: '80%',
+    position: 'absolute',
+    bottom: 0,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+  },
+  hoursModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(24),
+    paddingTop: moderateScale(24),
+    paddingBottom: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  hoursModalTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
+    flex: 1,
+  },
+  hoursModalTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  hoursModalContent: {
+    padding: moderateScale(24),
+  },
+  timePickerGroup: {
+    marginBottom: moderateScale(20),
+  },
+  timePickerLabel: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(10),
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(16),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    gap: moderateScale(12),
+  },
+  timePickerButtonText: {
+    fontSize: scaleFontSize(18),
+    fontWeight: '600',
+    color: '#1C86FF',
+    flex: 1,
+  },
+  hoursInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    padding: moderateScale(14),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(10),
+    marginTop: moderateScale(10),
+  },
+  hoursInfoText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    flex: 1,
+    lineHeight: scaleFontSize(18),
+  },
+  hoursModalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(20),
+    gap: moderateScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  hoursCancelButton: {
+    flex: 1,
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hoursCancelButtonText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#666',
+  },
+  hoursSaveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    elevation: 4,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  hoursSaveButtonText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -27,6 +27,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function MyServicesScreen() {
   const router = useRouter();
   const [services, setServices] = useState([]);
+
+  const handleBackPress = () => {
+    router.push('/(bsn)/(tabs)/home');
+  };
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [businessId, setBusinessId] = useState(null);
@@ -477,7 +481,8 @@ export default function MyServicesScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -501,7 +506,8 @@ export default function MyServicesScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.emptyContainer}>
           <Ionicons name="business-outline" size={moderateScale(80)} color="#ccc" />
@@ -533,7 +539,8 @@ export default function MyServicesScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={handleBackPress}
       />
 
       {/* Stats Section */}
@@ -623,7 +630,10 @@ export default function MyServicesScreen() {
         renderItem={renderServiceItem}
         keyExtractor={(item) => item._id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          services.length === 0 && styles.emptyListContent
+        ]}
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderLoadMoreButton}
         refreshControl={
@@ -865,6 +875,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: wp(5),
     paddingBottom: moderateScale(100),
+  },
+  emptyListContent: {
+    flexGrow: 1,
   },
   serviceCard: {
     backgroundColor: '#fff',

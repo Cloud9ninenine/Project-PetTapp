@@ -32,6 +32,10 @@ const CustomerBookings = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const router = useRouter();
 
+  const handleBackPress = () => {
+    router.push('/(bsn)/(tabs)/home');
+  };
+
   useEffect(() => {
     fetchBookings();
     fetchAllBookingsForStats();
@@ -483,7 +487,8 @@ const CustomerBookings = () => {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
+          onBackPress={handleBackPress}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -506,7 +511,8 @@ const CustomerBookings = () => {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
+        onBackPress={handleBackPress}
       />
 
       {/* Search Bar with Filter Button */}
