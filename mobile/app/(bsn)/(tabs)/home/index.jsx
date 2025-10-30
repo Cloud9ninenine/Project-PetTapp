@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -30,6 +31,15 @@ export default function BusinessDashboard() {
   const [businessName, setBusinessName] = useState("Business Dashboard");
   const [businessLogo, setBusinessLogo] = useState(null);
 
+  // Modal states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileModalConfig, setProfileModalConfig] = useState({
+    title: '',
+    message: '',
+    icon: 'business',
+    type: 'create' // 'create' or 'complete'
+  });
+
   // State for API data
   const [dashboardData, setDashboardData] = useState({
     metrics: {
@@ -42,6 +52,51 @@ export default function BusinessDashboard() {
     todaysSchedule: [],
   });
   const [services, setServices] = useState([]);
+
+  // Check if user profile is complete
+  const isUserProfileComplete = (user, profile) => {
+    if (!user) return false;
+
+    // Check required fields for a complete user profile
+    const hasUserInfo = user.firstName &&
+                       user.lastName &&
+                       user.email;
+
+    const hasContactNumber = profile && profile.contactNumber;
+
+    return hasUserInfo && hasContactNumber;
+  };
+
+  // Check if business profile is complete
+  const isBusinessProfileComplete = (business) => {
+    if (!business) return false;
+
+    // Check required fields for a complete business profile
+    const hasBasicInfo = business.businessName &&
+                         business.contactInfo &&
+                         business.contactInfo.email &&
+                         business.contactInfo.phone;
+
+    const hasAddress = business.address &&
+                       business.address.street &&
+                       business.address.city;
+
+    return hasBasicInfo && hasAddress;
+  };
+
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const response = await apiClient.get('/users/profile');
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+  };
 
   // Fetch business details
   const fetchBusinessDetails = async () => {
@@ -89,7 +144,7 @@ export default function BusinessDashboard() {
   };
 
   // Fetch dashboard data
-  const fetchDashboardData = async (bId) => {
+  const fetchDashboardData = async (bId, business = null) => {
     try {
       const response = await apiClient.get('/dashboard', {
         params: { businessId: bId }
@@ -100,7 +155,20 @@ export default function BusinessDashboard() {
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      Alert.alert('Error', 'Failed to load dashboard data');
+
+      // Check if error is due to incomplete profile
+      if (business && !isBusinessProfileComplete(business)) {
+        setProfileModalConfig({
+          title: 'Complete Your Profile',
+          message: 'Please complete your business profile to view dashboard data.',
+          icon: 'document-text-outline',
+          type: 'complete'
+        });
+        setShowProfileModal(true);
+      } else {
+        // Only show generic error if profile is complete
+        Alert.alert('Error', 'Failed to load dashboard data');
+      }
     }
   };
 
@@ -124,25 +192,72 @@ export default function BusinessDashboard() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const bId = await fetchBusinessId();
 
+      // First, check if business profile exists and is complete (PRIORITY)
+      const business = await fetchBusinessDetails();
+
+      if (!business) {
+        setProfileModalConfig({
+          title: 'Business Profile Required',
+          message: 'Please create your business profile first to access your dashboard.',
+          icon: 'business-outline',
+          type: 'create'
+        });
+        setShowProfileModal(true);
+        return;
+      }
+
+      // Check if business profile is complete
+      if (!isBusinessProfileComplete(business)) {
+        setProfileModalConfig({
+          title: 'Complete Your Business Profile',
+          message: 'Please complete your business profile to access the full dashboard features.',
+          icon: 'document-text-outline',
+          type: 'complete'
+        });
+        setShowProfileModal(true);
+        return;
+      }
+
+      // Second, check if user profile is complete
+      const userProfileData = await fetchUserProfile();
+
+      if (!userProfileData) {
+        setProfileModalConfig({
+          title: 'User Profile Required',
+          message: 'Please create your user profile to access your dashboard.',
+          icon: 'person-outline',
+          type: 'create'
+        });
+        setShowProfileModal(true);
+        return;
+      }
+
+      const { user, profile } = userProfileData;
+
+      // Check if user profile is complete
+      if (!isUserProfileComplete(user, profile)) {
+        setProfileModalConfig({
+          title: 'Complete Your Profile',
+          message: 'Please complete your user profile to access the full dashboard features.',
+          icon: 'person-circle-outline',
+          type: 'complete'
+        });
+        setShowProfileModal(true);
+        return;
+      }
+
+      // Get business ID
+      const bId = business._id;
       if (bId) {
+        setBusinessId(bId);
+        await AsyncStorage.setItem('businessId', bId);
+
+        // Load dashboard data and services only if both profiles are complete
         await Promise.all([
-          fetchDashboardData(bId),
+          fetchDashboardData(bId, business),
           fetchServices(bId)
         ]);
-      } else {
-        Alert.alert(
-          'Business Profile Required',
-          'Please complete your business profile first.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Go to Profile',
-              onPress: () => router.push('/(bsn)/(tabs)/profile')
-            }
-          ]
-        );
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -506,6 +621,54 @@ export default function BusinessDashboard() {
         </ScrollView>
         </>
       )}
+
+      {/* Styled Profile Required Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showProfileModal}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Icon Container */}
+            <View style={styles.modalIconContainer}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons
+                  name={profileModalConfig.icon}
+                  size={moderateScale(48)}
+                  color="#1C86FF"
+                />
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>{profileModalConfig.title}</Text>
+
+            {/* Message */}
+            <Text style={styles.modalMessage}>{profileModalConfig.message}</Text>
+
+            {/* Single Button */}
+            <TouchableOpacity
+              style={styles.modalFullWidthButton}
+              onPress={() => {
+                setShowProfileModal(false);
+                // Route to user profile or business profile based on modal icon
+                if (profileModalConfig.icon === 'person-outline' || profileModalConfig.icon === 'person-circle-outline') {
+                  router.push('/(bsn)/(tabs)/profile/settings/profile');
+                } else {
+                  router.push('/(bsn)/(tabs)/profile/business-info');
+                }
+              }}
+            >
+              <Text style={styles.modalFullWidthButtonText}>
+                {profileModalConfig.type === 'create' ? 'Create Profile' : 'Complete Profile'}
+              </Text>
+              <Ionicons name="arrow-forward" size={moderateScale(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -807,5 +970,76 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     fontWeight: '600',
     fontFamily: 'SFProBold',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(30),
+    width: '90%',
+    maxWidth: moderateScale(400),
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  modalIconContainer: {
+    marginBottom: moderateScale(20),
+  },
+  modalIconCircle: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: moderateScale(3),
+    borderColor: '#1C86FF',
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(22),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(22),
+    marginBottom: moderateScale(30),
+    paddingHorizontal: moderateScale(10),
+  },
+  modalFullWidthButton: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(10),
+    elevation: 4,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  modalFullWidthButtonText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });

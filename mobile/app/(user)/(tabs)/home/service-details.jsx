@@ -551,7 +551,7 @@ export default function ServiceDetailsScreen() {
                     {/* See on Maps Button */}
                     <TouchableOpacity style={styles.mapButton} onPress={handleSeeOnMaps}>
                       <Ionicons name="map" size={moderateScale(18)} color="#1C86FF" />
-                      <Text style={styles.mapButtonText}>See Maps</Text>
+                      <Text style={styles.mapButtonText}>Maps</Text>
                       <Ionicons name="chevron-forward" size={moderateScale(16)} color="#1C86FF" />
                     </TouchableOpacity>
                   </View>
@@ -576,17 +576,29 @@ export default function ServiceDetailsScreen() {
             <Text style={styles.sectionTitle}>Price and Duration</Text>
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
-                <Ionicons name="cash-outline" size={moderateScale(24)} color="#4CAF50" />
-                <Text style={styles.infoValue}>{formatPrice(service.price)}</Text>
+                <Ionicons name="cash-outline" size={moderateScale(22)} color="#4CAF50" />
+                <View style={styles.infoTextWrapper}>
+                  <Text style={styles.infoLabel}>Price</Text>
+                  <Text style={styles.infoValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {formatPrice(service.price)}
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.infoDivider} />
 
               <View style={styles.infoItem}>
-                <Ionicons name="time-outline" size={moderateScale(24)} color="#1C86FF" />
-                <View style={styles.durationTextContainer}>
-                  <Text style={styles.durationValue}>{formatDuration(service.duration).value} </Text>
-                  <Text style={styles.durationUnit}>{formatDuration(service.duration).unit}</Text>
+                <Ionicons name="time-outline" size={moderateScale(22)} color="#1C86FF" />
+                <View style={styles.infoTextWrapper}>
+                  <Text style={styles.infoLabel}>Duration</Text>
+                  <View style={styles.durationTextContainer}>
+                    <Text style={styles.durationValue} numberOfLines={1}>
+                      {formatDuration(service.duration).value}{' '}
+                    </Text>
+                    <Text style={styles.durationUnit} numberOfLines={1}>
+                      {formatDuration(service.duration).unit}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -886,11 +898,11 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     backgroundColor: '#F8F9FA',
     borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(18),
-    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(10),
     marginTop: moderateScale(10),
     marginBottom: moderateScale(10),
     borderWidth: 1,
@@ -904,29 +916,38 @@ const styles = StyleSheet.create({
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(10),
+    gap: moderateScale(8),
     flex: 1,
-    paddingHorizontal: moderateScale(8),
+    minWidth: 0,
+    paddingHorizontal: moderateScale(4),
+  },
+  infoTextWrapper: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   infoTextContainer: {
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
   infoLabel: {
-    fontSize: scaleFontSize(11),
+    fontSize: scaleFontSize(10),
     color: '#999',
     fontWeight: '600',
-    marginBottom: moderateScale(3),
+    marginBottom: moderateScale(2),
   },
   infoValue: {
-    fontSize: scaleFontSize(14),
+    fontSize: scaleFontSize(13),
     fontWeight: 'bold',
     color: '#333',
+    flexShrink: 1,
   },
   durationTextContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'flex-start',
+    flexWrap: 'wrap',
   },
   durationContainer: {
     flexDirection: 'row',
@@ -934,19 +955,21 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   durationValue: {
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(13),
     fontWeight: 'bold',
     color: '#333',
+    flexShrink: 1,
   },
   durationUnit: {
-    fontSize: scaleFontSize(11),
+    fontSize: scaleFontSize(10),
     color: '#666',
+    flexShrink: 1,
   },
   infoDivider: {
     width: 1.5,
-    height: moderateScale(40),
+    height: moderateScale(35),
     backgroundColor: '#D0D0D0',
-    marginHorizontal: moderateScale(8),
+    marginHorizontal: moderateScale(6),
   },
   availabilityText: {
     fontSize: scaleFontSize(14),

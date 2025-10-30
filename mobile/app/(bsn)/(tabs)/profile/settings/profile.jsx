@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,15 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Modal,
+  BackHandler,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
@@ -22,8 +27,12 @@ import apiClient from '@config/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Modal state for preventing navigation without profile completion
+  const [showWarningModal, setShowWarningModal] = useState(false);
 
   const [profileData, setProfileData] = useState({
     firstName: '',
@@ -38,6 +47,65 @@ export default function ProfileScreen() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Check if user profile is complete
+  const isUserProfileComplete = () => {
+    const hasUserInfo = profileData.firstName &&
+                       profileData.lastName &&
+                       profileData.email;
+
+    const hasContactNumber = profileData.contactNumber;
+
+    return hasUserInfo && hasContactNumber;
+  };
+
+  // Handle header back button press
+  const handleHeaderBackPress = () => {
+    // Allow navigation if still loading or if profile is complete
+    if (loading || isUserProfileComplete()) {
+      router.back();
+      return;
+    }
+
+    setShowWarningModal(true);
+  };
+
+  // Handle hardware back button press (Android)
+  const handleBackPress = () => {
+    // Allow navigation if still loading or if profile is complete
+    if (loading || isUserProfileComplete()) {
+      return false; // Allow back navigation
+    }
+
+    setShowWarningModal(true);
+    return true; // Prevent default back behavior
+  };
+
+  // Prevent back navigation and tab switching if profile is incomplete
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+
+      // Prevent tab navigation if profile is incomplete
+      const beforeRemoveListener = navigation.addListener('beforeRemove', (e) => {
+        // Allow navigation if still loading or if profile is complete
+        if (loading || isUserProfileComplete()) {
+          return;
+        }
+
+        // Prevent default navigation behavior
+        e.preventDefault();
+
+        // Show warning modal
+        setShowWarningModal(true);
+      });
+
+      return () => {
+        backHandler.remove();
+        beforeRemoveListener();
+      };
+    }, [profileData, navigation, loading])
+  );
 
   const fetchProfile = async () => {
     try {
@@ -184,6 +252,7 @@ export default function ProfileScreen() {
           titleColor="#fff"
           title="Profile"
           showBack={true}
+          onBackPress={handleHeaderBackPress}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -206,9 +275,20 @@ export default function ProfileScreen() {
         titleColor="#fff"
         title="Profile"
         showBack={true}
+        onBackPress={handleHeaderBackPress}
       />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
         {/* Profile Picture Section */}
         <View style={styles.formSection}>
           <View style={styles.sectionHeaderRow}>
@@ -258,6 +338,8 @@ export default function ProfileScreen() {
                 onChangeText={(text) => setProfileData({ ...profileData, firstName: text })}
                 placeholder="Enter first name"
                 placeholderTextColor="#999"
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -273,6 +355,8 @@ export default function ProfileScreen() {
                 onChangeText={(text) => setProfileData({ ...profileData, middleName: text })}
                 placeholder="Enter middle name"
                 placeholderTextColor="#999"
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -288,6 +372,8 @@ export default function ProfileScreen() {
                 onChangeText={(text) => setProfileData({ ...profileData, lastName: text })}
                 placeholder="Enter last name"
                 placeholderTextColor="#999"
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -303,6 +389,8 @@ export default function ProfileScreen() {
                 onChangeText={(text) => setProfileData({ ...profileData, suffix: text })}
                 placeholder="Jr., Sr., III, etc."
                 placeholderTextColor="#999"
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -328,6 +416,8 @@ export default function ProfileScreen() {
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
             </View>
           </View>
@@ -344,6 +434,8 @@ export default function ProfileScreen() {
                 placeholder="+639123456789"
                 placeholderTextColor="#999"
                 keyboardType="phone-pad"
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
               />
             </View>
           </View>
@@ -363,7 +455,49 @@ export default function ProfileScreen() {
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+
+      {/* Warning Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showWarningModal}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Icon Container */}
+            <View style={styles.modalIconContainer}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons
+                  name="person-circle-outline"
+                  size={moderateScale(48)}
+                  color="#1C86FF"
+                />
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>User Profile Required</Text>
+
+            {/* Message */}
+            <Text style={styles.modalMessage}>
+              You must complete your user profile setup to access other features. Please fill in all required information.
+            </Text>
+
+            {/* Single Button */}
+            <TouchableOpacity
+              style={styles.modalFullWidthButton}
+              onPress={() => setShowWarningModal(false)}
+            >
+              <Text style={styles.modalFullWidthButtonText}>Continue Setup</Text>
+              <Ionicons name="arrow-forward" size={moderateScale(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -379,6 +513,9 @@ const styles = StyleSheet.create({
   },
   backgroundImageStyle: {
     opacity: 0.1,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   loadingContainer: {
     flex: 1,
@@ -495,5 +632,76 @@ const styles = StyleSheet.create({
   profilePicHint: {
     fontSize: scaleFontSize(13),
     color: '#666',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(30),
+    width: '90%',
+    maxWidth: moderateScale(400),
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  modalIconContainer: {
+    marginBottom: moderateScale(20),
+  },
+  modalIconCircle: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: moderateScale(3),
+    borderColor: '#1C86FF',
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(22),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(22),
+    marginBottom: moderateScale(30),
+    paddingHorizontal: moderateScale(10),
+  },
+  modalFullWidthButton: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(10),
+    elevation: 4,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  modalFullWidthButtonText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });

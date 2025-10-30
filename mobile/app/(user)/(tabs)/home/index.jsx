@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
     paddingBottom: moderateScale(5),
   },
   welcomeText: {
-    fontSize: scaleFontSize(24),
+    fontSize: scaleFontSize(20),
     color: "#1C86FF",
     fontFamily: "SFProBold",
     lineHeight: scaleFontSize(50),

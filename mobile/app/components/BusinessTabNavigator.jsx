@@ -1,9 +1,11 @@
 // components/BusinessTabNavigator.jsx
-import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions, Keyboard, Platform } from "react-native";
+import { View, TouchableOpacity, Image, Text, StyleSheet, useWindowDimensions, Keyboard, Platform, Modal } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { moderateScale, scaleFontSize } from "@utils/responsive";
 import { useState, useEffect } from "react";
 import { useUnreadMessages } from "@_hooks/useUnreadMessages";
+import { Ionicons } from '@expo/vector-icons';
+import apiClient from '@config/api';
 
 const businessTabs = [
   {
@@ -45,12 +47,48 @@ export default function BusinessTabNavigator() {
   const { width } = useWindowDimensions();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const { totalUnread } = useUnreadMessages();
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
 
   // Determine if screen is very narrow (slim phone)
   const isVeryNarrow = width < 360;
   const isNarrow = width < 400;
 
+  // Check if business profile is complete
+  const checkBusinessProfile = async () => {
+    try {
+      setIsCheckingProfile(true);
+      const response = await apiClient.get('/businesses');
+      if (response.data && response.data.data && response.data.data.length > 0) {
+        const business = response.data.data[0];
+
+        const hasBasicInfo = business.businessName &&
+                             business.contactInfo?.email &&
+                             business.contactInfo?.phone;
+
+        const hasAddress = business.address?.street &&
+                           business.address?.city;
+
+        const isComplete = hasBasicInfo && hasAddress;
+        setIsProfileComplete(isComplete);
+        return isComplete;
+      } else {
+        setIsProfileComplete(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking business profile:', error);
+      setIsProfileComplete(false);
+      return false;
+    } finally {
+      setIsCheckingProfile(false);
+    }
+  };
+
   useEffect(() => {
+    checkBusinessProfile();
+
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       () => {
@@ -69,6 +107,26 @@ export default function BusinessTabNavigator() {
       keyboardDidHideListener.remove();
     };
   }, []);
+
+  // Handle tab navigation with profile check
+  const handleTabPress = async (tab) => {
+    // Allow navigation to profile tab even if profile is incomplete
+    if (tab.name === 'profile' || pathname.includes('business-info')) {
+      router.replace(tab.route);
+      return;
+    }
+
+    // Re-check profile status before allowing navigation
+    const profileComplete = await checkBusinessProfile();
+
+    // Check if profile is complete for other tabs
+    if (!profileComplete) {
+      setShowWarningModal(true);
+      return;
+    }
+
+    router.replace(tab.route);
+  };
 
   if (isKeyboardVisible) {
     return null;
@@ -89,7 +147,7 @@ export default function BusinessTabNavigator() {
               isFocused && styles.tabActive,
               isVeryNarrow && styles.tabNarrow
             ]}
-            onPress={() => router.replace(tab.route)}
+            onPress={() => handleTabPress(tab)}
             activeOpacity={0.7}
           >
             <View style={styles.iconContainer}>
@@ -122,6 +180,49 @@ export default function BusinessTabNavigator() {
           </TouchableOpacity>
         );
       })}
+
+      {/* Warning Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showWarningModal}
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Icon Container */}
+            <View style={styles.modalIconContainer}>
+              <View style={styles.modalIconCircle}>
+                <Ionicons
+                  name="business-outline"
+                  size={moderateScale(48)}
+                  color="#1C86FF"
+                />
+              </View>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.modalTitle}>Business Profile Required</Text>
+
+            {/* Message */}
+            <Text style={styles.modalMessage}>
+              Please complete your business profile setup to access other features.
+            </Text>
+
+            {/* Single Button */}
+            <TouchableOpacity
+              style={styles.modalFullWidthButton}
+              onPress={() => {
+                setShowWarningModal(false);
+                router.replace('/(bsn)/(tabs)/profile/business-info');
+              }}
+            >
+              <Text style={styles.modalFullWidthButtonText}>Complete Profile</Text>
+              <Ionicons name="arrow-forward" size={moderateScale(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -197,5 +298,76 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: scaleFontSize(10),
     fontWeight: "bold",
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(30),
+    width: '90%',
+    maxWidth: moderateScale(400),
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  modalIconContainer: {
+    marginBottom: moderateScale(20),
+  },
+  modalIconCircle: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: moderateScale(3),
+    borderColor: '#1C86FF',
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(22),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(22),
+    marginBottom: moderateScale(30),
+    paddingHorizontal: moderateScale(10),
+  },
+  modalFullWidthButton: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(24),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(10),
+    elevation: 4,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+  },
+  modalFullWidthButtonText: {
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });

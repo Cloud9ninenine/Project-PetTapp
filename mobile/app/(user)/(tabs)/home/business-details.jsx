@@ -648,7 +648,7 @@ export default function BusinessDetailsScreen() {
               ) : (
                 <>
                   <Ionicons name="chatbubbles-outline" size={moderateScale(20)} color="#fff" />
-                  <Text style={styles.chatButtonText}>Chat with Business</Text>
+                  <Text style={styles.chatButtonText}>Send a message</Text>
                 </>
               )}
             </TouchableOpacity>

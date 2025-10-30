@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "pettapp-73df7"
-  }
+    "default": "pettapp-73df7",
+    "no": "pettapp-73df7",
+    "pettapp-73df7": "pettapp-73df7"
+  },
+  "targets": {},
+  "etags": {}
 }
