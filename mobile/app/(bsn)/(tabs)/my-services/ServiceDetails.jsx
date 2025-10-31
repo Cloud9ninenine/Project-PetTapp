@@ -81,9 +81,12 @@ export default function ServiceDetails() {
     return days.map(d => d.substring(0, 3)).join(', ');
   };
 
-  const handleEditService = async (formData) => {
+  const handleEditService = async (formData, editServiceId) => {
     try {
-      const response = await apiClient.put(`/services/${serviceId}`, formData, {
+      // Use the serviceId from the modal or fallback to the one from route params
+      const idToUpdate = editServiceId || serviceId;
+
+      const response = await apiClient.put(`/services/${idToUpdate}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -163,17 +166,7 @@ export default function ServiceDetails() {
         {/* Description */}
         {service.description && (
           <>
-            <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <View style={[
-                styles.statusBadge,
-                service.isActive ? styles.statusBadgeActive : styles.statusBadgeInactive
-              ]}>
-                <Text style={styles.statusBadgeText}>
-                  {service.isActive ? 'Active' : 'Inactive'}
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.description}>{service.description}</Text>
           </>
         )}
@@ -280,6 +273,36 @@ export default function ServiceDetails() {
             </View>
           </>
         )}
+
+        {/* Created and Updated Dates */}
+        <View style={styles.timestampSection}>
+          {service.createdAt && (
+            <View style={styles.timestampItem}>
+              <Ionicons name="calendar-outline" size={moderateScale(14)} color="#999" />
+              <Text style={styles.timestampLabel}>Created: </Text>
+              <Text style={styles.timestampValue}>
+                {new Date(service.createdAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </Text>
+            </View>
+          )}
+          {service.updatedAt && (
+            <View style={styles.timestampItem}>
+              <Ionicons name="time-outline" size={moderateScale(14)} color="#999" />
+              <Text style={styles.timestampLabel}>Updated: </Text>
+              <Text style={styles.timestampValue}>
+                {new Date(service.updatedAt).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
@@ -355,14 +378,22 @@ export default function ServiceDetails() {
 
           {/* Service Title Card Overlapping Image */}
           <View style={styles.titleCard}>
-            <View style={styles.titleRow}>
-              <Text style={styles.serviceTitleText} numberOfLines={2}>
-                {service.name}
-              </Text>
+            <Text style={styles.serviceTitleText} numberOfLines={2}>
+              {service.name}
+            </Text>
+            <View style={styles.badgesRow}>
               <View style={styles.categoryBadge}>
                 <Ionicons name="pricetag" size={moderateScale(14)} color="#FF9B79" />
                 <Text style={styles.categoryBadgeText}>
                   {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
+                </Text>
+              </View>
+              <View style={[
+                styles.statusBadge,
+                service.isActive ? styles.statusBadgeActive : styles.statusBadgeInactive
+              ]}>
+                <Text style={styles.statusBadgeText}>
+                  {service.isActive ? 'Active' : 'Inactive'}
                 </Text>
               </View>
             </View>
@@ -386,20 +417,22 @@ export default function ServiceDetails() {
 
           <View style={styles.quickInfoCard}>
             <View style={styles.iconCircle}>
-              <Ionicons name="calendar-outline" size={moderateScale(20)} color="#FF9B79" />
-            </View>
-            <Text style={styles.quickInfoLabel}>Available</Text>
-            <Text style={styles.quickInfoValue} numberOfLines={2}>
-              {formatAvailabilityShort(service.availability)}
-            </Text>
-          </View>
-
-          <View style={styles.quickInfoCard}>
-            <View style={styles.iconCircle}>
               <Ionicons name="cash-outline" size={moderateScale(20)} color="#4CAF50" />
             </View>
             <Text style={styles.quickInfoLabel}>Price</Text>
             <Text style={styles.quickInfoValue}>{formatCurrency(service.price?.amount || 0)}</Text>
+          </View>
+
+          <View style={styles.quickInfoCard}>
+            <View style={styles.iconCircle}>
+              <Ionicons name="people-outline" size={moderateScale(20)} color="#FF9B79" />
+            </View>
+            <Text style={styles.quickInfoLabel}>Capacity</Text>
+            <Text style={styles.quickInfoValue} numberOfLines={2}>
+              {service.capacity || service.maxWorkers ?
+                `${service.capacity || service.maxWorkers} ${(service.capacity || service.maxWorkers) === 1 ? 'worker' : 'workers'}`
+                : 'N/A'}
+            </Text>
           </View>
         </View>
 
@@ -413,15 +446,15 @@ export default function ServiceDetails() {
             onPress={() => setShowEditModal(true)}
           >
             <Ionicons name="create-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.editButtonText}>Edit Service</Text>
+            <Text style={styles.editButtonText}>Edit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={handleDeleteService}
           >
-            <Ionicons name="trash-outline" size={moderateScale(20)} color="#fff" />
-            <Text style={styles.deleteButtonText}>Delete Service</Text>
+            <Ionicons name="trash-outline" size={moderateScale(20)} color="#FF6B6B" />
+            <Text style={styles.deleteButtonText}>Delete</Text>
           </TouchableOpacity>
         </View>
 
@@ -518,11 +551,18 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(12),
   },
   serviceTitleText: {
-    flex: 1,
     fontSize: scaleFontSize(22),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
-    marginRight: moderateScale(12),
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(12),
   },
   categoryBadge: {
     flexDirection: 'row',
@@ -609,15 +649,16 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(18),
     fontWeight: 'bold',
     color: '#333',
-    flex: 1,
+    marginTop: moderateScale(15),
+    marginBottom: moderateScale(10),
   },
   statusBadge: {
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(16),
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(12),
   },
   statusBadgeActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1C86FF',
   },
   statusBadgeInactive: {
     backgroundColor: '#FF6B6B',
@@ -739,13 +780,38 @@ const styles = StyleSheet.create({
     lineHeight: moderateScale(20),
   },
 
+  // Timestamp Section
+  timestampSection: {
+    marginTop: moderateScale(20),
+    paddingTop: moderateScale(16),
+    borderTopWidth: 1,
+    borderTopColor: '#E3F2FD',
+    gap: moderateScale(8),
+  },
+  timestampItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+  },
+  timestampLabel: {
+    fontSize: scaleFontSize(12),
+    color: '#999',
+  },
+  timestampValue: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    fontWeight: '500',
+  },
+
   // Action Buttons
   actionButtonsContainer: {
+    flexDirection: 'row',
     margin: wp(5),
     marginTop: moderateScale(24),
     gap: moderateScale(12),
   },
   editButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -766,6 +832,7 @@ const styles = StyleSheet.create({
     fontFamily: 'SFProBold',
   },
   deleteButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

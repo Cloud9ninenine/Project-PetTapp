@@ -229,15 +229,25 @@ export default function MyServicesScreen() {
     fetchServices(1, selectedCategory);
   };
 
-  const handleAddService = async (serviceData) => {
+  const handleAddService = async (serviceData, serviceId = null) => {
     try {
-      // Create new service
-      await apiClient.post('/services', serviceData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      Alert.alert('Success', 'Service created successfully');
+      if (serviceId) {
+        // Update existing service
+        await apiClient.put(`/services/${serviceId}`, serviceData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        Alert.alert('Success', 'Service updated successfully');
+      } else {
+        // Create new service
+        await apiClient.post('/services', serviceData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+        Alert.alert('Success', 'Service created successfully');
+      }
 
       setShowAddModal(false);
       fetchServices(1, selectedCategory);

@@ -239,3 +239,105 @@ export const fetchServicesByCategory = async (category, limit = 20) => {
     throw error;
   }
 };
+
+/**
+ * Fetch services by business ID
+ * @param {string} businessId - Business ID
+ * @param {Object} params - Query parameters (page, limit)
+ * @returns {Promise<Object>} Services response with pagination
+ */
+export const fetchServicesByBusiness = async (businessId, params = { page: 1, limit: 20 }) => {
+  if (!businessId) {
+    throw new Error('Business ID is required');
+  }
+
+  try {
+    const response = await apiClient.get(`/services/business/${businessId}`, { params });
+
+    if (response.data.success) {
+      return response.data;
+    }
+
+    throw new Error('Failed to fetch services');
+  } catch (error) {
+    console.error('Error fetching services by business:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create a new service with optional image upload
+ * @param {Object} serviceData - Service data (FormData object with all required fields)
+ * @returns {Promise<Object>} Created service object
+ */
+export const createService = async (serviceData) => {
+  try {
+    const response = await apiClient.post('/services', serviceData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    if (response.status === 201 && response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(response.data?.message || 'Failed to create service');
+  } catch (error) {
+    console.error('Error creating service:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update an existing service with optional image upload
+ * @param {string} serviceId - Service ID
+ * @param {Object} serviceData - Service data (FormData object with fields to update)
+ * @returns {Promise<Object>} Updated service object
+ */
+export const updateService = async (serviceId, serviceData) => {
+  if (!serviceId) {
+    throw new Error('Service ID is required');
+  }
+
+  try {
+    const response = await apiClient.put(`/services/${serviceId}`, serviceData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    if (response.status === 200 && response.data.success) {
+      return response.data.data;
+    }
+
+    throw new Error(response.data?.message || 'Failed to update service');
+  } catch (error) {
+    console.error('Error updating service:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a service (soft delete - sets isActive to false)
+ * @param {string} serviceId - Service ID
+ * @returns {Promise<void>}
+ */
+export const deleteService = async (serviceId) => {
+  if (!serviceId) {
+    throw new Error('Service ID is required');
+  }
+
+  try {
+    const response = await apiClient.delete(`/services/${serviceId}`);
+
+    if (response.status === 200 && response.data.success) {
+      return;
+    }
+
+    throw new Error(response.data?.message || 'Failed to delete service');
+  } catch (error) {
+    console.error('Error deleting service:', error);
+    throw error;
+  }
+};

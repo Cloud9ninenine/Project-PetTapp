@@ -34,13 +34,6 @@ export default function AuthLayout() {
           }}
         />
         <Stack.Screen 
-          name="initial-setup" 
-          options={{
-            title: 'User Information',
-            gestureEnabled: false,
-          }}
-        />
-        <Stack.Screen 
           name="pet-information" 
           options={{
             title: 'Pet Information',

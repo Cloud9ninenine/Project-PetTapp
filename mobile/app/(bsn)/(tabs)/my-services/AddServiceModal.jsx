@@ -16,17 +16,14 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 export default function AddServiceModal({ visible, onClose, onAddService, editingService, businessId }) {
   const [loading, setLoading] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [showDaysDropdown, setShowDaysDropdown] = useState(false);
-  const [showPetTypesDropdown, setShowPetTypesDropdown] = useState(false);
+  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
   const [imageUri, setImageUri] = useState(null);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [currentTimePicker, setCurrentTimePicker] = useState(null); // { field: 'start' | 'end' }
+  const [currentHealthReq, setCurrentHealthReq] = useState('');
 
   // Form state matching backend schema
   const [formData, setFormData] = useState({
@@ -34,41 +31,25 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     category: '',
     description: '',
     duration: '',
+    capacity: '1',
     priceAmount: '',
     priceCurrency: 'PHP',
-    availabilityDays: [],
-    timeSlotStart: '09:00',
-    timeSlotEnd: '17:00',
     petTypes: [],
     minAge: '',
     maxAge: '',
-    healthRequirements: '',
+    healthRequirements: [], // Changed from string to array
     specialNotes: '',
   });
 
   const [errors, setErrors] = useState({});
 
-  // Backend categories
+  // Backend categories (aligned with home screen browse categories)
   const categories = [
-    { value: 'veterinary', label: 'Veterinary', icon: 'medical-outline', color: '#4CAF50' },
-    { value: 'grooming', label: 'Grooming', icon: 'cut-outline', color: '#2196F3' },
-    { value: 'boarding', label: 'Boarding', icon: 'home-outline', color: '#FF9B79' },
-    { value: 'daycare', label: 'Daycare', icon: 'sunny-outline', color: '#FFD700' },
-    { value: 'training', label: 'Training', icon: 'school-outline', color: '#9C27B0' },
-    { value: 'emergency', label: 'Emergency', icon: 'alert-circle-outline', color: '#FF6B6B' },
-    { value: 'consultation', label: 'Consultation', icon: 'chatbubbles-outline', color: '#00BCD4' },
-    { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline', color: '#607D8B' },
-  ];
-
-  // Backend days enum
-  const daysOfWeek = [
-    { value: 'monday', label: 'Monday' },
-    { value: 'tuesday', label: 'Tuesday' },
-    { value: 'wednesday', label: 'Wednesday' },
-    { value: 'thursday', label: 'Thursday' },
-    { value: 'friday', label: 'Friday' },
-    { value: 'saturday', label: 'Saturday' },
-    { value: 'sunday', label: 'Sunday' },
+    { value: 'veterinary', label: 'Veterinary', icon: 'medical-outline', color: '#FF6B6B' },
+    { value: 'grooming', label: 'Grooming', icon: 'cut-outline', color: '#4ECDC4' },
+    { value: 'accommodation', label: 'Accommodation', icon: 'home-outline', color: '#95E1D3' },
+    { value: 'transport', label: 'Transport', icon: 'car-outline', color: '#FFD93D' },
+    { value: 'pet-supplies', label: 'Pet Supplies', icon: 'cube-outline', color: '#6C5CE7' },
   ];
 
   // Backend pet types enum
@@ -92,15 +73,13 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
         category: editingService.category || '',
         description: editingService.description || '',
         duration: editingService.duration?.toString() || '',
+        capacity: editingService.capacity?.toString() || '1',
         priceAmount: editingService.price?.amount?.toString() || '',
         priceCurrency: editingService.price?.currency || 'PHP',
-        availabilityDays: editingService.availability?.days || [],
-        timeSlotStart: editingService.availability?.timeSlots?.[0]?.start || '09:00',
-        timeSlotEnd: editingService.availability?.timeSlots?.[0]?.end || '17:00',
         petTypes: editingService.requirements?.petTypes || [],
         minAge: editingService.requirements?.ageRestrictions?.minAge?.toString() || '',
         maxAge: editingService.requirements?.ageRestrictions?.maxAge?.toString() || '',
-        healthRequirements: editingService.requirements?.healthRequirements?.join(', ') || '',
+        healthRequirements: editingService.requirements?.healthRequirements || [], // Keep as array
         specialNotes: editingService.requirements?.specialNotes || '',
       });
       setImageUri(editingService.imageUrl || null);
@@ -116,19 +95,18 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       category: '',
       description: '',
       duration: '',
+      capacity: '1',
       priceAmount: '',
       priceCurrency: 'PHP',
-      availabilityDays: [],
-      timeSlotStart: '09:00',
-      timeSlotEnd: '17:00',
       petTypes: [],
       minAge: '',
       maxAge: '',
-      healthRequirements: '',
+      healthRequirements: [], // Reset as empty array
       specialNotes: '',
     });
     setImageUri(null);
     setErrors({});
+    setCurrentHealthReq('');
   };
 
   const validateForm = () => {
@@ -143,13 +121,14 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       newErrors.duration = 'Duration must be between 15 and 1440 minutes';
     }
 
+    const capacity = parseInt(formData.capacity);
+    if (!formData.capacity || isNaN(capacity) || capacity < 1 || capacity > 10) {
+      newErrors.capacity = 'Capacity must be between 1 and 10 workers';
+    }
+
     const price = parseFloat(formData.priceAmount);
     if (!formData.priceAmount || isNaN(price) || price < 0) {
       newErrors.priceAmount = 'Valid price is required';
-    }
-
-    if (formData.availabilityDays.length === 0) {
-      newErrors.availabilityDays = 'Select at least one day';
     }
 
     if (formData.petTypes.length === 0) {
@@ -198,17 +177,29 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       return;
     }
 
+    // Validate businessId is present when creating new service
+    if (!editingService && !businessId) {
+      Alert.alert('Error', 'Business ID is required to create a service');
+      return;
+    }
+
     try {
       setLoading(true);
 
       const formDataToSend = new FormData();
 
+      // businessId is only needed when creating (not when editing)
+      // When editing, the service already has a businessId that can't be changed
+      if (!editingService && businessId) {
+        formDataToSend.append('businessId', businessId);
+      }
+
       // Required fields
-      formDataToSend.append('businessId', businessId);
       formDataToSend.append('name', formData.name.trim());
       formDataToSend.append('category', formData.category);
       formDataToSend.append('description', formData.description.trim());
       formDataToSend.append('duration', formData.duration);
+      formDataToSend.append('capacity', formData.capacity);
 
       // Price as JSON string
       formDataToSend.append('price', JSON.stringify({
@@ -216,36 +207,40 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
         currency: formData.priceCurrency,
       }));
 
-      // Availability as JSON string
-      formDataToSend.append('availability', JSON.stringify({
-        days: formData.availabilityDays,
-        timeSlots: [{
-          start: formData.timeSlotStart,
-          end: formData.timeSlotEnd,
-        }],
-      }));
-
-      // Requirements as JSON string
+      // Requirements as JSON string - ALWAYS send complete object to avoid data loss
+      // This prevents MongoDB from deleting fields when doing partial updates
       const requirements = {
         petTypes: formData.petTypes,
+        healthRequirements: formData.healthRequirements, // Always an array (can be empty)
+        specialNotes: formData.specialNotes.trim() || '', // Always a string (can be empty)
       };
 
-      if (formData.minAge || formData.maxAge) {
+      // Add ageRestrictions - include even if empty to prevent deletion on edit
+      // If both fields are empty/cleared, we still include an empty object
+      const hasMinAge = formData.minAge && formData.minAge.toString().trim() !== '';
+      const hasMaxAge = formData.maxAge && formData.maxAge.toString().trim() !== '';
+
+      if (hasMinAge || hasMaxAge) {
         requirements.ageRestrictions = {};
-        if (formData.minAge) requirements.ageRestrictions.minAge = parseFloat(formData.minAge);
-        if (formData.maxAge) requirements.ageRestrictions.maxAge = parseFloat(formData.maxAge);
+        if (hasMinAge) {
+          requirements.ageRestrictions.minAge = parseFloat(formData.minAge);
+        }
+        if (hasMaxAge) {
+          requirements.ageRestrictions.maxAge = parseFloat(formData.maxAge);
+        }
+      } else if (editingService) {
+        // When editing and both are cleared, send empty object to clear old values
+        // (undefined would cause the field to be omitted, keeping old values)
+        requirements.ageRestrictions = {};
       }
 
-      if (formData.healthRequirements.trim()) {
-        requirements.healthRequirements = formData.healthRequirements
-          .split(',')
-          .map(r => r.trim())
-          .filter(r => r);
-      }
-
-      if (formData.specialNotes.trim()) {
-        requirements.specialNotes = formData.specialNotes.trim();
-      }
+      // Log submission details to help debugging
+      console.log('=== SUBMITTING SERVICE ===');
+      console.log('Mode:', editingService ? 'EDIT' : 'CREATE');
+      console.log('Service ID:', editingService?._id || 'N/A');
+      console.log('Business ID:', businessId || 'NOT SET');
+      console.log('Business ID being sent:', !editingService && businessId ? businessId : 'OMITTED (editing mode)');
+      console.log('Requirements being sent:', JSON.stringify(requirements, null, 2));
 
       formDataToSend.append('requirements', JSON.stringify(requirements));
 
@@ -262,7 +257,12 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
         });
       }
 
-      await onAddService(formDataToSend);
+      // Call the appropriate handler (create or update)
+      if (editingService) {
+        await onAddService(formDataToSend, editingService._id);
+      } else {
+        await onAddService(formDataToSend);
+      }
       resetForm();
     } catch (error) {
       console.error('Error submitting service:', error);
@@ -270,16 +270,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     } finally {
       setLoading(false);
     }
-  };
-
-  const toggleDay = (day) => {
-    setFormData(prev => ({
-      ...prev,
-      availabilityDays: prev.availabilityDays.includes(day)
-        ? prev.availabilityDays.filter(d => d !== day)
-        : [...prev.availabilityDays, day],
-    }));
-    setErrors(prev => ({ ...prev, availabilityDays: null }));
   };
 
   const togglePetType = (type) => {
@@ -292,47 +282,25 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     setErrors(prev => ({ ...prev, petTypes: null }));
   };
 
-  const getCategoryData = () => {
-    return categories.find(c => c.value === formData.category);
-  };
-
-  const openTimePicker = (field) => {
-    setCurrentTimePicker(field);
-    setShowTimePicker(true);
-  };
-
-  const handleTimeChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-
-    if (event.type === 'set' && selectedDate && currentTimePicker) {
-      const hours = selectedDate.getHours().toString().padStart(2, '0');
-      const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
-      const timeString = `${hours}:${minutes}`;
-
+  const addHealthRequirement = () => {
+    if (currentHealthReq.trim()) {
       setFormData(prev => ({
         ...prev,
-        [currentTimePicker === 'start' ? 'timeSlotStart' : 'timeSlotEnd']: timeString
+        healthRequirements: [...prev.healthRequirements, currentHealthReq.trim()],
       }));
-
-      if (Platform.OS === 'ios') {
-        // On iOS, keep picker open until they tap outside or Done
-      } else {
-        setCurrentTimePicker(null);
-      }
-    } else if (event.type === 'dismissed') {
-      setShowTimePicker(false);
-      setCurrentTimePicker(null);
+      setCurrentHealthReq('');
     }
   };
 
-  const getTimeForPicker = (timeString) => {
-    const [hours, minutes] = timeString.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hours);
-    date.setMinutes(minutes);
-    return date;
+  const removeHealthRequirement = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      healthRequirements: prev.healthRequirements.filter((_, i) => i !== index),
+    }));
+  };
+
+  const getCategoryData = () => {
+    return categories.find(c => c.value === formData.category);
   };
 
   return (
@@ -371,7 +339,9 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
 
             {/* Service Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Service Name *</Text>
+              <Text style={styles.inputLabel}>
+                Service Name <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TextInput
                 style={[styles.input, errors.name && styles.inputError]}
                 placeholder="e.g., Pet Vaccination"
@@ -387,7 +357,9 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
 
             {/* Category */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Category *</Text>
+              <Text style={styles.inputLabel}>
+                Category <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TouchableOpacity
                 style={[styles.dropdownContainer, errors.category && styles.inputError]}
                 onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -445,7 +417,9 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
 
             {/* Description */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Description *</Text>
+              <Text style={styles.inputLabel}>
+                Description <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TextInput
                 style={[styles.input, styles.textArea, errors.description && styles.inputError]}
                 placeholder="Brief description of the service"
@@ -462,10 +436,12 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
               {errors.description && <Text style={styles.errorText}>{errors.description}</Text>}
             </View>
 
-            {/* Price and Duration */}
+            {/* Price and Currency */}
             <View style={styles.inputRow}>
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>Price (PHP) *</Text>
+                <Text style={styles.inputLabel}>
+                  Price <Text style={styles.requiredAsterisk}>*</Text>
+                </Text>
                 <TextInput
                   style={[styles.input, errors.priceAmount && styles.inputError]}
                   placeholder="1500"
@@ -480,7 +456,73 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
               </View>
 
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>Duration (min) *</Text>
+                <Text style={styles.inputLabel}>
+                  Currency <Text style={styles.requiredAsterisk}>*</Text>
+                </Text>
+                <TouchableOpacity
+                  style={[styles.input, styles.currencyDropdown]}
+                  onPress={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
+                >
+                  <Text style={styles.currencyText}>{formData.priceCurrency}</Text>
+                  <Ionicons
+                    name={showCurrencyDropdown ? "chevron-up" : "chevron-down"}
+                    size={moderateScale(20)}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+                {showCurrencyDropdown && (
+                  <View style={styles.currencyDropdownList}>
+                    <Pressable
+                      style={[
+                        styles.currencyDropdownItem,
+                        formData.priceCurrency === 'PHP' && styles.currencyDropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        setFormData({ ...formData, priceCurrency: 'PHP' });
+                        setShowCurrencyDropdown(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.currencyDropdownItemText,
+                        formData.priceCurrency === 'PHP' && styles.currencyDropdownItemTextSelected
+                      ]}>
+                        PHP
+                      </Text>
+                      {formData.priceCurrency === 'PHP' && (
+                        <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#1C86FF" />
+                      )}
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.currencyDropdownItem,
+                        formData.priceCurrency === 'USD' && styles.currencyDropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        setFormData({ ...formData, priceCurrency: 'USD' });
+                        setShowCurrencyDropdown(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.currencyDropdownItemText,
+                        formData.priceCurrency === 'USD' && styles.currencyDropdownItemTextSelected
+                      ]}>
+                        USD
+                      </Text>
+                      {formData.priceCurrency === 'USD' && (
+                        <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#1C86FF" />
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Duration and Capacity */}
+            <View style={styles.inputRow}>
+              <View style={styles.inputGroupHalf}>
+                <Text style={styles.inputLabel}>
+                  Duration (min) <Text style={styles.requiredAsterisk}>*</Text>
+                </Text>
                 <TextInput
                   style={[styles.input, errors.duration && styles.inputError]}
                   placeholder="60"
@@ -493,62 +535,30 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
                 />
                 {errors.duration && <Text style={styles.errorText}>{errors.duration}</Text>}
               </View>
-            </View>
-
-            {/* Availability Days */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Available Days *</Text>
-              <View style={styles.daysContainer}>
-                {daysOfWeek.map((day) => (
-                  <TouchableOpacity
-                    key={day.value}
-                    style={[
-                      styles.dayChip,
-                      formData.availabilityDays.includes(day.value) && styles.dayChipActive,
-                      errors.availabilityDays && styles.inputError
-                    ]}
-                    onPress={() => toggleDay(day.value)}
-                  >
-                    <Text style={[
-                      styles.dayChipText,
-                      formData.availabilityDays.includes(day.value) && styles.dayChipTextActive
-                    ]}>
-                      {day.label.substring(0, 3)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              {errors.availabilityDays && <Text style={styles.errorText}>{errors.availabilityDays}</Text>}
-            </View>
-
-            {/* Time Slots */}
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>Start Time</Text>
-                <TouchableOpacity
-                  style={styles.timePickerButton}
-                  onPress={() => openTimePicker('start')}
-                >
-                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
-                  <Text style={styles.timePickerText}>{formData.timeSlotStart}</Text>
-                </TouchableOpacity>
-              </View>
 
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>End Time</Text>
-                <TouchableOpacity
-                  style={styles.timePickerButton}
-                  onPress={() => openTimePicker('end')}
-                >
-                  <Ionicons name="time-outline" size={moderateScale(20)} color="#1C86FF" />
-                  <Text style={styles.timePickerText}>{formData.timeSlotEnd}</Text>
-                </TouchableOpacity>
+                <Text style={styles.inputLabel}>
+                  Capacity (workers) <Text style={styles.requiredAsterisk}>*</Text>
+                </Text>
+                <TextInput
+                  style={[styles.input, errors.capacity && styles.inputError]}
+                  placeholder="1"
+                  value={formData.capacity}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, capacity: text });
+                    setErrors({ ...errors, capacity: null });
+                  }}
+                  keyboardType="numeric"
+                />
+                {errors.capacity && <Text style={styles.errorText}>{errors.capacity}</Text>}
               </View>
             </View>
 
             {/* Pet Types */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Suitable for Pets *</Text>
+              <Text style={styles.inputLabel}>
+                Suitable for Pets <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <View style={styles.petTypesContainer}>
                 {petTypes.map((pet) => (
                   <TouchableOpacity
@@ -560,11 +570,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
                     ]}
                     onPress={() => togglePetType(pet.value)}
                   >
-                    <Ionicons
-                      name={pet.icon}
-                      size={moderateScale(16)}
-                      color={formData.petTypes.includes(pet.value) ? '#fff' : '#1C86FF'}
-                    />
                     <Text style={[
                       styles.petTypeChipText,
                       formData.petTypes.includes(pet.value) && styles.petTypeChipTextActive
@@ -611,16 +616,38 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
 
             {/* Health Requirements */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Health Requirements (comma-separated)</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="e.g., Current health certificate, No fever"
-                value={formData.healthRequirements}
-                onChangeText={(text) => setFormData({ ...formData, healthRequirements: text })}
-                multiline
-                numberOfLines={2}
-                textAlignVertical="top"
-              />
+              <Text style={styles.inputLabel}>Health Requirements</Text>
+              <View style={styles.healthReqInputContainer}>
+                <TextInput
+                  style={[styles.input, styles.healthReqInput]}
+                  placeholder="e.g., Current health certificate"
+                  value={currentHealthReq}
+                  onChangeText={setCurrentHealthReq}
+                  onSubmitEditing={addHealthRequirement}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={addHealthRequirement}
+                >
+                  <Ionicons name="add-circle" size={moderateScale(28)} color="#1C86FF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Display added health requirements */}
+              <View style={styles.healthReqList}>
+                {formData.healthRequirements.map((req, index) => (
+                  <View key={index} style={styles.healthReqChip}>
+                    <Text style={styles.healthReqChipText} numberOfLines={2}>{req}</Text>
+                    <TouchableOpacity
+                      onPress={() => removeHealthRequirement(index)}
+                      style={styles.removeButton}
+                    >
+                      <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
             </View>
 
             {/* Special Notes */}
@@ -662,59 +689,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
           </ScrollView>
         </View>
       </View>
-
-      {/* Time Picker Modal */}
-      {showTimePicker && currentTimePicker && (
-        Platform.OS === 'ios' ? (
-          <Modal
-            visible={showTimePicker}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => {
-              setShowTimePicker(false);
-              setCurrentTimePicker(null);
-            }}
-          >
-            <View style={styles.timePickerModalOverlay}>
-              <View style={styles.timePickerModalContent}>
-                <View style={styles.timePickerHeader}>
-                  <Text style={styles.timePickerTitle}>
-                    Select {currentTimePicker === 'start' ? 'Start' : 'End'} Time
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowTimePicker(false);
-                      setCurrentTimePicker(null);
-                    }}
-                  >
-                    <Text style={styles.timePickerDoneButton}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-                <DateTimePicker
-                  value={getTimeForPicker(
-                    currentTimePicker === 'start' ? formData.timeSlotStart : formData.timeSlotEnd
-                  )}
-                  mode="time"
-                  is24Hour={true}
-                  display="spinner"
-                  onChange={handleTimeChange}
-                  style={styles.timePicker}
-                />
-              </View>
-            </View>
-          </Modal>
-        ) : (
-          <DateTimePicker
-            value={getTimeForPicker(
-              currentTimePicker === 'start' ? formData.timeSlotStart : formData.timeSlotEnd
-            )}
-            mode="time"
-            is24Hour={true}
-            display="default"
-            onChange={handleTimeChange}
-          />
-        )
-      )}
     </Modal>
   );
 }
@@ -762,6 +736,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: moderateScale(8),
+  },
+  requiredAsterisk: {
+    color: '#FF0000',
   },
   input: {
     backgroundColor: '#fff',
@@ -887,29 +864,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  daysContainer: {
+  currencyDropdown: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: moderateScale(8),
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  dayChip: {
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(8),
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#1C86FF',
-  },
-  dayChipActive: {
-    backgroundColor: '#1C86FF',
-  },
-  dayChipText: {
-    fontSize: scaleFontSize(12),
-    color: '#1C86FF',
+  currencyText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
     fontWeight: '600',
   },
-  dayChipTextActive: {
-    color: '#fff',
+  currencyDropdownList: {
+    position: 'absolute',
+    top: moderateScale(75),
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(10),
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  currencyDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  currencyDropdownItemSelected: {
+    backgroundColor: '#E3F2FD',
+  },
+  currencyDropdownItemText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    fontWeight: '500',
+  },
+  currencyDropdownItemTextSelected: {
+    color: '#1C86FF',
+    fontWeight: '600',
   },
   petTypesContainer: {
     flexDirection: 'row',
@@ -917,9 +917,6 @@ const styles = StyleSheet.create({
     gap: moderateScale(8),
   },
   petTypeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: moderateScale(4),
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(8),
     borderRadius: moderateScale(8),
@@ -938,56 +935,40 @@ const styles = StyleSheet.create({
   petTypeChipTextActive: {
     color: '#fff',
   },
-  timePickerButton: {
+  healthReqInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(12),
-    borderWidth: 1.5,
-    borderColor: '#1C86FF',
-    gap: moderateScale(10),
+    gap: moderateScale(8),
   },
-  timePickerText: {
-    fontSize: scaleFontSize(14),
-    color: '#333',
-    fontWeight: '600',
+  healthReqInput: {
     flex: 1,
+    marginBottom: 0,
   },
-  timePickerModalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  addButton: {
+    padding: moderateScale(4),
   },
-  timePickerModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: moderateScale(20),
-    borderTopRightRadius: moderateScale(20),
-    paddingBottom: moderateScale(20),
+  healthReqList: {
+    marginTop: moderateScale(12),
+    gap: moderateScale(8),
   },
-  timePickerHeader: {
+  healthReqChip: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: moderateScale(20),
-    paddingVertical: moderateScale(15),
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#1C86FF',
   },
-  timePickerTitle: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '600',
+  healthReqChipText: {
+    flex: 1,
+    fontSize: scaleFontSize(13),
     color: '#333',
+    marginRight: moderateScale(8),
   },
-  timePickerDoneButton: {
-    fontSize: scaleFontSize(16),
-    color: '#1C86FF',
-    fontWeight: '600',
-  },
-  timePicker: {
-    width: '100%',
-    height: moderateScale(200),
+  removeButton: {
+    padding: moderateScale(2),
   },
   submitButton: {
     backgroundColor: '#1C86FF',
