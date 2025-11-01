@@ -15,79 +15,22 @@ export default function MapViewer({ address, onClose }) {
       <!DOCTYPE html>
       <html>
         <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-          <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
           <style>
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            }
-            #map {
-              width: 100%;
-              height: 100vh;
-            }
-            .custom-popup {
-              font-size: 14px;
-              line-height: 1.4;
-            }
-            .popup-title {
-              font-weight: bold;
-              font-size: 16px;
-              color: #1C86FF;
-              margin-bottom: 8px;
-            }
-            .popup-address {
-              color: #333;
-              margin-bottom: 4px;
-            }
-            .popup-coords {
-              color: #666;
-              font-size: 12px;
-              margin-top: 8px;
-              padding-top: 8px;
-              border-top: 1px solid #ddd;
-            }
+            body { margin: 0; padding: 0; }
+            #map { height: 100vh; width: 100vw; border: 0; }
           </style>
         </head>
         <body>
-          <div id="map"></div>
-          <script>
-            var map = L.map('map').setView([${lat}, ${lon}], 16);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-              maxZoom: 19
-            }).addTo(map);
-
-            var customIcon = L.divIcon({
-              className: 'custom-marker',
-              html: '<div style="background-color: #1C86FF; width: 30px; height: 30px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"><div style="width: 10px; height: 10px; background-color: white; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></div></div>',
-              iconSize: [30, 30],
-              iconAnchor: [15, 30]
-            });
-
-            var popupContent = \`
-              <div class="custom-popup">
-                <div class="popup-title">${label}</div>
-                <div class="popup-address">${fullAddress}</div>
-                <div class="popup-coords">
-                  📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}
-                </div>
-              </div>
-            \`;
-
-            L.marker([${lat}, ${lon}], { icon: customIcon })
-              .addTo(map)
-              .bindPopup(popupContent)
-              .openPopup();
-
-            // Add zoom controls
-            L.control.zoom({
-              position: 'bottomright'
-            }).addTo(map);
-          </script>
+          <iframe
+            id="map"
+            src="https://maps.google.com/maps?q=${lat},${lon}&hl=en&z=16&output=embed"
+            frameborder="0"
+            scrolling="no"
+            marginheight="0"
+            marginwidth="0"
+            loading="lazy"
+          ></iframe>
         </body>
       </html>
     `;
