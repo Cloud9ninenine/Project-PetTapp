@@ -165,39 +165,51 @@ export const fetchServiceById = async (serviceId) => {
       const service = response.data.data;
 
       // Extract business data
+      // Always fetch full business data from /businesses endpoint to get images attached
       let businessData = null;
-      if (service.businessId && typeof service.businessId === 'object') {
-        // Business data is already populated from the API
-        const businessInfo = service.businessId;
+      const businessId = typeof service.businessId === 'object'
+        ? service.businessId._id
+        : service.businessId;
 
-        // Format address string for display
-        const addressString = businessInfo.address?.street
-          ? `${businessInfo.address.street}, ${businessInfo.address.city || ''}, ${businessInfo.address.state || ''}`
-          : businessInfo.address?.fullAddress || 'No address available';
-
-        businessData = {
-          _id: businessInfo._id,
-          name: businessInfo.businessName,
-          address: businessInfo.address, // Keep full address object with coordinates
-          addressString: addressString.trim(), // Add formatted string for display
-          contactNumber: businessInfo.contactInfo?.phone || businessInfo.contactInfo?.phoneNumber || 'No contact available',
-          businessType: businessInfo.businessType,
-          ratings: businessInfo.ratings,
-          businessHours: businessInfo.businessHours,
-          isActive: businessInfo.isActive,
-          isVerified: businessInfo.isVerified,
-          images: businessInfo.images, // Full images object with logo
-          logo: businessInfo.logo, // Add top-level logo for direct access if available
-        };
-      } else if (service.businessId && typeof service.businessId === 'string') {
-        // If only ID is returned, fetch full business data
+      if (businessId) {
         try {
-          const businessResponse = await apiClient.get(`/businesses/${service.businessId}`);
+          const businessResponse = await apiClient.get(`/businesses/${businessId}`);
           if (businessResponse.status === 200 && businessResponse.data.success) {
-            businessData = businessResponse.data.data;
+            const fullBusinessData = businessResponse.data.data;
+            // Extract only necessary fields to reduce data overhead
+            businessData = {
+              _id: fullBusinessData._id,
+              name: fullBusinessData.businessName,
+              images: fullBusinessData.images, // Contains logo and businessImages
+              address: fullBusinessData.address,
+              contactNumber: fullBusinessData.contactInfo?.phone || fullBusinessData.contactInfo?.phoneNumber || 'No contact available',
+              contactInfo: fullBusinessData.contactInfo,
+              businessType: fullBusinessData.businessType,
+              ratings: fullBusinessData.ratings,
+              businessHours: fullBusinessData.businessHours,
+              isActive: fullBusinessData.isActive,
+              isVerified: fullBusinessData.isVerified,
+            };
           }
         } catch (businessError) {
           console.warn('Could not fetch business data:', businessError);
+          // Fallback to populated data if available
+          if (typeof service.businessId === 'object') {
+            const businessInfo = service.businessId;
+            businessData = {
+              _id: businessInfo._id,
+              name: businessInfo.businessName,
+              images: businessInfo.images,
+              address: businessInfo.address,
+              contactNumber: businessInfo.contactInfo?.phone || businessInfo.contactInfo?.phoneNumber || 'No contact available',
+              contactInfo: businessInfo.contactInfo,
+              businessType: businessInfo.businessType,
+              ratings: businessInfo.ratings,
+              businessHours: businessInfo.businessHours,
+              isActive: businessInfo.isActive,
+              isVerified: businessInfo.isVerified,
+            };
+          }
         }
       }
 

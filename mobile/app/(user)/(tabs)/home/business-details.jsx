@@ -52,7 +52,13 @@ export default function BusinessDetailsScreen() {
         const businessResponse = await apiClient.get(`/businesses/${businessId}`);
 
         if (businessResponse.status === 200 && businessResponse.data.success) {
-          setBusinessData(businessResponse.data.data);
+          const data = businessResponse.data.data;
+          console.log('=== Business Data Structure ===');
+          console.log('Has images object:', !!data.images);
+          console.log('images.logo:', data.images?.logo);
+          console.log('Direct logo field:', data.logo);
+          console.log('Full images object:', JSON.stringify(data.images, null, 2));
+          setBusinessData(data);
 
           // Fetch services for this business
           try {
@@ -690,7 +696,7 @@ export default function BusinessDetailsScreen() {
         {renderTabContent()}
 
         {/* Bottom Spacing */}
-        <View style={{ height: hp(3) }} />
+        <View style={{ height: hp(6) }} />
       </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
