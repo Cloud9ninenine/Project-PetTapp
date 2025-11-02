@@ -12,7 +12,8 @@
       "Bash(npx react-native-community/cli doctor:*)",
       "Bash(node:*)",
       "Bash(npm run android)",
-      "Read(//c/Users/user/Documents/GitHub/**)"
+      "Read(//c/Users/user/Documents/GitHub/**)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

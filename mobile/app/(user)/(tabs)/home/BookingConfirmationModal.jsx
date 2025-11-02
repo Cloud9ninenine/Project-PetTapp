@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
+import { Calendar } from 'react-native-calendars';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 
@@ -36,6 +37,10 @@ export default function BookingConfirmationModal({
   const [addresses, setAddresses] = useState([]);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
 
+  // Business hours for validation
+  const [businessHours, setBusinessHours] = useState(null);
+  const [serviceDuration, setServiceDuration] = useState(60); // Default 60 minutes
+
   // Required fields
   const [selectedPet, setSelectedPet] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -48,7 +53,6 @@ export default function BookingConfirmationModal({
   const [specialRequests, setSpecialRequests] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -137,6 +141,16 @@ export default function BookingConfirmationModal({
     }
   }, [visible]);
 
+  // Extract business hours and service duration from bookingData
+  useEffect(() => {
+    if (bookingData?.businessHours) {
+      setBusinessHours(bookingData.businessHours);
+    }
+    if (bookingData?.service?.durationMinutes) {
+      setServiceDuration(bookingData.service.durationMinutes);
+    }
+  }, [bookingData]);
+
   // Helper functions for showing styled alerts
   const showAlert = (type, title, message) => {
     setAlertModal({ visible: true, type, title, message });
@@ -144,6 +158,93 @@ export default function BookingConfirmationModal({
 
   const hideAlert = () => {
     setAlertModal({ visible: false, type: '', title: '', message: '' });
+  };
+
+  // Helper function: Get disabled dates based on business hours
+  const getDisabledDates = () => {
+    if (!businessHours) return {};
+
+    const markedDates = {};
+    const today = new Date();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+    // Generate next 90 days
+    for (let i = 0; i < 90; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      const dateString = date.toISOString().split('T')[0];
+      const dayOfWeek = dayNames[date.getDay()];
+      const daySchedule = businessHours[dayOfWeek];
+
+      if (!daySchedule || !daySchedule.isOpen) {
+        markedDates[dateString] = {
+          disabled: true,
+          disableTouchEvent: true,
+          textColor: '#d9d9d9',
+        };
+      }
+    }
+
+    return markedDates;
+  };
+
+  // Helper function: Get business hours for a specific date
+  const getBusinessHoursForDay = (date) => {
+    if (!businessHours || !date) return null;
+
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayOfWeek = dayNames[date.getDay()];
+    const daySchedule = businessHours[dayOfWeek];
+
+    if (!daySchedule || !daySchedule.isOpen) {
+      return { isOpen: false };
+    }
+
+    return {
+      isOpen: true,
+      open: daySchedule.open,
+      close: daySchedule.close,
+    };
+  };
+
+  // Helper function: Check if business is open on a specific day
+  const isBusinessOpenOnDay = (date) => {
+    const hours = getBusinessHoursForDay(date);
+    return hours?.isOpen || false;
+  };
+
+  // Helper function: Validate if time is within business hours
+  const isTimeWithinBusinessHours = (time, date) => {
+    const hours = getBusinessHoursForDay(date);
+
+    if (!hours?.isOpen) return false;
+
+    const selectedMinutes = time.getHours() * 60 + time.getMinutes();
+    const [openHour, openMin] = hours.open.split(':').map(Number);
+    const [closeHour, closeMin] = hours.close.split(':').map(Number);
+    const openMinutes = openHour * 60 + openMin;
+    const closeMinutes = closeHour * 60 + closeMin;
+
+    // Check if start time is within business hours
+    if (selectedMinutes < openMinutes || selectedMinutes >= closeMinutes) {
+      return false;
+    }
+
+    // Check if appointment end time (start + duration) is within business hours
+    const endMinutes = selectedMinutes + serviceDuration;
+    if (endMinutes > closeMinutes) {
+      return false;
+    }
+
+    return true;
+  };
+
+  // Helper function: Format time for display (12-hour format)
+  const formatTimeDisplay = (timeString) => {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
   const formatDate = (date) => {
@@ -165,10 +266,14 @@ export default function BookingConfirmationModal({
   };
 
   const handleDateChange = (event, date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
     if (date) {
+      // Validate if business is open on selected day
+      if (!isBusinessOpenOnDay(date)) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayNames[date.getDay()];
+        showAlert('validation', 'Business Closed', `The business is closed on ${dayName}s. Please select another day.`);
+        return;
+      }
       setSelectedDate(date);
     }
   };
@@ -178,6 +283,28 @@ export default function BookingConfirmationModal({
       setShowTimePicker(false);
     }
     if (time) {
+      // Validate if time is within business hours
+      if (!isTimeWithinBusinessHours(time, selectedDate)) {
+        const hours = getBusinessHoursForDay(selectedDate);
+        if (hours?.isOpen) {
+          const openTime = formatTimeDisplay(hours.open);
+          const closeTime = formatTimeDisplay(hours.close);
+          const durationHours = Math.floor(serviceDuration / 60);
+          const durationMins = serviceDuration % 60;
+          const durationStr = durationHours > 0
+            ? `${durationHours}h ${durationMins}m`
+            : `${durationMins}m`;
+
+          showAlert(
+            'validation',
+            'Invalid Time',
+            `Please select a time between ${openTime} and ${closeTime}. Note: Your appointment duration is ${durationStr}, so it must end before closing time.`
+          );
+        } else {
+          showAlert('validation', 'Business Closed', 'The business is closed on this day.');
+        }
+        return;
+      }
       setSelectedTime(time);
     }
   };
@@ -354,14 +481,64 @@ export default function BookingConfirmationModal({
             {/* Date - REQUIRED */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>
-                Date <Text style={styles.requiredAsterisk}>*</Text>
+                Select Date <Text style={styles.requiredAsterisk}>*</Text>
               </Text>
-              <TouchableOpacity style={styles.inputField} onPress={() => setShowDatePicker(true)}>
-                <Text style={styles.inputText}>
-                  {formatDate(selectedDate)}
-                </Text>
-                <Ionicons name="calendar-outline" size={moderateScale(20)} color="#fff" />
-              </TouchableOpacity>
+              <View style={styles.calendarWrapper}>
+                <Calendar
+                  current={selectedDate.toISOString().split('T')[0]}
+                  minDate={new Date().toISOString().split('T')[0]}
+                  maxDate={new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                  onDayPress={(day) => {
+                    const newDate = new Date(day.dateString);
+                    handleDateChange(null, newDate);
+                  }}
+                  markedDates={{
+                    ...getDisabledDates(),
+                    [selectedDate.toISOString().split('T')[0]]: {
+                      selected: true,
+                      selectedColor: '#1C86FF',
+                      selectedTextColor: '#fff',
+                    },
+                  }}
+                  theme={{
+                    backgroundColor: '#ffffff',
+                    calendarBackground: '#ffffff',
+                    textSectionTitleColor: '#1C86FF',
+                    selectedDayBackgroundColor: '#1C86FF',
+                    selectedDayTextColor: '#ffffff',
+                    todayTextColor: '#1C86FF',
+                    dayTextColor: '#333333',
+                    textDisabledColor: '#d9d9d9',
+                    dotColor: '#1C86FF',
+                    selectedDotColor: '#ffffff',
+                    arrowColor: '#1C86FF',
+                    monthTextColor: '#1C86FF',
+                    textDayFontWeight: '400',
+                    textMonthFontWeight: 'bold',
+                    textDayHeaderFontWeight: '600',
+                    textDayFontSize: scaleFontSize(14),
+                    textMonthFontSize: scaleFontSize(16),
+                    textDayHeaderFontSize: scaleFontSize(12),
+                  }}
+                  style={styles.calendar}
+                />
+              </View>
+
+              {/* Business Hours Display for Selected Day */}
+              {selectedDate && businessHours && (
+                <View style={styles.businessHoursDisplay}>
+                  <Ionicons name="time-outline" size={moderateScale(18)} color="#1C86FF" />
+                  <Text style={styles.businessHoursText}>
+                    {(() => {
+                      const hours = getBusinessHoursForDay(selectedDate);
+                      if (hours?.isOpen) {
+                        return `Open: ${formatTimeDisplay(hours.open)} - ${formatTimeDisplay(hours.close)}`;
+                      }
+                      return 'Closed on this day';
+                    })()}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Time - REQUIRED */}
@@ -570,17 +747,6 @@ export default function BookingConfirmationModal({
         </View>
       </Modal>
 
-      {/* Native Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
-      )}
-
       {/* Native Time Picker */}
       {showTimePicker && (
         <DateTimePicker
@@ -768,6 +934,32 @@ const styles = StyleSheet.create({
   },
   requiredAsterisk: {
     color: '#FF0000',
+  },
+  // Calendar Styles
+  calendarWrapper: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    overflow: 'hidden',
+    marginBottom: moderateScale(12),
+  },
+  calendar: {
+    borderRadius: moderateScale(12),
+  },
+  businessHoursDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    padding: moderateScale(12),
+    borderRadius: moderateScale(8),
+    gap: moderateScale(8),
+  },
+  businessHoursText: {
+    fontSize: scaleFontSize(14),
+    color: '#1C86FF',
+    fontWeight: '600',
+    flex: 1,
   },
   // Custom Alert Modal Styles
   alertOverlay: {

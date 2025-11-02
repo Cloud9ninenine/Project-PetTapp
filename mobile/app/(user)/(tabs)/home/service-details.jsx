@@ -179,6 +179,7 @@ export default function ServiceDetailsScreen() {
         imageUrl: service.imageUrl,
         price: formatPrice(service.price),
         duration: formatDurationString(service.duration),
+        durationMinutes: service.duration, // Add raw duration in minutes for validation
       },
       business: businessData ? {
         id: businessData._id || businessData.id,
@@ -186,6 +187,7 @@ export default function ServiceDetailsScreen() {
         address: businessData.address,
         contactNumber: businessData.contactNumber,
       } : null,
+      businessHours: businessData?.businessHours || null, // Add business hours for validation
       availability: service.availability,
       requirements: service.requirements,
       pet: {
