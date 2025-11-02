@@ -49,6 +49,7 @@ export default function BusinessDashboard() {
       monthlyRevenue: 0,
     },
     pendingBookings: [],
+    rescheduleRequests: [],
     todaysSchedule: [],
   });
   const [services, setServices] = useState([]);
@@ -485,6 +486,63 @@ export default function BusinessDashboard() {
             )}
           </View>
 
+          {/* Reschedule Requests Section */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Reschedule Requests</Text>
+            <TouchableOpacity onPress={() => router.push("../booking")}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Reschedule Requests List */}
+          <View style={styles.rescheduleRequestsList}>
+            {dashboardData.rescheduleRequests && dashboardData.rescheduleRequests.length > 0 ? (
+              dashboardData.rescheduleRequests.slice(0, 3).map((booking) => (
+                <TouchableOpacity
+                  key={booking._id}
+                  style={styles.rescheduleRequestCard}
+                  onPress={() => router.push({
+                    pathname: "../booking/AppointmentDetails",
+                    params: { bookingId: booking._id }
+                  })}
+                >
+                  <View style={styles.rescheduleIconContainer}>
+                    <Ionicons
+                      name="swap-horizontal-outline"
+                      size={moderateScale(28)}
+                      color="#FF6B6B"
+                    />
+                  </View>
+                  <View style={styles.rescheduleInfo}>
+                    <Text style={styles.rescheduleCustomer} numberOfLines={1}>
+                      {booking.name || 'Customer'}
+                    </Text>
+                    <Text style={styles.rescheduleService} numberOfLines={1}>
+                      {booking.service || 'Service'}
+                    </Text>
+                    <View style={styles.rescheduleTimeContainer}>
+                      <Text style={styles.rescheduleOldTime}>
+                        {formatTime(booking.currentDateTime)}
+                      </Text>
+                      <Ionicons name="arrow-forward" size={moderateScale(12)} color="#999" />
+                      <Text style={styles.rescheduleNewTime}>
+                        {formatTime(booking.requestedDateTime)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.rescheduleRequestBadge}>
+                    <Text style={styles.rescheduleRequestBadgeText}>Review</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-done-outline" size={moderateScale(48)} color="#C7C7CC" />
+                <Text style={styles.emptyStateText}>No reschedule requests</Text>
+              </View>
+            )}
+          </View>
+
           {/* Today's Schedule Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Schedule</Text>
@@ -817,6 +875,73 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF9B79",
   },
   pendingBadgeText: {
+    fontSize: scaleFontSize(11),
+    color: "#fff",
+    fontWeight: "600",
+  },
+  rescheduleRequestsList: {
+    marginBottom: moderateScale(30),
+  },
+  rescheduleRequestCard: {
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    padding: moderateScale(15),
+    marginBottom: moderateScale(12),
+    alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: "#FF6B6B",
+  },
+  rescheduleIconContainer: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: "#FFEBEE",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: moderateScale(12),
+  },
+  rescheduleInfo: {
+    flex: 1,
+  },
+  rescheduleCustomer: {
+    fontSize: scaleFontSize(15),
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: moderateScale(4),
+  },
+  rescheduleService: {
+    fontSize: scaleFontSize(13),
+    color: "#666",
+    marginBottom: moderateScale(6),
+  },
+  rescheduleTimeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: moderateScale(6),
+  },
+  rescheduleOldTime: {
+    fontSize: scaleFontSize(12),
+    color: "#999",
+    textDecorationLine: "line-through",
+  },
+  rescheduleNewTime: {
+    fontSize: scaleFontSize(12),
+    color: "#FF6B6B",
+    fontWeight: "600",
+  },
+  rescheduleRequestBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    backgroundColor: "#FF6B6B",
+  },
+  rescheduleRequestBadgeText: {
     fontSize: scaleFontSize(11),
     color: "#fff",
     fontWeight: "600",

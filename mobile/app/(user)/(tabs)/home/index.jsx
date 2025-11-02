@@ -526,7 +526,7 @@ export default function HomeScreen() {
             {/* Welcome Message */}
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>
-                Pet care and wellness, one tap away
+                Welcome back! 👋 {userName}!
               </Text>
             </View>
 

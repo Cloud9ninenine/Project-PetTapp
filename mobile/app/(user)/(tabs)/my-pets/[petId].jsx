@@ -12,6 +12,9 @@ import {
   Image,
   Platform,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Header from '@components/Header';
+import SuccessModal from '@components/SuccessModal';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 
@@ -36,102 +40,15 @@ const SPECIES_OPTIONS = [
   { label: 'Other', value: 'other' },
 ];
 
-const BREED_OPTIONS_BY_SPECIES = {
-  dog: [
-    { label: 'Select breed', value: '' },
-    { label: 'Golden Retriever', value: 'golden-retriever' },
-    { label: 'Labrador', value: 'labrador' },
-    { label: 'German Shepherd', value: 'german-shepherd' },
-    { label: 'Bulldog', value: 'bulldog' },
-    { label: 'Beagle', value: 'beagle' },
-    { label: 'Poodle', value: 'poodle' },
-    { label: 'Rottweiler', value: 'rottweiler' },
-    { label: 'Yorkshire Terrier', value: 'yorkshire-terrier' },
-    { label: 'Mixed Breed', value: 'mixed' },
-    { label: 'Other', value: 'other' },
-  ],
-  cat: [
-    { label: 'Select breed', value: '' },
-    { label: 'Siamese', value: 'siamese' },
-    { label: 'Persian', value: 'persian' },
-    { label: 'Maine Coon', value: 'maine-coon' },
-    { label: 'Ragdoll', value: 'ragdoll' },
-    { label: 'Bengal', value: 'bengal' },
-    { label: 'British Shorthair', value: 'british-shorthair' },
-    { label: 'Sphynx', value: 'sphynx' },
-    { label: 'Mixed Breed', value: 'mixed' },
-    { label: 'Other', value: 'other' },
-  ],
-  bird: [
-    { label: 'Select breed', value: '' },
-    { label: 'Parrot', value: 'parrot' },
-    { label: 'Canary', value: 'canary' },
-    { label: 'Cockatiel', value: 'cockatiel' },
-    { label: 'Budgerigar', value: 'budgerigar' },
-    { label: 'Lovebird', value: 'lovebird' },
-    { label: 'Finch', value: 'finch' },
-    { label: 'Other', value: 'other' },
-  ],
-  fish: [
-    { label: 'Select breed', value: '' },
-    { label: 'Goldfish', value: 'goldfish' },
-    { label: 'Betta', value: 'betta' },
-    { label: 'Guppy', value: 'guppy' },
-    { label: 'Tetra', value: 'tetra' },
-    { label: 'Angelfish', value: 'angelfish' },
-    { label: 'Koi', value: 'koi' },
-    { label: 'Other', value: 'other' },
-  ],
-  rabbit: [
-    { label: 'Select breed', value: '' },
-    { label: 'Holland Lop', value: 'holland-lop' },
-    { label: 'Netherland Dwarf', value: 'netherland-dwarf' },
-    { label: 'Flemish Giant', value: 'flemish-giant' },
-    { label: 'Rex', value: 'rex' },
-    { label: 'Lionhead', value: 'lionhead' },
-    { label: 'Mixed Breed', value: 'mixed' },
-    { label: 'Other', value: 'other' },
-  ],
-  hamster: [
-    { label: 'Select breed', value: '' },
-    { label: 'Syrian', value: 'syrian' },
-    { label: 'Dwarf', value: 'dwarf' },
-    { label: 'Roborovski', value: 'roborovski' },
-    { label: 'Chinese', value: 'chinese' },
-    { label: 'Other', value: 'other' },
-  ],
-  'guinea-pig': [
-    { label: 'Select breed', value: '' },
-    { label: 'American', value: 'american' },
-    { label: 'Abyssinian', value: 'abyssinian' },
-    { label: 'Peruvian', value: 'peruvian' },
-    { label: 'Silkie', value: 'silkie' },
-    { label: 'Teddy', value: 'teddy' },
-    { label: 'Mixed Breed', value: 'mixed' },
-    { label: 'Other', value: 'other' },
-  ],
-  reptile: [
-    { label: 'Select breed', value: '' },
-    { label: 'Bearded Dragon', value: 'bearded-dragon' },
-    { label: 'Leopard Gecko', value: 'leopard-gecko' },
-    { label: 'Ball Python', value: 'ball-python' },
-    { label: 'Corn Snake', value: 'corn-snake' },
-    { label: 'Red-Eared Slider', value: 'red-eared-slider' },
-    { label: 'Mixed Breed', value: 'mixed' },
-    { label: 'Other', value: 'other' },
-  ],
-  other: [
-    { label: 'Select breed', value: '' },
-    { label: 'Mixed', value: 'mixed' },
-    { label: 'Unknown', value: 'unknown' },
-    { label: 'Other', value: 'other' },
-  ],
-};
-
 const GENDER_OPTIONS = [
   { label: 'Gender', value: '' },
   { label: 'Male', value: 'male' },
   { label: 'Female', value: 'female' },
+];
+
+const AGE_UNIT_OPTIONS = [
+  { label: 'Years', value: 'years' },
+  { label: 'Months', value: 'months' },
 ];
 
 export default function PetDetailScreen() {
@@ -144,7 +61,7 @@ export default function PetDetailScreen() {
     species: '',
     breed: '',
     age: '',
-    birthday: '',
+    ageUnit: 'years',
     gender: '',
     weight: '',
     color: '',
@@ -156,14 +73,17 @@ export default function PetDetailScreen() {
   const [petImage, setPetImage] = useState(null);
   const [originalImage, setOriginalImage] = useState(null);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
-  const [showBreedModal, setShowBreedModal] = useState(false);
   const [showGenderModal, setShowGenderModal] = useState(false);
+  const [showAgeUnitModal, setShowAgeUnitModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Fetch pet data on mount
   useEffect(() => {
@@ -175,26 +95,41 @@ export default function PetDetailScreen() {
         if (response.status === 200 && response.data.success) {
           const pet = response.data.data;
 
-          // Calculate birthday from age (backend doesn't store birthday, only age)
-          const today = new Date();
-          const birthYear = today.getFullYear() - pet.age;
-          const formattedBirthday = `01/01/${birthYear}`;
-
           setPetInfo({
             name: pet.name || '',
             species: pet.species || '',
             breed: pet.breed || '',
             age: pet.age ? pet.age.toString() : '',
-            birthday: formattedBirthday,
+            ageUnit: pet.ageUnit || 'years',
             gender: pet.gender || '',
             weight: pet.weight ? pet.weight.toString() : '',
             color: pet.color || '',
             specialInstructions: pet.specialInstructions || '',
           });
 
-          // Load medical history and vaccinations
-          setMedicalHistory(pet.medicalHistory || []);
-          setVaccinations(pet.vaccinations || []);
+          // Helper function to format ISO date to MM/DD/YYYY
+          const formatDate = (isoDate) => {
+            if (!isoDate) return '';
+            const date = new Date(isoDate);
+            return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
+          };
+
+          // Load medical history and vaccinations with unique IDs and formatted dates
+          const medicalHistoryWithIds = (pet.medicalHistory || []).map((entry, index) => ({
+            ...entry,
+            id: entry._id || entry.id || `medical-${index}-${Date.now()}`,
+            diagnosedDate: formatDate(entry.diagnosedDate) || entry.diagnosedDate || '',
+          }));
+          setMedicalHistory(medicalHistoryWithIds);
+
+          const vaccinationsWithIds = (pet.vaccinations || []).map((entry, index) => ({
+            ...entry,
+            id: entry._id || entry.id || `vaccination-${index}-${Date.now()}`,
+            vaccineName: entry.vaccine || entry.vaccineName || '',
+            administeredDate: formatDate(entry.administeredDate) || entry.administeredDate || '',
+            nextDueDate: formatDate(entry.nextDueDate) || entry.nextDueDate || '',
+          }));
+          setVaccinations(vaccinationsWithIds);
 
           if (pet.images?.profile) {
             setPetImage(pet.images.profile);
@@ -242,13 +177,7 @@ export default function PetDetailScreen() {
 
   const handleSpeciesSelect = (value, label) => {
     updatePetInfo('species', value);
-    updatePetInfo('breed', '');
     setShowSpeciesModal(false);
-  };
-
-  const handleBreedSelect = (value, label) => {
-    updatePetInfo('breed', value);
-    setShowBreedModal(false);
   };
 
   const handleGenderSelect = (value, label) => {
@@ -256,16 +185,14 @@ export default function PetDetailScreen() {
     setShowGenderModal(false);
   };
 
+  const handleAgeUnitSelect = (value, label) => {
+    updatePetInfo('ageUnit', value);
+    setShowAgeUnitModal(false);
+  };
+
   const getSpeciesLabel = () => {
     const selected = SPECIES_OPTIONS.find(option => option.value === petInfo.species);
     return selected ? selected.label : 'Select species';
-  };
-
-  const getBreedLabel = () => {
-    if (!petInfo.species) return 'Select species first';
-    const breedOptions = BREED_OPTIONS_BY_SPECIES[petInfo.species] || [];
-    const selected = breedOptions.find(option => option.value === petInfo.breed);
-    return selected ? selected.label : 'Select breed';
   };
 
   const getGenderLabel = () => {
@@ -273,8 +200,9 @@ export default function PetDetailScreen() {
     return selected ? selected.label : 'Select gender';
   };
 
-  const getBreedOptions = () => {
-    return BREED_OPTIONS_BY_SPECIES[petInfo.species] || [];
+  const getAgeUnitLabel = () => {
+    const selected = AGE_UNIT_OPTIONS.find(option => option.value === petInfo.ageUnit);
+    return selected ? selected.label : 'Select age unit';
   };
 
   const pickImage = async () => {
@@ -305,10 +233,7 @@ export default function PetDetailScreen() {
     if (date && currentDateField) {
       const formattedDate = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`;
 
-      if (currentDateField.type === 'birthday') {
-        setSelectedDate(date);
-        updatePetInfo('birthday', formattedDate);
-      } else if (currentDateField.type === 'medical') {
+      if (currentDateField.type === 'medical') {
         updateMedicalHistoryField(currentDateField.id, currentDateField.field, formattedDate);
       } else if (currentDateField.type === 'vaccination') {
         updateVaccinationField(currentDateField.id, currentDateField.field, formattedDate);
@@ -368,39 +293,51 @@ export default function PetDetailScreen() {
   };
 
   const validatePetData = () => {
-    const { name, birthday, species, breed, age, gender, weight, color } = petInfo;
-    
+    const { name, age, ageUnit, species, gender, weight, color } = petInfo;
+
     // Check required fields
-    if (!name || !birthday || !species || !breed || !age || !gender || !weight) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!name || age === '' || !ageUnit || !species || !gender) {
+      Alert.alert('Error', 'Please fill in all required fields (name, age, age unit, species, gender)');
       return false;
     }
-    
+
     // Validate field lengths
     if (name.length > 50) {
       Alert.alert('Error', 'Pet name must be 50 characters or less');
       return false;
     }
-    
+
     if (color && color.length > 30) {
       Alert.alert('Error', 'Color description must be 30 characters or less');
       return false;
     }
-    
-    // Validate age
+
+    // Validate age based on ageUnit
     const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 0 || ageNum > 30) {
-      Alert.alert('Error', 'Age must be between 0 and 30 years');
+    if (isNaN(ageNum) || ageNum < 0) {
+      Alert.alert('Error', 'Age must be a positive number');
       return false;
     }
-    
-    // Validate weight
-    const weightNum = parseFloat(weight);
-    if (isNaN(weightNum) || weightNum < 0 || weightNum > 200) {
-      Alert.alert('Error', 'Weight must be between 0 and 200 kg');
+
+    if (ageUnit === 'months' && ageNum > 11) {
+      Alert.alert('Error', 'Age in months must be between 0 and 11. For 12+ months, please use years.');
       return false;
     }
-    
+
+    if (ageUnit === 'years' && ageNum > 30) {
+      Alert.alert('Error', 'Age in years must be between 0 and 30');
+      return false;
+    }
+
+    // Validate weight if provided
+    if (weight) {
+      const weightNum = parseFloat(weight);
+      if (isNaN(weightNum) || weightNum < 0 || weightNum > 200) {
+        Alert.alert('Error', 'Weight must be between 0 and 200 kg');
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -418,22 +355,18 @@ export default function PetDetailScreen() {
       // Create FormData for multipart/form-data request
       const formData = new FormData();
 
-      // Add fields to FormData with proper data types
+      // Add required fields
       formData.append('name', petInfo.name.trim());
       formData.append('species', petInfo.species);
-      formData.append('breed', petInfo.breed || '');
-      formData.append('age', petInfo.age); // Use direct age input
+      formData.append('age', petInfo.age.toString());
+      formData.append('ageUnit', petInfo.ageUnit);
       formData.append('gender', petInfo.gender);
-      formData.append('weight', parseFloat(petInfo.weight).toString());
 
-      // Add optional fields only if they have values
-      if (petInfo.color && petInfo.color.trim()) {
-        formData.append('color', petInfo.color.trim());
-      }
-
-      if (petInfo.specialInstructions && petInfo.specialInstructions.trim()) {
-        formData.append('specialInstructions', petInfo.specialInstructions.trim());
-      }
+      // Add optional fields - send empty strings to clear values
+      formData.append('breed', petInfo.breed ? petInfo.breed.trim() : '');
+      formData.append('weight', petInfo.weight && petInfo.weight.trim() ? parseFloat(petInfo.weight).toString() : '');
+      formData.append('color', petInfo.color ? petInfo.color.trim() : '');
+      formData.append('specialInstructions', petInfo.specialInstructions ? petInfo.specialInstructions.trim() : '');
 
       // Add medical history as JSON string with proper date conversion
       if (medicalHistory.length > 0) {
@@ -477,9 +410,7 @@ export default function PetDetailScreen() {
       });
 
       if (response.status === 200) {
-        Alert.alert('Success', 'Pet information updated successfully!', [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
+        setShowSuccessModal(true);
       }
     } catch (error) {
       console.error('Error updating pet:', error);
@@ -545,9 +476,7 @@ export default function PetDetailScreen() {
       const response = await apiClient.delete(`/pets/${petId}`);
 
       if (response.status === 200 || response.status === 204) {
-        Alert.alert('Deleted', `${petInfo.name} has been removed from your pets list.`, [
-          { text: 'OK', onPress: () => router.back() }
-        ]);
+        setShowDeleteSuccessModal(true);
       }
     } catch (error) {
       console.error('Error deleting pet:', error);
@@ -612,8 +541,19 @@ export default function PetDetailScreen() {
         showBack={true}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <View style={styles.content}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <View style={styles.content}>
           {/* Pet Photo Upload */}
           <TouchableOpacity style={styles.addCircle} onPress={pickImage}>
             {petImage ? (
@@ -629,44 +569,22 @@ export default function PetDetailScreen() {
           <View style={styles.formSection}>
             {/* Pet Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Pet Name</Text>
+              <Text style={styles.label}>Pet Name *</Text>
               <TextInput
                 style={styles.input}
                 value={petInfo.name}
                 onChangeText={(value) => updatePetInfo('name', value)}
                 placeholder="Enter pet name"
+                placeholderTextColor="#999"
+                maxLength={50}
+                returnKeyType="next"
+                blurOnSubmit={false}
               />
-            </View>
-
-            {/* Age */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Age (years) *</Text>
-              <TextInput
-                style={styles.input}
-                value={petInfo.age}
-                onChangeText={(value) => updatePetInfo('age', value)}
-                placeholder="Enter age in years"
-                keyboardType="numeric"
-                maxLength={2}
-              />
-            </View>
-
-            {/* Birthday */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Birthday</Text>
-              <TouchableOpacity onPress={() => showDatePickerModal('birthday')}>
-                <View style={styles.dateInputContainer}>
-                  <Text style={[styles.dateInput, !petInfo.birthday && styles.placeholderTextInput]}>
-                    {petInfo.birthday || 'MM/DD/YYYY'}
-                  </Text>
-                  <Ionicons name="calendar-outline" size={moderateScale(20)} color="#666" style={styles.dateIcon} />
-                </View>
-              </TouchableOpacity>
             </View>
 
             {/* Species */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Species</Text>
+              <Text style={styles.label}>Species *</Text>
               <TouchableOpacity
                 style={styles.dropdownButton}
                 onPress={() => setShowSpeciesModal(true)}
@@ -681,58 +599,91 @@ export default function PetDetailScreen() {
             {/* Breed */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Breed</Text>
+              <TextInput
+                style={styles.input}
+                value={petInfo.breed}
+                onChangeText={(value) => updatePetInfo('breed', value)}
+                placeholder="Golden Retriever"
+                placeholderTextColor="#999"
+                maxLength={50}
+                returnKeyType="next"
+                blurOnSubmit={false}
+              />
+            </View>
+
+            {/* Sex */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Sex *</Text>
               <TouchableOpacity
-                style={[styles.dropdownButton, !petInfo.species && styles.disabledDropdown]}
-                onPress={() => petInfo.species && setShowBreedModal(true)}
-                disabled={!petInfo.species}
+                style={styles.dropdownButton}
+                onPress={() => setShowGenderModal(true)}
               >
-                <Text style={[styles.dropdownText, (!petInfo.breed || !petInfo.species) && styles.placeholderText]}>
-                  {getBreedLabel()}
+                <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
+                  {getGenderLabel()}
                 </Text>
                 <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
               </TouchableOpacity>
             </View>
 
-            {/* Sex and Weight - Side by Side */}
+            {/* Age and Age Unit */}
             <View style={styles.rowInputGroup}>
               <View style={styles.halfInput}>
-                <Text style={styles.label}>Sex</Text>
+                <Text style={styles.label}>Age *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={petInfo.age}
+                  onChangeText={(value) => updatePetInfo('age', value)}
+                  placeholder="2"
+                  placeholderTextColor="#999"
+                  keyboardType="numeric"
+                  maxLength={2}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                />
+              </View>
+
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Age Unit *</Text>
                 <TouchableOpacity
                   style={styles.dropdownButton}
-                  onPress={() => setShowGenderModal(true)}
+                  onPress={() => setShowAgeUnitModal(true)}
                 >
-                  <Text style={[styles.dropdownText, !petInfo.gender && styles.placeholderText]}>
-                    {getGenderLabel()}
+                  <Text style={[styles.dropdownText, !petInfo.ageUnit && styles.placeholderText]}>
+                    {getAgeUnitLabel()}
                   </Text>
                   <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
                 </TouchableOpacity>
               </View>
+            </View>
 
+            {/* Weight and Color */}
+            <View style={styles.rowInputGroup}>
               <View style={styles.halfInput}>
                 <Text style={styles.label}>Weight (kg)</Text>
                 <TextInput
                   style={styles.input}
                   value={petInfo.weight}
                   onChangeText={(value) => updatePetInfo('weight', value)}
-                  placeholder="Weight"
+                  placeholder="25.5"
+                  placeholderTextColor="#999"
                   keyboardType="decimal-pad"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
                 />
               </View>
-            </View>
 
-            {/* Color */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Color</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={petInfo.color}
-                onChangeText={(value) => updatePetInfo('color', value)}
-                placeholder="Color, markings, etc."
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                maxLength={30}
-              />
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Color</Text>
+                <TextInput
+                  style={styles.input}
+                  value={petInfo.color}
+                  onChangeText={(value) => updatePetInfo('color', value)}
+                  placeholder="Golden"
+                  placeholderTextColor="#999"
+                  maxLength={30}
+                  returnKeyType="done"
+                />
+              </View>
             </View>
           </View>
 
@@ -903,8 +854,10 @@ export default function PetDetailScreen() {
               <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
       {/* Species Modal */}
       <Modal
@@ -941,26 +894,26 @@ export default function PetDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Breed Modal */}
+      {/* Age Unit Modal */}
       <Modal
-        visible={showBreedModal}
+        visible={showAgeUnitModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowBreedModal(false)}
+        onRequestClose={() => setShowAgeUnitModal(false)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowBreedModal(false)}
+          onPress={() => setShowAgeUnitModal(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Breed</Text>
+            <Text style={styles.modalTitle}>Select Age Unit</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {getBreedOptions().map((option) => (
+              {AGE_UNIT_OPTIONS.map((option) => (
                 <TouchableOpacity
                   key={option.value}
                   style={styles.modalOption}
-                  onPress={() => handleBreedSelect(option.value, option.label)}
+                  onPress={() => handleAgeUnitSelect(option.value, option.label)}
                 >
                   <Text style={styles.modalOptionText}>{option.label}</Text>
                 </TouchableOpacity>
@@ -968,7 +921,7 @@ export default function PetDetailScreen() {
             </ScrollView>
             <TouchableOpacity
               style={styles.modalCloseButton}
-              onPress={() => setShowBreedModal(false)}
+              onPress={() => setShowAgeUnitModal(false)}
             >
               <Text style={styles.confirmButtonText}>Close</Text>
             </TouchableOpacity>
@@ -1082,7 +1035,11 @@ export default function PetDetailScreen() {
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleDateChange}
-          maximumDate={new Date()}
+          maximumDate={
+            currentDateField?.type === 'vaccination' && currentDateField?.field === 'nextDueDate'
+              ? undefined
+              : new Date()
+          }
         />
       )}
 
@@ -1097,6 +1054,30 @@ export default function PetDetailScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Success Modal - Update */}
+      <SuccessModal
+        visible={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          router.back();
+        }}
+        title="Updated!"
+        message="Your pet's information has been updated successfully!"
+        buttonText="Done"
+      />
+
+      {/* Success Modal - Delete */}
+      <SuccessModal
+        visible={showDeleteSuccessModal}
+        onClose={() => {
+          setShowDeleteSuccessModal(false);
+          router.back();
+        }}
+        title="Deleted!"
+        message={`${petInfo.name} has been removed from your pets list.`}
+        buttonText="Done"
+      />
     </SafeAreaView>
   );
 }
@@ -1261,31 +1242,38 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: moderateScale(20),
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(20),
+    borderRadius: moderateScale(20),
+    padding: moderateScale(24),
     width: '100%',
     maxWidth: moderateScale(400),
     maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: scaleFontSize(20),
+    fontSize: scaleFontSize(22),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
     marginBottom: moderateScale(20),
+    letterSpacing: 0.3,
   },
   modalOption: {
-    paddingVertical: moderateScale(14),
+    paddingVertical: moderateScale(16),
     paddingHorizontal: moderateScale(16),
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fff',
   },
   modalOptionText: {
     fontSize: scaleFontSize(16),
@@ -1294,47 +1282,59 @@ const styles = StyleSheet.create({
   },
   modalCloseButton: {
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     marginTop: moderateScale(20),
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   confirmModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: moderateScale(20),
   },
   confirmModalContent: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(30),
+    borderRadius: moderateScale(24),
+    padding: moderateScale(32),
     width: '90%',
     maxWidth: moderateScale(400),
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
   },
   confirmIcon: {
-    marginBottom: moderateScale(20),
+    marginBottom: moderateScale(24),
   },
   confirmModalTitle: {
-    fontSize: scaleFontSize(22),
+    fontSize: scaleFontSize(24),
     fontFamily: 'SFProBold',
     color: '#1C86FF',
     textAlign: 'center',
-    marginBottom: moderateScale(12),
+    marginBottom: moderateScale(14),
+    letterSpacing: 0.4,
   },
   confirmModalText: {
     fontSize: scaleFontSize(16),
     fontFamily: 'SFProReg',
-    color: '#666',
+    color: '#555',
     textAlign: 'center',
-    marginBottom: moderateScale(24),
-    lineHeight: moderateScale(22),
+    marginBottom: moderateScale(28),
+    lineHeight: scaleFontSize(24),
+    paddingHorizontal: moderateScale(8),
   },
   confirmModalButtons: {
     flexDirection: 'row',
-    gap: moderateScale(12),
+    gap: moderateScale(14),
     width: '100%',
   },
   cancelButton: {
@@ -1342,25 +1342,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 2,
     borderColor: '#1C86FF',
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cancelButtonText: {
     color: '#1C86FF',
     fontSize: scaleFontSize(16),
-    fontFamily: 'SFProReg',
-    fontWeight: '600',
+    fontFamily: 'SFProBold',
+    letterSpacing: 0.3,
   },
   confirmButtonModal: {
     flex: 1,
     backgroundColor: '#1C86FF',
-    paddingVertical: moderateScale(12),
-    borderRadius: moderateScale(10),
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
   },
   deleteButtonModal: {
     backgroundColor: '#dc3545',
+    shadowColor: '#dc3545',
   },
   loadingContainer: {
     flex: 1,
@@ -1370,28 +1381,35 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: moderateScale(16),
-    fontSize: scaleFontSize(16),
-    color: '#666',
-    fontFamily: 'SFProReg',
+    fontSize: scaleFontSize(17),
+    color: '#555',
+    fontFamily: 'SFProSB',
+    letterSpacing: 0.3,
   },
   savingOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   savingContainer: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(30),
+    borderRadius: moderateScale(20),
+    padding: moderateScale(36),
     alignItems: 'center',
     minWidth: moderateScale(200),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
   savingText: {
-    marginTop: moderateScale(16),
-    fontSize: scaleFontSize(16),
+    marginTop: moderateScale(18),
+    fontSize: scaleFontSize(17),
     color: '#333',
-    fontFamily: 'SFProReg',
+    fontFamily: 'SFProSB',
+    letterSpacing: 0.3,
   },
   sectionContainer: {
     marginBottom: moderateScale(16),

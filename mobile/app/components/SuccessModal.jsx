@@ -7,32 +7,24 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 
 /**
- * CompleteProfileModal - Reusable modal component that prompts users to complete their profile
+ * SuccessModal - Reusable success modal component
  *
  * @param {boolean} visible - Controls modal visibility
  * @param {function} onClose - Callback when modal is closed
- * @param {string} title - Modal title (default: "Complete Your Profile")
- * @param {string} message - Modal message (default: profile completion message)
- * @param {string} buttonText - Button text (default: "Go to Profile")
+ * @param {string} title - Modal title (default: "Success")
+ * @param {string} message - Success message
+ * @param {string} buttonText - Button text (default: "OK")
  */
-export default function CompleteProfileModal({
+export default function SuccessModal({
   visible,
   onClose,
-  title = "Complete Your Profile",
-  message = "Please complete your profile information before continuing. You need to provide your first name, last name, contact number, and a complete address (street and city).",
-  buttonText = "Go to Profile",
+  title = "Success",
+  message = "Operation completed successfully!",
+  buttonText = "OK",
 }) {
-  const router = useRouter();
-
-  const handleGoToProfile = () => {
-    if (onClose) onClose();
-    router.push("/(user)/(tabs)/profile");
-  };
-
   return (
     <Modal
       visible={visible}
@@ -42,23 +34,20 @@ export default function CompleteProfileModal({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Ionicons name="alert-circle" size={60} color="#FF9B79" style={styles.modalIcon} />
+          {/* Success Icon with animated checkmark */}
+          <View style={styles.iconContainer}>
+            <Ionicons name="checkmark-circle" size={moderateScale(80)} color="#4CAF50" />
+          </View>
+
           <Text style={styles.modalTitle}>{title}</Text>
           <Text style={styles.modalText}>{message}</Text>
+
           <TouchableOpacity
             style={styles.modalButton}
-            onPress={handleGoToProfile}
+            onPress={onClose}
           >
             <Text style={styles.modalButtonText}>{buttonText}</Text>
           </TouchableOpacity>
-          {onClose && (
-            <TouchableOpacity
-              style={styles.dismissButton}
-              onPress={onClose}
-            >
-              <Text style={styles.dismissButtonText}>Dismiss</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     </Modal>
@@ -68,34 +57,34 @@ export default function CompleteProfileModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: wp(5),
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(20),
-    padding: moderateScale(32),
+    borderRadius: moderateScale(24),
+    padding: moderateScale(36),
     width: '90%',
     maxWidth: wp(90),
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
   },
-  modalIcon: {
-    marginBottom: hp(2.5),
+  iconContainer: {
+    marginBottom: hp(2),
   },
   modalTitle: {
-    fontSize: scaleFontSize(24),
+    fontSize: scaleFontSize(26),
     fontFamily: "SFProBold",
-    color: '#1C86FF',
+    color: '#4CAF50',
     textAlign: 'center',
     marginBottom: hp(1.5),
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
   },
   modalText: {
     fontSize: scaleFontSize(16),
@@ -108,12 +97,11 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     width: '100%',
-    backgroundColor: '#1C86FF',
+    backgroundColor: '#4CAF50',
     paddingVertical: hp(1.8),
     borderRadius: moderateScale(12),
     alignItems: 'center',
-    marginBottom: hp(1.2),
-    shadowColor: '#1C86FF',
+    shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -124,16 +112,5 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(18),
     fontFamily: "SFProBold",
     letterSpacing: 0.5,
-  },
-  dismissButton: {
-    width: '100%',
-    paddingVertical: hp(1.5),
-    alignItems: 'center',
-    borderRadius: moderateScale(12),
-  },
-  dismissButtonText: {
-    color: '#888',
-    fontSize: scaleFontSize(16),
-    fontFamily: "SFProSB",
   },
 });

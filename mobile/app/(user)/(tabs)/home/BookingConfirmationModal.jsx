@@ -5,13 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Image,
   Animated,
   Dimensions,
   Platform,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,12 +32,18 @@ export default function BookingConfirmationModal({
   const [pets, setPets] = useState([]);
   const [loadingPets, setLoadingPets] = useState(true);
 
+  // Fetch addresses from API
+  const [addresses, setAddresses] = useState([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
   // Required fields
   const [selectedPet, setSelectedPet] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
+  const [locationType, setLocationType] = useState('clinic');
 
   // Optional fields
+  const [selectedAddress, setSelectedAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [specialRequests, setSpecialRequests] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -48,13 +52,28 @@ export default function BookingConfirmationModal({
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Payment methods from API enum
+  // Modal states for custom styled alerts
+  const [alertModal, setAlertModal] = useState({
+    visible: false,
+    type: '', // 'error', 'success', 'validation'
+    title: '',
+    message: '',
+  });
+
+  // Payment methods from API enum (aligned with web version)
   const paymentMethods = [
-    { value: 'cash', label: 'Cash', icon: 'cash-outline' },
-    { value: 'gcash', label: 'GCash', icon: 'phone-portrait-outline' },
-    { value: 'paymaya', label: 'PayMaya', icon: 'phone-portrait-outline' },
-    { value: 'credit-card', label: 'Credit Card', icon: 'card-outline' },
-    { value: 'debit-card', label: 'Debit Card', icon: 'card-outline' },
+    {
+      value: 'cash',
+      label: 'Cash',
+      icon: 'cash-outline',
+      description: 'Pay in cash when you receive the service'
+    },
+    {
+      value: 'qr-payment',
+      label: 'QR Payment',
+      icon: 'qr-code-outline',
+      description: 'Pay via GCash, PayMaya, or Bank Transfer'
+    },
   ];
 
   // Fetch pets from API
@@ -68,7 +87,7 @@ export default function BookingConfirmationModal({
         }
       } catch (error) {
         console.error('Error fetching pets:', error);
-        Alert.alert('Error', 'Failed to load your pets. Please try again.');
+        showAlert('error', 'Error', 'Failed to load your pets. Please try again.');
       } finally {
         setLoadingPets(false);
       }
@@ -78,6 +97,28 @@ export default function BookingConfirmationModal({
       fetchPets();
     }
   }, [visible]);
+
+  // Fetch addresses from API
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      try {
+        setLoadingAddresses(true);
+        const response = await apiClient.get('/addresses');
+        if (response.data.success) {
+          setAddresses(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching addresses:', error);
+        // Don't show alert for addresses as they're optional
+      } finally {
+        setLoadingAddresses(false);
+      }
+    };
+
+    if (visible && locationType === 'home') {
+      fetchAddresses();
+    }
+  }, [visible, locationType]);
 
   React.useEffect(() => {
     if (visible) {
@@ -96,74 +137,13 @@ export default function BookingConfirmationModal({
     }
   }, [visible]);
 
-  const getServiceImageSource = () => {
-    // Priority 1: Use imageUrl from API response if available
-    if (bookingData?.service?.imageUrl && typeof bookingData.service.imageUrl === 'string') {
-      return { uri: bookingData.service.imageUrl };
-    }
-
-    // Priority 2: Fallback to category-based images
-    const category = bookingData?.service?.category || bookingData?.service?.type;
-    const serviceName = bookingData?.service?.name;
-
-    // Veterinary services
-    if (category === 'veterinary') {
-      if (serviceName === 'Animed Veterinary Clinic') {
-        return require('@assets/images/serviceimages/17.png');
-      } else if (serviceName === 'Vetfusion Animal Clinic') {
-        return require('@assets/images/serviceimages/19.png');
-      } else {
-        return require('@assets/images/serviceimages/18.png');
-      }
-    }
-
-    // Grooming services
-    if (category === 'grooming') {
-      return require('@assets/images/serviceimages/21.png');
-    }
-
-    // Boarding services
-    if (category === 'boarding' || category === 'daycare') {
-      if (serviceName === 'PetCity Daycare') {
-        return require('@assets/images/serviceimages/16.png');
-      }
-      return require('@assets/images/serviceimages/22.png');
-    }
-
-    // Training services
-    if (category === 'training') {
-      return require('@assets/images/serviceimages/17.png');
-    }
-
-    // Emergency services
-    if (category === 'emergency') {
-      return require('@assets/images/serviceimages/19.png');
-    }
-
-    // Consultation services
-    if (category === 'consultation') {
-      return require('@assets/images/serviceimages/18.png');
-    }
-
-    // Default fallback
-    return require('@assets/images/serviceimages/18.png');
+  // Helper functions for showing styled alerts
+  const showAlert = (type, title, message) => {
+    setAlertModal({ visible: true, type, title, message });
   };
 
-  const renderStars = (rating = 4.9) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(<Ionicons key={i} name="star" size={moderateScale(14)} color="#ff9b79" />);
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(<Ionicons key={i} name="star-half" size={moderateScale(14)} color="#ff9b79" />);
-      } else {
-        stars.push(<Ionicons key={i} name="star-outline" size={moderateScale(14)} color="#E0E0E0" />);
-      }
-    }
-    return stars;
+  const hideAlert = () => {
+    setAlertModal({ visible: false, type: '', title: '', message: '' });
   };
 
   const formatDate = (date) => {
@@ -205,23 +185,33 @@ export default function BookingConfirmationModal({
   const handleConfirm = async () => {
     // Validate required fields
     if (!selectedPet) {
-      Alert.alert('Required Field', 'Please select a pet');
+      showAlert('validation', 'Required Field', 'Please select a pet');
       return;
     }
 
     if (!paymentMethod) {
-      Alert.alert('Required Field', 'Please select a payment method');
+      showAlert('validation', 'Required Field', 'Please select a payment method');
+      return;
+    }
+
+    if (!locationType) {
+      showAlert('validation', 'Required Field', 'Please select service location');
+      return;
+    }
+
+    if (locationType === 'home' && !selectedAddress) {
+      showAlert('validation', 'Required Field', 'Please select an address for home service');
       return;
     }
 
     // Validate field lengths
     if (notes.length > 500) {
-      Alert.alert('Validation Error', 'Notes must be 500 characters or less');
+      showAlert('validation', 'Validation Error', 'Notes must be 500 characters or less');
       return;
     }
 
     if (specialRequests.length > 300) {
-      Alert.alert('Validation Error', 'Special requests must be 300 characters or less');
+      showAlert('validation', 'Validation Error', 'Special requests must be 300 characters or less');
       return;
     }
 
@@ -240,7 +230,9 @@ export default function BookingConfirmationModal({
         serviceId: bookingData?.service?.id,
         petId: selectedPet,
         appointmentDateTime: appointmentDate.toISOString(),
-        ...(paymentMethod && { paymentMethod }),
+        paymentMethod,
+        locationType,
+        ...(locationType === 'home' && selectedAddress && { addressId: selectedAddress }),
         ...(notes.trim() && { notes: notes.trim() }),
         ...(specialRequests.trim() && { specialRequests: specialRequests.trim() }),
       };
@@ -262,14 +254,18 @@ export default function BookingConfirmationModal({
           specialRequests,
         };
 
-        onConfirm(bookingResult);
+        showAlert('success', 'Success!', 'Your booking request has been submitted successfully. The business will review and confirm your appointment.');
+        setTimeout(() => {
+          hideAlert();
+          onConfirm(bookingResult);
+        }, 2000);
       } else {
-        Alert.alert('Booking Failed', response.data.message || 'Failed to create booking');
+        showAlert('error', 'Booking Failed', response.data.message || 'Failed to create booking');
       }
     } catch (error) {
       console.error('Error creating booking:', error);
       const errorMessage = error.response?.data?.message || error.message || 'An unexpected error occurred';
-      Alert.alert('Booking Error', errorMessage);
+      showAlert('error', 'Booking Error', errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -307,31 +303,6 @@ export default function BookingConfirmationModal({
               Fill in the details to submit your booking request.
             </Text>
 
-            <View style={styles.serviceCard}>
-              <Image source={getServiceImageSource()} style={styles.serviceImage} />
-              <View style={styles.serviceInfo}>
-                <Text style={styles.serviceName}>{bookingData?.service?.name}</Text>
-                <Text style={styles.serviceCategory}>
-                  {((bookingData?.service?.category || bookingData?.service?.type || '').charAt(0).toUpperCase() +
-                   (bookingData?.service?.category || bookingData?.service?.type || '').slice(1))}
-                </Text>
-                <View style={styles.starsContainer}>
-                  {renderStars(bookingData?.service?.rating)}
-                </View>
-                {bookingData?.service?.price && (
-                  <Text style={styles.servicePriceText}>
-                    {typeof bookingData.service.price === 'string' && bookingData.service.price.startsWith('₱')
-                      ? bookingData.service.price
-                      : typeof bookingData.service.price === 'object'
-                      ? `${bookingData.service.price.amount}`
-                      : `${bookingData.service.price}`}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
             {/* Status Information Notice */}
             <View style={styles.statusInfoBox}>
               <View style={styles.statusInfoHeader}>
@@ -339,13 +310,15 @@ export default function BookingConfirmationModal({
                 <Text style={styles.statusInfoTitle}>Booking Status</Text>
               </View>
               <Text style={styles.statusInfoText}>
-                Your booking will be created with <Text style={styles.statusBadge}>PENDING</Text> status. .
+                Your booking will be created with <Text style={styles.statusBadge}>PENDING</Text> status.
               </Text>
             </View>
 
             {/* Pet Selection - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Select Pet *</Text>
+              <Text style={styles.inputLabel}>
+                Select Pet <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               {loadingPets ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#1C86FF" />
@@ -380,33 +353,98 @@ export default function BookingConfirmationModal({
 
             {/* Date - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Date *</Text>
+              <Text style={styles.inputLabel}>
+                Date <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TouchableOpacity style={styles.inputField} onPress={() => setShowDatePicker(true)}>
                 <Text style={styles.inputText}>
                   {formatDate(selectedDate)}
                 </Text>
-                <View style={styles.calendarIcon}>
-                  <Text style={styles.calendarIconText}>📅</Text>
-                </View>
+                <Ionicons name="calendar-outline" size={moderateScale(20)} color="#fff" />
               </TouchableOpacity>
             </View>
 
             {/* Time - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Time *</Text>
+              <Text style={styles.inputLabel}>
+                Time <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <TouchableOpacity style={styles.inputField} onPress={() => setShowTimePicker(true)}>
                 <Text style={styles.inputText}>
                   {formatTime(selectedTime)}
                 </Text>
-                <View style={styles.dropdownIcon}>
-                  <Text style={styles.dropdownIconText}>⌄</Text>
-                </View>
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#fff" />
               </TouchableOpacity>
             </View>
 
+            {/* Service Location - REQUIRED */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                Service Location <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
+              <View style={styles.pickerContainer}>
+                <Ionicons name="location-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
+                <Picker
+                  selectedValue={locationType}
+                  onValueChange={(itemValue) => {
+                    setLocationType(itemValue);
+                    if (itemValue === 'clinic') {
+                      setSelectedAddress('');
+                    }
+                  }}
+                  style={styles.picker}
+                  dropdownIconColor="#fff"
+                >
+                  <Picker.Item label="Clinic" value="clinic" />
+                  <Picker.Item label="Home Service" value="home" />
+                </Picker>
+              </View>
+            </View>
+
+            {/* Address Selection - REQUIRED for home service */}
+            {locationType === 'home' && (
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>
+                  Choose Address <Text style={styles.requiredAsterisk}>*</Text>
+                </Text>
+                {loadingAddresses ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#1C86FF" />
+                    <Text style={styles.loadingText}>Loading addresses...</Text>
+                  </View>
+                ) : addresses.length > 0 ? (
+                  <View style={styles.pickerContainer}>
+                    <Ionicons name="home-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
+                    <Picker
+                      selectedValue={selectedAddress}
+                      onValueChange={(itemValue) => setSelectedAddress(itemValue)}
+                      style={styles.picker}
+                      dropdownIconColor="#fff"
+                    >
+                      <Picker.Item label="Select an address" value="" />
+                      {addresses.map((addr) => (
+                        <Picker.Item
+                          key={addr._id}
+                          label={`${addr.label} — ${addr.city}`}
+                          value={addr._id}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                ) : (
+                  <View style={styles.noPetsContainer}>
+                    <Ionicons name="home-outline" size={moderateScale(32)} color="#999" />
+                    <Text style={styles.noPetsText}>No saved addresses. Please add one in your profile.</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* Payment Method - REQUIRED */}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Payment Method *</Text>
+              <Text style={styles.inputLabel}>
+                Payment Method <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
               <View style={styles.pickerContainer}>
                 <Ionicons name="wallet-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
                 <Picker
@@ -483,6 +521,55 @@ export default function BookingConfirmationModal({
         </Animated.View>
       </View>
 
+      {/* Custom Styled Alert Modal */}
+      <Modal
+        visible={alertModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={hideAlert}
+      >
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertContainer}>
+            {/* Icon based on type */}
+            <View style={[
+              styles.alertIconContainer,
+              alertModal.type === 'success' && styles.successIconContainer,
+              alertModal.type === 'error' && styles.errorIconContainer,
+              alertModal.type === 'validation' && styles.validationIconContainer,
+            ]}>
+              <Ionicons
+                name={
+                  alertModal.type === 'success' ? 'checkmark-circle' :
+                  alertModal.type === 'error' ? 'close-circle' :
+                  'alert-circle'
+                }
+                size={moderateScale(60)}
+                color="#fff"
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.alertTitle}>{alertModal.title}</Text>
+
+            {/* Message */}
+            <Text style={styles.alertMessage}>{alertModal.message}</Text>
+
+            {/* OK Button */}
+            <TouchableOpacity
+              style={[
+                styles.alertButton,
+                alertModal.type === 'success' && styles.successButton,
+                alertModal.type === 'error' && styles.errorButton,
+                alertModal.type === 'validation' && styles.validationButton,
+              ]}
+              onPress={hideAlert}
+            >
+              <Text style={styles.alertButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Native Date Picker */}
       {showDatePicker && (
         <DateTimePicker
@@ -523,7 +610,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: moderateScale(18),
     paddingBottom: moderateScale(30),
     paddingTop: moderateScale(10),
-    maxHeight: screenHeight * 0.9,
+    maxHeight: screenHeight * 0.95,
   },
   handleBar: {
     width: moderateScale(40),
@@ -547,52 +634,6 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(20),
     lineHeight: moderateScale(20),
   },
-  serviceCard: {
-    flexDirection: 'row',
-    backgroundColor: '#f8f8f8',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(12),
-    marginBottom: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#1C86FF',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E0E0E0',
-    marginBottom: moderateScale(15),
-  },
-  serviceImage: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(8),
-    resizeMode: 'cover',
-  },
-  serviceInfo: {
-    flex: 1,
-    marginLeft: moderateScale(15),
-    justifyContent: 'center',
-  },
-  serviceName: {
-    fontSize: scaleFontSize(16),
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginBottom: moderateScale(4),
-  },
-  serviceCategory: {
-    fontSize: scaleFontSize(12),
-    color: '#FF9B79',
-    marginBottom: moderateScale(6),
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    gap: moderateScale(1),
-  },
-  servicePriceText: {
-    fontSize: scaleFontSize(14),
-    fontWeight: 'bold',
-    color: '#1C86FF',
-    marginTop: moderateScale(4),
-  },
   inputContainer: {
     marginBottom: moderateScale(12),
   },
@@ -606,7 +647,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
     borderRadius: moderateScale(8),
     paddingHorizontal: moderateScale(15),
-    paddingVertical: moderateScale(12),
+    height: moderateScale(50),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -618,27 +659,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: scaleFontSize(16),
     color: '#fff',
-  },
-  calendarIcon: {
-    width: moderateScale(24),
-    height: moderateScale(24),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  calendarIconText: {
-    fontSize: scaleFontSize(18),
-    color: '#fff',
-  },
-  dropdownIcon: {
-    width: moderateScale(24),
-    height: moderateScale(24),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownIconText: {
-    fontSize: scaleFontSize(18),
-    color: '#fff',
-    fontWeight: 'bold',
   },
   bookButton: {
     backgroundColor: '#1C86FF',
@@ -665,6 +685,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C86FF',
     borderRadius: moderateScale(8),
     paddingHorizontal: moderateScale(15),
+    height: moderateScale(50),
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -744,5 +765,80 @@ const styles = StyleSheet.create({
   statusBadge: {
     fontWeight: '700',
     color: '#FF9B79',
+  },
+  requiredAsterisk: {
+    color: '#FF0000',
+  },
+  // Custom Alert Modal Styles
+  alertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  alertContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(30),
+    width: '90%',
+    maxWidth: moderateScale(400),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  alertIconContainer: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(20),
+  },
+  successIconContainer: {
+    backgroundColor: '#4CAF50',
+  },
+  errorIconContainer: {
+    backgroundColor: '#F44336',
+  },
+  validationIconContainer: {
+    backgroundColor: '#FF9800',
+  },
+  alertTitle: {
+    fontSize: scaleFontSize(22),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  alertMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(22),
+    marginBottom: moderateScale(25),
+  },
+  alertButton: {
+    width: '100%',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+  },
+  successButton: {
+    backgroundColor: '#4CAF50',
+  },
+  errorButton: {
+    backgroundColor: '#F44336',
+  },
+  validationButton: {
+    backgroundColor: '#FF9800',
+  },
+  alertButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
   },
 });

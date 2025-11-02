@@ -79,7 +79,7 @@ export default function MyPetsScreen() {
   // Refresh pets when screen is focused (e.g., returning from add/edit pet)
   useFocusEffect(
     React.useCallback(() => {
-      if (isProfileComplete && !isLoading) {
+      if (isProfileComplete) {
         fetchPets(true);
       }
     }, [isProfileComplete])
