@@ -14,6 +14,7 @@ import {
   Dimensions,
   PanResponder,
   Image,
+  Keyboard,
 } from "react-native";
 
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -36,6 +37,7 @@ const ScheduleDetail = () => {
   const [booking, setBooking] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [serviceImageUrl, setServiceImageUrl] = useState(null);
 
   // State for cancellation modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -72,6 +74,21 @@ const ScheduleDetail = () => {
     fetchBookingDetail();
   }, [params.bookingId]);
 
+  // Fetch service image from service API endpoint
+  const fetchServiceImage = async (serviceId) => {
+    try {
+      const response = await apiClient.get(`/services/${serviceId}`);
+      if (response.data.success && response.data.data) {
+        const imageUrl = response.data.data.imageUrl;
+        console.log('✅ Fetched service image:', imageUrl);
+        setServiceImageUrl(imageUrl);
+      }
+    } catch (error) {
+      console.error('Error fetching service image:', error);
+      setServiceImageUrl(null);
+    }
+  };
+
   const fetchBookingDetail = async () => {
     try {
       setIsLoading(true);
@@ -86,7 +103,13 @@ const ScheduleDetail = () => {
       const response = await apiClient.get(`/bookings/${bookingId}`);
 
       if (response.data.success) {
-        setBooking(response.data.data);
+        const bookingData = response.data.data;
+        setBooking(bookingData);
+
+        // Fetch service image separately
+        if (bookingData.serviceId?._id) {
+          await fetchServiceImage(bookingData.serviceId._id);
+        }
       }
     } catch (error) {
       console.error('Error fetching booking:', error);
@@ -167,6 +190,11 @@ const ScheduleDetail = () => {
     return `₱${amount.toLocaleString()}`;
   };
 
+  // Get service image - uses the separately fetched service image
+  const getServiceImageUrl = () => {
+    return serviceImageUrl || null;
+  };
+
   // Get service icon based on category
   const getServiceIcon = (serviceId) => {
     const category = serviceId?.category?.toLowerCase();
@@ -214,6 +242,7 @@ const ScheduleDetail = () => {
   };
 
   const handleCancelPress = () => {
+    Keyboard.dismiss();
     setShowCancelModal(true);
   };
 
@@ -603,19 +632,29 @@ const ScheduleDetail = () => {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Business/Service Info */}
         <View style={styles.clinicSection}>
-          {booking.serviceId?.image ? (
-            <Image
-              source={{ uri: booking.serviceId.image }}
-              style={styles.serviceImage}
-              resizeMode="cover"
-            />
+          {getServiceImageUrl() ? (
+            <View style={styles.serviceImageContainer}>
+              <Image
+                source={{ uri: getServiceImageUrl() }}
+                style={styles.serviceImage}
+                resizeMode="cover"
+              />
+              <View style={styles.serviceInfoOverlay}>
+                <Text style={styles.clinicName}>{booking.businessId?.businessName || 'Business Name'}</Text>
+                <Text style={styles.serviceName}>{booking.serviceId?.name || 'Service'}</Text>
+              </View>
+            </View>
           ) : (
-            <View style={styles.clinicLogo}>
-              <Ionicons name={getServiceIcon(booking.serviceId)} size={hp(4.5)} color="#1C86FF" />
+            <View style={styles.serviceImageContainer}>
+              <View style={styles.clinicLogo}>
+                <Ionicons name={getServiceIcon(booking.serviceId)} size={hp(4.5)} color="#1C86FF" />
+              </View>
+              <View style={styles.serviceInfoOverlay}>
+                <Text style={styles.clinicName}>{booking.businessId?.businessName || 'Business Name'}</Text>
+                <Text style={styles.serviceName}>{booking.serviceId?.name || 'Service'}</Text>
+              </View>
             </View>
           )}
-          <Text style={styles.clinicName}>{booking.businessId?.businessName || 'Business Name'}</Text>
-          <Text style={styles.serviceName}>{booking.serviceId?.name || 'Service'}</Text>
         </View>
 
         {/* Rescheduled Alert - if approved */}
@@ -909,36 +948,42 @@ const ScheduleDetail = () => {
             <Text style={styles.bookedOnValue}>{formatDateTime(booking.createdAt)}</Text>
           </View>
         </View>
-
-        {/* Action Buttons */}
-        {renderActionButtons()}
       </ScrollView>
+
+      {/* Sticky Action Buttons Footer */}
+      <View style={styles.stickyButtonsContainer}>
+        {renderActionButtons()}
+      </View>
 
       {/* Cancellation Modal */}
       <Modal
         visible={showCancelModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowCancelModal(false)}
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setShowCancelModal(false);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Cancel Booking</Text>
             <Text style={styles.modalSubtitle}>Please provide a reason for cancellation</Text>
 
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Reason for cancellation (max 200 characters)"
-              placeholderTextColor="#999"
-              value={cancellationReason}
-              onChangeText={setCancellationReason}
-              multiline
-              maxLength={200}
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-
-            <Text style={styles.characterCount}>{cancellationReason.length}/200</Text>
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Reason for cancellation (max 200 characters)"
+                placeholderTextColor="#999"
+                value={cancellationReason}
+                onChangeText={setCancellationReason}
+                multiline
+                maxLength={200}
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              <Text style={styles.characterCount}>{cancellationReason.length}/200</Text>
+            </View>
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -1251,7 +1296,40 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(20),
   },
   statusBarText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
-  clinicSection: { alignItems: "center", marginBottom: moderateScale(20) },
+  clinicSection: {
+    marginBottom: moderateScale(20),
+  },
+  serviceImageContainer: {
+    width: "100%",
+    height: hp(25),
+    borderRadius: moderateScale(16),
+    overflow: "hidden",
+    backgroundColor: "#F0F0F0",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  serviceImage: {
+    width: "100%",
+    height: "100%",
+    position: "absolute",
+  },
+  serviceInfoOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(16),
+    justifyContent: "flex-end",
+    minHeight: hp(9),
+  },
   clinicLogo: {
     width: hp(9),
     height: hp(9),
@@ -1259,10 +1337,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: moderateScale(10),
   },
-  clinicName: { fontSize: scaleFontSize(18), fontWeight: "bold", color: "#333" },
-  serviceName: { fontSize: scaleFontSize(14), color: "#666" },
+  clinicName: {
+    fontSize: scaleFontSize(18),
+    fontWeight: "bold",
+    color: "#fff",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  serviceName: {
+    fontSize: scaleFontSize(14),
+    color: "#e0e0e0",
+    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   detailsBox: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -1418,6 +1508,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionButtonsContainer: { gap: moderateScale(12) },
+  stickyButtonsContainer: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(16),
+    paddingBottom: moderateScale(24),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -1517,16 +1620,30 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
   },
+  modalInputContainer: {
+    position: 'relative',
+    marginVertical: moderateScale(16),
+  },
   modalInput: {
     backgroundColor: "#F5F5F5",
     borderRadius: moderateScale(8),
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    padding: moderateScale(12),
+    paddingHorizontal: moderateScale(12),
+    paddingTop: moderateScale(12),
+    paddingBottom: moderateScale(32),
     fontSize: scaleFontSize(14),
     color: "#333",
     minHeight: moderateScale(100),
     maxHeight: moderateScale(150),
+  },
+  characterCount: {
+    position: 'absolute',
+    bottom: moderateScale(8),
+    left: moderateScale(12),
+    fontSize: scaleFontSize(12),
+    color: "#999",
+    fontWeight: '500',
   },
   modalButtons: {
     flexDirection: "row",

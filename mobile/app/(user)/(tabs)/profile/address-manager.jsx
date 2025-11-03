@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import apiClient from "../../../config/api";
+import apiClient from "@config/api";
 import MapViewer from './map-viewer';
 import MapPicker from './map-picker';
 

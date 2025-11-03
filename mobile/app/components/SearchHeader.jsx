@@ -426,7 +426,7 @@
       height: moderateScale(44),
       justifyContent: 'center',
       alignItems: 'center',
-      overflow: 'hidden',
+      overflow: 'visible',
     },
     profileImage: {
       width: moderateScale(44),
@@ -436,8 +436,8 @@
     },
     badgeContainer: {
       position: 'absolute',
-      top: moderateScale(0),
-      right: moderateScale(0),
+      top: moderateScale(-6),
+      right: moderateScale(-6),
       backgroundColor: '#FF3B30',
       borderRadius: moderateScale(10),
       minWidth: moderateScale(20),

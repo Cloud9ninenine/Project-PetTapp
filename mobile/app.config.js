@@ -105,7 +105,9 @@ export default {
       typedRoutes: true
     },
     extra: {
-      router: {},
+      router: {
+        ignorePattern: '.*\\/_(?!layout|error|not-found)(?<!\\.d\\.ts)$'
+      },
       eas: {
         projectId: "610db6c5-defb-4390-887c-9dfd773742ef"
       },

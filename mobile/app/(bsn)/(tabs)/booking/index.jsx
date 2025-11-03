@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
+  ScrollView,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +31,11 @@ const CustomerBookings = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({
+    sortBy: 'dateDesc', // dateDesc, dateAsc
+    paymentMethod: 'all', // all, cash, qr-payment
+  });
+  const [tempFilterOptions, setTempFilterOptions] = useState(filterOptions);
   const router = useRouter();
 
   const handleBackPress = () => {
@@ -39,7 +45,7 @@ const CustomerBookings = () => {
   useEffect(() => {
     fetchBookings();
     fetchAllBookingsForStats();
-  }, [selectedStatus]);
+  }, [selectedStatus, filterOptions]);
 
   const fetchAllBookingsForStats = async () => {
     try {
@@ -69,15 +75,29 @@ const CustomerBookings = () => {
         limit: 20,
       };
 
+      // Apply sort based on filter options
+      switch (filterOptions.sortBy) {
+        case 'dateAsc':
+          params.sort = 'appointmentDateTime'; // Ascending (oldest first)
+          break;
+        case 'dateDesc':
+        default:
+          params.sort = '-appointmentDateTime'; // Descending (most recent first)
+          break;
+      }
+
+      // Add payment method filter if not 'all'
+      if (filterOptions.paymentMethod && filterOptions.paymentMethod !== 'all') {
+        params.paymentMethod = filterOptions.paymentMethod;
+      }
+
       // Handle special filter statuses
       if (selectedStatus === 'active') {
         // Active bookings: pending, confirmed, in-progress
         params.status = 'pending,confirmed,in-progress';
-        params.sort = '-appointmentDateTime';
       } else if (selectedStatus !== 'all') {
         // Specific status
         params.status = selectedStatus;
-        params.sort = '-appointmentDateTime';
       }
       // For 'all' status, we'll sort on client-side after fetching
 
@@ -85,6 +105,37 @@ const CustomerBookings = () => {
 
       if (response.data && response.data.success) {
         let newBookings = response.data.data || [];
+
+        // Frontend safety filter: Ensure payment method filter is applied correctly
+        if (filterOptions.paymentMethod && filterOptions.paymentMethod !== 'all') {
+          const beforeFilterCount = newBookings.length;
+          newBookings = newBookings.filter(booking =>
+            booking.paymentMethod === filterOptions.paymentMethod
+          );
+
+          if (beforeFilterCount !== newBookings.length) {
+            console.warn('⚠️ Payment filter mismatch detected!', {
+              requestedPaymentMethod: filterOptions.paymentMethod,
+              beforeFilterCount: beforeFilterCount,
+              afterFilterCount: newBookings.length,
+            });
+          }
+        }
+
+        // Frontend date sorting: Ensure appointment date sorting is applied correctly
+        if (filterOptions.sortBy === 'dateDesc') {
+          newBookings.sort((a, b) => {
+            const dateA = new Date(a.appointmentDateTime).getTime();
+            const dateB = new Date(b.appointmentDateTime).getTime();
+            return dateB - dateA; // Newest first
+          });
+        } else if (filterOptions.sortBy === 'dateAsc') {
+          newBookings.sort((a, b) => {
+            const dateA = new Date(a.appointmentDateTime).getTime();
+            const dateB = new Date(b.appointmentDateTime).getTime();
+            return dateA - dateB; // Oldest first
+          });
+        }
 
         // Custom sort for 'all' status: Active first, then Pending, then rest
         if (selectedStatus === 'all') {
@@ -105,8 +156,10 @@ const CustomerBookings = () => {
               return aPriority - bPriority;
             }
 
-            // If same priority, sort by appointment date (most recent first)
-            return new Date(b.appointmentDateTime) - new Date(a.appointmentDateTime);
+            // If same priority, sort by appointment date based on filter
+            const dateA = new Date(a.appointmentDateTime).getTime();
+            const dateB = new Date(b.appointmentDateTime).getTime();
+            return filterOptions.sortBy === 'dateAsc' ? dateA - dateB : dateB - dateA;
           });
         }
 
@@ -347,6 +400,34 @@ const CustomerBookings = () => {
     return allBookings.filter(b => b.status === statusMap[status]).length;
   };
 
+  // Handle filter modal open
+  const handleOpenFilterModal = () => {
+    setTempFilterOptions(filterOptions);
+    setFilterModalVisible(true);
+  };
+
+  // Handle filter apply
+  const handleApplyFilter = () => {
+    setFilterOptions(tempFilterOptions);
+    setFilterModalVisible(false);
+  };
+
+  // Handle filter reset
+  const handleResetFilter = () => {
+    const defaultOptions = {
+      sortBy: 'dateDesc',
+      paymentMethod: 'all',
+    };
+    setTempFilterOptions(defaultOptions);
+    setFilterOptions(defaultOptions);
+    setFilterModalVisible(false);
+  };
+
+  // Check if filters are active
+  const hasActiveFilters = () => {
+    return filterOptions.sortBy !== 'dateDesc' || filterOptions.paymentMethod !== 'all';
+  };
+
   const renderFilterModal = () => (
     <Modal
       visible={filterModalVisible}
@@ -359,61 +440,126 @@ const CustomerBookings = () => {
         activeOpacity={1}
         onPress={() => setFilterModalVisible(false)}
       >
-        <View style={styles.filterDropdown}>
-          {statusFilters.map((filter) => {
-            const count = getStatusCount(filter.value);
-            const isSelected = selectedStatus === filter.value;
-            return (
-              <TouchableOpacity
-                key={filter.value}
-                style={[
-                  styles.filterOption,
-                  isSelected && styles.filterOptionSelected
-                ]}
-                onPress={() => {
-                  setSelectedStatus(filter.value);
-                  setPage(1);
-                  setHasMore(true);
-                  setFilterModalVisible(false);
-                }}
-              >
-                <View style={styles.filterOptionContent}>
-                  {filter.icon && (
-                    <Ionicons
-                      name={filter.icon}
-                      size={moderateScale(18)}
-                      color={isSelected ? '#1C86FF' : '#666'}
-                    />
-                  )}
-                  <Text style={[
-                    styles.filterOptionText,
-                    isSelected && styles.filterOptionTextSelected
-                  ]}>
-                    {filter.label}
-                  </Text>
-                  {allBookings.length > 0 && count > 0 && (
-                    <View style={[
-                      styles.filterCountBadge,
-                      isSelected && styles.filterCountBadgeSelected
-                    ]}>
-                      <Text style={[
-                        styles.filterCountText,
-                        isSelected && styles.filterCountTextSelected
-                      ]}>
-                        {count}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                {isSelected && (
-                  <Ionicons name="checkmark" size={moderateScale(20)} color="#1C86FF" />
-                )}
-              </TouchableOpacity>
-            );
-          })}
+        <View style={styles.filterModalContent}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filter & Sort</Text>
+            <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+              <Ionicons name="close" size={moderateScale(24)} color="#333" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.filterContent}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled={true}
+          >
+            {/* Sort Section */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Sort By</Text>
+
+              {[
+                { value: 'dateDesc', label: 'Date - Newest First', icon: 'arrow-down' },
+                { value: 'dateAsc', label: 'Date - Oldest First', icon: 'arrow-up' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilterOptions({ ...tempFilterOptions, sortBy: option.value })}
+                >
+                  <View style={styles.filterCheckbox}>
+                    {tempFilterOptions.sortBy === option.value && (
+                      <Ionicons name="checkmark" size={moderateScale(16)} color="#1C86FF" />
+                    )}
+                  </View>
+                  <Ionicons name={option.icon} size={moderateScale(18)} color="#1C86FF" style={styles.optionIcon} />
+                  <Text style={styles.filterOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Payment Method Section */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Payment Method</Text>
+
+              {[
+                { value: 'all', label: 'All Methods', icon: 'list' },
+                { value: 'cash', label: 'Cash', icon: 'cash-outline' },
+                { value: 'qr-payment', label: 'QR Payment', icon: 'qr-code-outline' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilterOptions({ ...tempFilterOptions, paymentMethod: option.value })}
+                >
+                  <View style={styles.filterCheckbox}>
+                    {tempFilterOptions.paymentMethod === option.value && (
+                      <Ionicons name="checkmark" size={moderateScale(16)} color="#1C86FF" />
+                    )}
+                  </View>
+                  <Ionicons name={option.icon} size={moderateScale(18)} color="#1C86FF" style={styles.optionIcon} />
+                  <Text style={styles.filterOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
+
+          {/* Modal Footer */}
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={[styles.footerButton, styles.resetButton]}
+              onPress={handleResetFilter}
+            >
+              <Ionicons name="refresh" size={moderateScale(18)} color="#1C86FF" />
+              <Text style={styles.resetButtonText}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.footerButton, styles.applyButton]}
+              onPress={handleApplyFilter}
+            >
+              <Ionicons name="checkmark-done" size={moderateScale(18)} color="#fff" />
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableOpacity>
     </Modal>
+  );
+
+  const renderStatusFilter = () => (
+    <View style={styles.filterContainer}>
+      <FlatList
+        horizontal
+        data={statusFilters}
+        keyExtractor={(item) => item.value}
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              selectedStatus === item.value && styles.filterChipActive
+            ]}
+            onPress={() => setSelectedStatus(item.value)}
+          >
+            {item.icon && (
+              <Ionicons
+                name={item.icon}
+                size={moderateScale(16)}
+                color={selectedStatus === item.value ? '#fff' : '#1C86FF'}
+                style={styles.filterChipIcon}
+              />
+            )}
+            <Text style={[
+              styles.filterChipText,
+              selectedStatus === item.value && styles.filterChipTextActive
+            ]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.filterList}
+      />
+    </View>
   );
 
   const renderLoadMoreButton = () => {
@@ -515,24 +661,33 @@ const CustomerBookings = () => {
         onBackPress={handleBackPress}
       />
 
-      {/* Search Bar with Filter Button */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search customers, pets, services..."
-          placeholderTextColor="#C7C7CC"
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
-        >
-          <Ionicons name="filter" size={moderateScale(22)} color="#1C86FF" />
-          {selectedStatus !== 'all' && (
-            <View style={styles.filterActiveDot} />
+      {/* Search Bar and Filter Button */}
+      <View style={styles.searchBarContainer}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={moderateScale(20)} color="#C7C7CC" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search customers, pets, services..."
+            placeholderTextColor="#C7C7CC"
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchText('')}>
+              <Ionicons name="close-circle" size={moderateScale(20)} color="#C7C7CC" />
+            </TouchableOpacity>
           )}
+        </View>
+        <TouchableOpacity
+          style={[styles.filterButton, hasActiveFilters() && styles.filterButtonActive]}
+          onPress={handleOpenFilterModal}
+        >
+          <Ionicons
+            name="filter"
+            size={moderateScale(20)}
+            color={hasActiveFilters() ? "#fff" : "#1C86FF"}
+          />
+          {hasActiveFilters() && <View style={styles.filterBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -582,17 +737,23 @@ const styles = StyleSheet.create({
     fontFamily: 'SFProBold',
     textAlign: 'center',
   },
-  searchContainer: {
+  searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: wp(4),
-    marginVertical: moderateScale(15),
+    marginVertical: moderateScale(12),
+    gap: moderateScale(8),
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: moderateScale(15),
     borderRadius: moderateScale(10),
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#1C86FF',
-    height: hp(6),
+    borderColor: '#E0E0E0',
+    height: hp(5.5),
   },
   searchIcon: {
     marginRight: moderateScale(8),
@@ -608,6 +769,10 @@ const styles = StyleSheet.create({
     marginLeft: moderateScale(8),
     position: 'relative',
   },
+  filterButtonActive: {
+    backgroundColor: '#1C86FF',
+    borderRadius: moderateScale(8),
+  },
   filterActiveDot: {
     position: 'absolute',
     top: moderateScale(6),
@@ -617,13 +782,141 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(4),
     backgroundColor: '#FF6B6B',
   },
+  filterBadge: {
+    position: 'absolute',
+    top: moderateScale(4),
+    right: moderateScale(4),
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    backgroundColor: '#FF6B6B',
+  },
+  filterContainer: {
+    paddingVertical: moderateScale(8),
+    backgroundColor: '#fff',
+  },
+  filterList: {
+    paddingHorizontal: wp(4),
+    gap: moderateScale(8),
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    borderRadius: moderateScale(20),
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    gap: moderateScale(6),
+  },
+  filterChipActive: {
+    backgroundColor: '#1C86FF',
+    borderColor: '#1C86FF',
+  },
+  filterChipIcon: {
+    marginRight: moderateScale(2),
+  },
+  filterChipText: {
+    fontSize: scaleFontSize(13),
+    color: '#1C86FF',
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(18),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+  },
+  filterContent: {
+    maxHeight: moderateScale(400),
+    padding: moderateScale(16),
+  },
+  filterSection: {
+    marginBottom: moderateScale(24),
+  },
+  filterSectionTitle: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(12),
+  },
+  filterCheckbox: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(4),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: moderateScale(12),
+  },
+  optionIcon: {
+    marginLeft: moderateScale(4),
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    padding: moderateScale(16),
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  footerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(10),
+    gap: moderateScale(6),
+  },
+  resetButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+  },
+  resetButtonText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#1C86FF',
+  },
+  applyButton: {
+    backgroundColor: '#1C86FF',
+  },
+  applyButtonText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#fff',
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: hp(13),
-    paddingRight: wp(4),
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(5),
+  },
+  filterModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    width: '90%',
+    maxWidth: wp(90),
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+    overflow: 'hidden',
   },
   filterDropdown: {
     backgroundColor: '#FFFFFF',
@@ -640,11 +933,11 @@ const styles = StyleSheet.create({
   filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: moderateScale(16),
     paddingVertical: moderateScale(12),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    gap: moderateScale(12),
   },
   filterOptionSelected: {
     backgroundColor: '#F0F7FF',

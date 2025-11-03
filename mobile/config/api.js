@@ -4,11 +4,16 @@ import { AppState } from 'react-native';
 
 const API_URL = 'https://pettapp.onrender.com';
 
+// Debug: Log API configuration on load
+if (__DEV__) {
+  console.log('⚙️  API initialized with URL:', API_URL);
+}
+
 // Progressive timeout configuration
 const TIMEOUT_CONFIG = {
-  initial: 5000,        // 5s for first attempt
-  progressive: [10000, 15000, 20000, 30000, 45000, 60000], // Progressive timeouts
-  max: 60000,          // Max 60s timeout
+  initial: 8000,        // 8s for first attempt (increased from 5s)
+  progressive: [12000, 20000, 30000, 45000, 60000, 90000, 120000], // Progressive timeouts with longer waits for cold starts
+  max: 120000,          // Max 120s timeout (increased from 60s to handle Render cold starts)
 };
 
 // Server health status tracker
@@ -21,13 +26,13 @@ let serverStatus = {
 };
 
 // Keep-alive configuration
-const KEEP_ALIVE_INTERVAL = 25000; // Ping every 25 seconds (more aggressive)
-const WAKE_SEQUENCE_PINGS = 6;     // Number of pings during wake sequence
+const KEEP_ALIVE_INTERVAL = 60000; // Ping every 60 seconds (reduced from 25s for better performance)
+const WAKE_SEQUENCE_PINGS = 8;     // Number of pings during wake sequence (increased from 6)
 let keepAliveIntervalId = null;
 let isAppForegrounded = true;
 
-// Health check interval (ping every 30 seconds)
-const HEALTH_CHECK_INTERVAL = 30000;
+// Health check interval (ping every 45 seconds when actively monitoring)
+const HEALTH_CHECK_INTERVAL = 45000; // Increased from 30 seconds to reduce load
 let healthCheckIntervalId = null;
 
 // Flag to prevent multiple token refresh attempts
@@ -196,55 +201,50 @@ const getProgressiveTimeout = (attempt) => {
 };
 
 /**
- * Check if the server is online with progressive timeout
+ * Check if the server is online with timeout guarantee
  * @param {number} timeoutMs - Optional timeout override in milliseconds
  * @returns {Promise<boolean>} - Returns true if server is reachable
  */
-export const checkServerHealth = async (timeoutMs = 5000) => {
-  // Prevent multiple simultaneous checks
-  if (serverStatus.isChecking) {
-    console.log('⏳ Health check already in progress...');
-    return serverStatus.isOnline;
-  }
-
-  serverStatus.isChecking = true;
-
+export const checkServerHealth = async (timeoutMs = 8000) => {
   try {
-    console.log('🏥 Checking server health...');
+    console.log(`🏥 Checking server health (timeout: ${timeoutMs / 1000}s)...`);
 
-    // Use a lightweight endpoint with progressive timeout
-    const response = await axios.get(`${API_URL}/health`, {
+    // Create a new axios instance with explicit timeout for this request
+    const healthCheckClient = axios.create({
+      baseURL: API_URL,
       timeout: timeoutMs,
       headers: { 'Content-Type': 'application/json' }
     });
 
-    const isHealthy = response.status === 200;
+    // Race the request against a timeout to ensure completion
+    const response = await Promise.race([
+      healthCheckClient.get('/health'),
+      new Promise((_, reject) =>
+        setTimeout(() => {
+          reject(new Error(`Health check timeout after ${timeoutMs / 1000}s`));
+        }, timeoutMs + 500) // Add 500ms buffer for cleanup
+      )
+    ]);
 
-    serverStatus.isOnline = isHealthy;
+    // Successful response
+    serverStatus.isOnline = true;
     serverStatus.isAwake = true;
     serverStatus.lastChecked = new Date();
     serverStatus.consecutiveFailures = 0;
 
     console.log('✅ Server is online and healthy');
     return true;
+
   } catch (error) {
+    // Track failures
     serverStatus.consecutiveFailures++;
     serverStatus.isOnline = false;
     serverStatus.lastChecked = new Date();
 
-    console.error(`❌ Server health check failed (${serverStatus.consecutiveFailures} consecutive failures)`);
-
-    if (error.code === 'ECONNABORTED') {
-      console.error('⏱️ Server response timeout');
-    } else if (error.request) {
-      console.error('🌐 No response from server - may be offline or slow');
-    } else {
-      console.error('❓ Error:', error.message);
-    }
+    console.error(`❌ Server health check failed (attempt ${serverStatus.consecutiveFailures})`);
+    console.error(`   Error: ${error.message}`);
 
     return false;
-  } finally {
-    serverStatus.isChecking = false;
   }
 };
 
@@ -302,16 +302,17 @@ export const getServerStatus = () => {
  * Wait for server to be online before proceeding with progressive timeouts
  * Useful before login or critical operations
  * @param {number} maxRetries - Maximum number of retry attempts
- * @param {number} retryDelay - Delay between retries in ms
+ * @param {number} initialDelay - Initial delay between retries in ms
  * @returns {Promise<boolean>} - Returns true if server becomes online
  */
-export const waitForServer = async (maxRetries = 7, retryDelay = 3000) => {
+export const waitForServer = async (maxRetries = 5, initialDelay = 2000) => {
   console.log(`⏳ Waiting for server to be online (max ${maxRetries} attempts)...`);
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // Get progressive timeout for this attempt
-    const timeout = getProgressiveTimeout(attempt);
-    console.log(`🔄 Attempt ${attempt}/${maxRetries} (timeout: ${timeout / 1000}s)...`);
+    // Timeout increases with each attempt: 8s, 12s, 20s, 30s, 45s
+    const timeout = Math.min(8000 + (attempt - 1) * 8000, 45000);
+
+    console.log(`🔄 Attempt ${attempt}/${maxRetries} (timeout: ${Math.round(timeout / 1000)}s)...`);
 
     const isOnline = await checkServerHealth(timeout);
 
@@ -320,10 +321,10 @@ export const waitForServer = async (maxRetries = 7, retryDelay = 3000) => {
       return true;
     }
 
+    // Wait before retrying (except on last attempt)
     if (attempt < maxRetries) {
-      // Progressive delay: start small, increase gradually
-      const delay = Math.min(retryDelay * attempt, 8000);
-      console.log(`⏱️ Waiting ${delay / 1000}s before retry...`);
+      const delay = initialDelay * attempt; // 2s, 4s, 6s, 8s, 10s
+      console.log(`⏱️ Waiting ${Math.round(delay / 1000)}s before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -333,61 +334,59 @@ export const waitForServer = async (maxRetries = 7, retryDelay = 3000) => {
 };
 
 /**
- * Make API request with automatic retry and progressive timeouts for cold start scenarios
+ * Make API request with automatic retry and progressive timeouts
  * @param {Function} requestFn - The API request function to execute
  * @param {number} maxRetries - Maximum retry attempts
  * @returns {Promise} - The API response
  */
-export const apiRequestWithRetry = async (requestFn, maxRetries = 6) => {
+export const apiRequestWithRetry = async (requestFn, maxRetries = 5) => {
   let lastError;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Get progressive timeout for this attempt
-      const timeout = getProgressiveTimeout(attempt);
+      // Progressive timeout: 8s, 16s, 24s, 32s, 45s
+      const timeout = Math.min(8000 + (attempt - 1) * 8000, 45000);
 
-      // Create a temporary client with progressive timeout for this attempt
+      // Create a temporary client with progressive timeout
       const tempClient = axios.create({
         baseURL: API_URL,
         timeout: timeout,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
-      // Copy auth token from original request
+      // Add auth token if available
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
         tempClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
 
-      console.log(`🔄 API request attempt ${attempt}/${maxRetries} (timeout: ${timeout / 1000}s)`);
+      console.log(`🔄 API request attempt ${attempt}/${maxRetries} (timeout: ${Math.round(timeout / 1000)}s)`);
 
-      // Execute request with progressive timeout
+      // Execute request
       const response = await requestFn(tempClient);
 
-      // Mark server as awake on success
-      serverStatus.isAwake = true;
-      serverStatus.isOnline = true;
+      // Success - reset failure count
       serverStatus.consecutiveFailures = 0;
-
       return response;
+
     } catch (error) {
       lastError = error;
 
-      // Only retry on timeout or network errors
+      // Check if we should retry
       const shouldRetry =
-        error.code === 'ECONNABORTED' ||
-        (error.request && !error.response) ||
-        error.response?.status === 503;
+        error.code === 'ECONNABORTED' ||  // Timeout
+        (error.request && !error.response) || // Network error
+        error.response?.status === 503; // Service unavailable
 
       if (!shouldRetry || attempt === maxRetries) {
+        // Don't retry or last attempt - throw error
+        console.error(`❌ API request failed: ${error.message}`);
         throw error;
       }
 
-      // Progressive delay between retries
-      const delay = Math.min(2000 * attempt, 8000);
-      console.log(`⏱️ Request failed, waiting ${delay}ms before retry...`);
+      // Wait before retrying
+      const delay = 1000 * attempt; // 1s, 2s, 3s, 4s, 5s
+      console.log(`⏱️ Waiting ${delay / 1000}s before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -434,37 +433,31 @@ export const checkServerWithMessage = async () => {
 export const wakeServerSequence = async () => {
   console.log('🌅 Starting server wake sequence...');
 
-  // Check if server is already awake
-  if (serverStatus.isAwake && serverStatus.isOnline) {
-    console.log('✅ Server is already awake');
-    return true;
-  }
-
-  // Send multiple rapid pings with progressive timeouts
+  // Try to wake the server with progressive timeouts and delays
   for (let ping = 1; ping <= WAKE_SEQUENCE_PINGS; ping++) {
-    const timeout = getProgressiveTimeout(ping);
-    console.log(`📡 Wake ping ${ping}/${WAKE_SEQUENCE_PINGS} (timeout: ${timeout / 1000}s)`);
+    // Progressive timeout: 8s, 12s, 20s, 30s, 45s, 60s, 90s, 120s
+    const timeout = Math.min(8000 + (ping - 1) * 15000, 120000);
 
-    try {
-      const isOnline = await checkServerHealth(timeout);
+    console.log(`📡 Wake ping ${ping}/${WAKE_SEQUENCE_PINGS} (timeout: ${Math.round(timeout / 1000)}s)...`);
 
-      if (isOnline) {
-        console.log(`✅ Server woke up on ping ${ping}!`);
-        serverStatus.isAwake = true;
-        return true;
-      }
-    } catch (error) {
-      console.log(`⏱️ Wake ping ${ping} timed out, continuing...`);
+    const isOnline = await checkServerHealth(timeout);
+
+    if (isOnline) {
+      console.log(`✅ Server woke up on ping ${ping}!`);
+      serverStatus.isAwake = true;
+      return true;
     }
 
-    // Short delay between pings (except after last ping)
+    // Delay between pings to give server time to start (except after last ping)
     if (ping < WAKE_SEQUENCE_PINGS) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const delayMs = Math.min(2000 + (ping * 1000), 8000); // 3s, 4s, 5s, 6s, 7s, 8s...
+      console.log(`   Waiting ${Math.round(delayMs / 1000)}s before next ping...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
 
-  console.warn('⚠️ Server wake sequence completed but server may still be starting');
-  return serverStatus.isOnline === true;
+  console.warn('⚠️ Server wake sequence completed, app will continue');
+  return false;
 };
 
 /**

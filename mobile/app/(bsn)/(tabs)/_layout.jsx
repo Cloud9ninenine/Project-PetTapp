@@ -10,7 +10,8 @@ export default function RootLayout() {
   // Screens where you don't want the footer
   const hideFooterOn = [
     "/home/service-details",
-    "/(bsn)/(tabs)/messages/chat"
+    "/(bsn)/(tabs)/messages/chat",
+    "AppointmentDetails"
   ];
 
   const shouldHideFooter = hideFooterOn.some((path) =>

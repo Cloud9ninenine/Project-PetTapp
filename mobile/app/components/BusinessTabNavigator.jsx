@@ -34,9 +34,9 @@ const businessTabs = [
     icon: require("@assets/images/service_icon/Pet Icon.png"),
   },
   {
-    name: "booking",
+    name: "Appointments",
     route: "/(bsn)/(tabs)/booking",
-    label: "Booking",
+    label: "Appointments",
     icon: require("@assets/images/service_icon/calendar icon.png"),
   },
 

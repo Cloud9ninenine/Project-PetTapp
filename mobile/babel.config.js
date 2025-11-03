@@ -13,7 +13,7 @@ module.exports = function (api) {
             "@assets": "./app/assets",
             "@components": "./app/components",
             "@utils": "./utils",
-            "@config": "./app/config",
+            "@config": "./config",
             "@services": "./services",
             "@auth": "./app/(auth)",
             "@user": "./app/(user)",

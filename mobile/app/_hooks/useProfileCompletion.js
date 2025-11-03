@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import apiClient from '../config/api';
+import apiClient from '@config/api';
 
 /**
  * Custom hook to check if user profile is complete

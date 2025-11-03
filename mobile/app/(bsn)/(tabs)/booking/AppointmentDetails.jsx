@@ -37,6 +37,26 @@ const AppointmentDetail = () => {
   const [editRejectionReason, setEditRejectionReason] = useState('');
   const [loadingChat, setLoadingChat] = useState(false);
 
+  // Confirmation modal states
+  const [confirmationModal, setConfirmationModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    action: null,
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    confirmColor: '#1C86FF',
+  });
+
+  // Success modal states
+  const [successModal, setSuccessModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    icon: 'checkmark-circle',
+    iconColor: '#4CAF50',
+  });
+
   useEffect(() => {
     if (params.bookingId) {
       fetchBookingDetails();
@@ -130,6 +150,21 @@ const AppointmentDetail = () => {
     Alert.alert("Copied", "Booking ID copied to clipboard");
   };
 
+  const showSuccessModal = (title, message, icon = 'checkmark-circle', iconColor = '#4CAF50') => {
+    setSuccessModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      iconColor,
+    });
+
+    // Auto-close after 2 seconds
+    setTimeout(() => {
+      setSuccessModal(prev => ({ ...prev, visible: false }));
+    }, 2000);
+  };
+
   const handleStatusUpdate = async (newStatus) => {
     try {
       setUpdating(true);
@@ -138,8 +173,20 @@ const AppointmentDetail = () => {
         status: newStatus,
       });
 
-      Alert.alert("Success", `Booking status updated to ${newStatus}!`);
-      fetchBookingDetails(); // Refresh data
+      const statusLabels = {
+        'confirmed': 'Confirmed',
+        'in-progress': 'In Progress',
+        'completed': 'Completed',
+        'no-show': 'No Show',
+        'cancelled': 'Cancelled',
+      };
+
+      showSuccessModal(
+        `${statusLabels[newStatus] || newStatus}`,
+        `Booking status updated successfully!`
+      );
+
+      setTimeout(() => fetchBookingDetails(), 500);
     } catch (error) {
       console.error('Error updating booking status:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to update booking status');
@@ -148,39 +195,77 @@ const AppointmentDetail = () => {
     }
   };
 
+  const showConfirmationModal = (title, message, action, confirmText = 'Confirm', confirmColor = '#1C86FF') => {
+    setConfirmationModal({
+      visible: true,
+      title,
+      message,
+      action,
+      confirmText,
+      cancelText: 'Cancel',
+      confirmColor,
+    });
+  };
+
+  const handleConfirmationConfirm = async () => {
+    if (confirmationModal.action) {
+      setConfirmationModal(prev => ({ ...prev, visible: false }));
+      await handleStatusUpdate(confirmationModal.action);
+    }
+  };
+
+  const handleConfirmationCancel = () => {
+    setConfirmationModal(prev => ({ ...prev, visible: false }));
+  };
+
   const handleConfirm = () => {
-    Alert.alert("Confirm Appointment", "Confirm this appointment?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", onPress: () => handleStatusUpdate('confirmed') },
-    ]);
+    showConfirmationModal(
+      "Confirm Appointment",
+      "Are you sure you want to confirm this appointment?",
+      'confirmed',
+      'Confirm',
+      '#4CAF50'
+    );
   };
 
   const handleStartService = () => {
-    Alert.alert("Start Service", "Mark this appointment as in progress?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Start", onPress: () => handleStatusUpdate('in-progress') },
-    ]);
+    showConfirmationModal(
+      "Start Service",
+      "Mark this appointment as in progress?",
+      'in-progress',
+      'Start',
+      '#FFC107'
+    );
   };
 
   const handleComplete = () => {
-    Alert.alert("Mark as Complete", "Mark this appointment as completed?", [
-      { text: "No", style: "cancel" },
-      { text: "Yes", onPress: () => handleStatusUpdate('completed') },
-    ]);
+    showConfirmationModal(
+      "Mark as Complete",
+      "Mark this appointment as completed?",
+      'completed',
+      'Complete',
+      '#4CAF50'
+    );
   };
 
   const handleNoShow = () => {
-    Alert.alert("Mark as No Show", "Mark this appointment as no show?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Confirm", onPress: () => handleStatusUpdate('no-show') },
-    ]);
+    showConfirmationModal(
+      "Mark as No Show",
+      "Mark this appointment as no show?",
+      'no-show',
+      'Confirm',
+      '#9E9E9E'
+    );
   };
 
   const handleCancel = () => {
-    Alert.alert("Cancel Appointment", "Are you sure you want to cancel this appointment?", [
-      { text: "No", style: "cancel" },
-      { text: "Yes", onPress: () => handleStatusUpdate('cancelled') },
-    ]);
+    showConfirmationModal(
+      "Cancel Appointment",
+      "Are you sure you want to cancel this appointment?",
+      'cancelled',
+      'Cancel',
+      '#FF6B6B'
+    );
   };
 
   const handleVerifyPayment = async () => {
@@ -189,8 +274,8 @@ const AppointmentDetail = () => {
 
       await apiClient.patch(`/bookings/${params.bookingId}/payment-proof/verify`);
 
-      Alert.alert("Success", "Payment verified successfully!");
-      fetchBookingDetails();
+      showSuccessModal("Payment Verified", "Payment has been verified successfully!");
+      setTimeout(() => fetchBookingDetails(), 500);
     } catch (error) {
       console.error('Error verifying payment:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to verify payment');
@@ -217,9 +302,14 @@ const AppointmentDetail = () => {
         rejectionReason: rejectionReason,
       });
 
-      Alert.alert("Success", "Payment proof rejected");
+      showSuccessModal(
+        "Payment Rejected",
+        "Payment proof has been rejected successfully!",
+        'close-circle',
+        '#FF6B6B'
+      );
       setRejectionReason('');
-      fetchBookingDetails();
+      setTimeout(() => fetchBookingDetails(), 500);
     } catch (error) {
       console.error('Error rejecting payment:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to reject payment');
@@ -361,8 +451,13 @@ const AppointmentDetail = () => {
             try {
               setUpdating(true);
               await apiClient.patch(`/bookings/${params.bookingId}/approve-edit`);
-              Alert.alert('Success', 'Booking edit request approved successfully!');
-              fetchBookingDetails();
+              showSuccessModal(
+                'Edit Request Approved',
+                'Booking edit request has been approved successfully!',
+                'checkmark-circle',
+                '#4CAF50'
+              );
+              setTimeout(() => fetchBookingDetails(), 500);
             } catch (error) {
               console.error('Error approving edit request:', error);
               Alert.alert('Error', error.response?.data?.message || 'Failed to approve edit request');
@@ -393,9 +488,14 @@ const AppointmentDetail = () => {
         rejectionReason: editRejectionReason,
       });
 
-      Alert.alert('Success', 'Booking edit request rejected');
+      showSuccessModal(
+        'Edit Request Rejected',
+        'Booking edit request has been rejected successfully!',
+        'close-circle',
+        '#FF6B6B'
+      );
       setEditRejectionReason('');
-      fetchBookingDetails();
+      setTimeout(() => fetchBookingDetails(), 500);
     } catch (error) {
       console.error('Error rejecting edit request:', error);
       Alert.alert('Error', error.response?.data?.message || 'Failed to reject edit request');
@@ -443,9 +543,9 @@ const AppointmentDetail = () => {
 
     if (status === "pending") {
       return (
-        <View style={styles.actionButtonsContainer}>
+        <View style={styles.actionButtonsRow}>
           <TouchableOpacity
-            style={[styles.fullButton, updating && styles.buttonDisabled]}
+            style={[styles.sideBySideButton, updating && styles.buttonDisabled]}
             onPress={handleConfirm}
             disabled={updating}
           >
@@ -454,17 +554,17 @@ const AppointmentDetail = () => {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                <Text style={styles.fullButtonText}>Confirm Booking</Text>
+                <Text style={styles.sideBySideButtonText}>Confirm</Text>
               </>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.cancelButton, updating && styles.buttonDisabled]}
+            style={[styles.sideBySideButtonOutline, updating && styles.buttonDisabled]}
             onPress={handleCancel}
             disabled={updating}
           >
             <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
-            <Text style={styles.cancelButtonText}>Cancel Booking</Text>
+            <Text style={styles.sideBySideButtonOutlineText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       );
@@ -634,7 +734,8 @@ const AppointmentDetail = () => {
         customTitle={renderTitle()}
         showBack={true}
       />
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.mainContent}>
+        <ScrollView contentContainerStyle={styles.content}>
 
         {/* Action Required Notice - if pending edit request */}
         {bookingData.editRequest?.approvalStatus === 'pending' && (
@@ -993,8 +1094,15 @@ const AppointmentDetail = () => {
         )}
 
         {/* 7. Action Buttons */}
-        {renderActionButtons()}
-      </ScrollView>
+        </ScrollView>
+      </View>
+
+      {/* Sticky Action Buttons Footer */}
+      {renderActionButtons() && (
+        <View style={styles.stickyButtonFooter}>
+          {renderActionButtons()}
+        </View>
+      )}
 
       {/* Reject Payment Modal */}
       <Modal
@@ -1113,6 +1221,134 @@ const AppointmentDetail = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={confirmationModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleConfirmationCancel}
+      >
+        <View style={styles.confirmationOverlay}>
+          <View style={styles.confirmationContent}>
+            {/* Icon Container */}
+            <View
+              style={[
+                styles.confirmationIconContainer,
+                { backgroundColor: `${confirmationModal.confirmColor}20` }
+              ]}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={moderateScale(60)}
+                color={confirmationModal.confirmColor}
+              />
+            </View>
+
+            {/* Title and Message */}
+            <Text
+              style={[
+                styles.confirmationTitle,
+                { color: confirmationModal.confirmColor }
+              ]}
+            >
+              {confirmationModal.title}
+            </Text>
+            <Text style={styles.confirmationMessage}>
+              {confirmationModal.message}
+            </Text>
+
+            {/* Action Buttons */}
+            <View style={styles.confirmationButtonContainer}>
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={[
+                  styles.confirmationCancelButton,
+                  updating && styles.confirmationButtonDisabled
+                ]}
+                onPress={handleConfirmationCancel}
+                disabled={updating}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={moderateScale(18)}
+                  color="#FF6B6B"
+                />
+                <Text style={styles.confirmationCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              {/* Confirm Button */}
+              <TouchableOpacity
+                style={[
+                  styles.confirmationConfirmButton,
+                  { backgroundColor: confirmationModal.confirmColor },
+                  updating && styles.confirmationButtonDisabled
+                ]}
+                onPress={handleConfirmationConfirm}
+                disabled={updating}
+              >
+                {updating ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={moderateScale(18)}
+                      color="#fff"
+                    />
+                    <Text style={styles.confirmationConfirmButtonText}>
+                      {confirmationModal.confirmText}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={successModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSuccessModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.successOverlay}>
+          <View style={styles.successContent}>
+            {/* Icon Container */}
+            <View
+              style={[
+                styles.successIconContainer,
+                { backgroundColor: `${successModal.iconColor}20` }
+              ]}
+            >
+              <Ionicons
+                name={successModal.icon}
+                size={moderateScale(64)}
+                color={successModal.iconColor}
+              />
+            </View>
+
+            {/* Title and Message */}
+            <Text style={[styles.successTitle, { color: successModal.iconColor }]}>
+              {successModal.title}
+            </Text>
+            <Text style={styles.successMessage}>
+              {successModal.message}
+            </Text>
+
+            {/* Success Indicator */}
+            <View style={styles.successIndicator}>
+              <Ionicons
+                name="checkmark"
+                size={moderateScale(24)}
+                color={successModal.iconColor}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1125,6 +1361,10 @@ const styles = StyleSheet.create({
   },
   backgroundImageStyle: {
     opacity: 0.1,
+  },
+  mainContent: {
+    flex: 1,
+    overflow: 'hidden',
   },
   titleContainer: {
     flex: 1,
@@ -1160,7 +1400,16 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
-    paddingBottom: moderateScale(40),
+    paddingBottom: moderateScale(20),
+  },
+  stickyButtonFooter: {
+    backgroundColor: '#fff',
+    paddingHorizontal: wp(5),
+    paddingVertical: moderateScale(16),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    minHeight: moderateScale(80),
+    justifyContent: 'center',
   },
   // Section Card Styles
   sectionCard: {
@@ -1373,10 +1622,14 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     color: '#999',
   },
-  actionButtonsContainer: { gap: moderateScale(12) },
+  actionButtonsContainer: {
+    gap: moderateScale(12),
+    width: '100%',
+  },
   actionButtonsRow: {
     flexDirection: "row",
     gap: moderateScale(12),
+    width: '100%',
   },
   fullButton: {
     backgroundColor: "#1C86FF",
@@ -1390,7 +1643,7 @@ const styles = StyleSheet.create({
   fullButtonText: { color: "#FFF", fontSize: scaleFontSize(16), fontWeight: "600" },
   sideBySideButton: {
     flex: 1,
-    backgroundColor: "#9E9E9E",
+    backgroundColor: "#1C86FF",
     paddingVertical: hp(1.8),
     borderRadius: moderateScale(12),
     alignItems: "center",
@@ -1658,6 +1911,141 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: scaleFontSize(14),
     fontWeight: '600',
+  },
+  // Confirmation Modal Styles
+  confirmationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(5),
+  },
+  confirmationContent: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(24),
+    padding: moderateScale(32),
+    width: '90%',
+    maxWidth: wp(90),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  confirmationIconContainer: {
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2.5),
+  },
+  confirmationTitle: {
+    fontSize: scaleFontSize(24),
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: hp(1.5),
+    letterSpacing: 0.4,
+  },
+  confirmationMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp(3),
+    lineHeight: scaleFontSize(22),
+    paddingHorizontal: moderateScale(8),
+  },
+  confirmationButtonContainer: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    width: '100%',
+  },
+  confirmationCancelButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: hp(1.6),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    backgroundColor: '#fff',
+  },
+  confirmationCancelButtonText: {
+    color: '#FF6B6B',
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+  },
+  confirmationConfirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingVertical: hp(1.6),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmationConfirmButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+  },
+  confirmationButtonDisabled: {
+    opacity: 0.6,
+  },
+  // Success Modal Styles
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: wp(5),
+  },
+  successContent: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(28),
+    padding: moderateScale(40),
+    width: '85%',
+    maxWidth: wp(85),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  successIconContainer: {
+    width: moderateScale(120),
+    height: moderateScale(120),
+    borderRadius: moderateScale(60),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  successTitle: {
+    fontSize: scaleFontSize(26),
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: hp(1),
+    letterSpacing: 0.3,
+  },
+  successMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+    lineHeight: scaleFontSize(22),
+    paddingHorizontal: moderateScale(8),
+  },
+  successIndicator: {
+    marginTop: hp(1),
   },
 });
 

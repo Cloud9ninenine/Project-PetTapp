@@ -20,8 +20,8 @@ import * as Location from 'expo-location';
 import Header from '@components/Header';
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
-import apiClient from "../../../config/api";
-import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
+import apiClient from "@config/api";
+import { useProfileCompletion } from "@_hooks/useProfileCompletion";
 
 export default function BusinessesScreen() {
   const params = useLocalSearchParams();

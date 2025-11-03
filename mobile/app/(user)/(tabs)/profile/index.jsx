@@ -18,7 +18,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Header from '@components/Header';
-import apiClient from "../../../config/api";
+import apiClient from "@config/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { performCompleteLogout } from '@utils/logoutHelper';
 import AddressManager from './address-manager';

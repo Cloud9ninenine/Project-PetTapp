@@ -19,7 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { wp, hp, moderateScale, scaleFontSize, isSmallDevice } from "@utils/responsive";
-import apiClient from "../config/api";
+import apiClient from "@config/api";
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState("");

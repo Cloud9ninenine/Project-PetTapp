@@ -14,6 +14,8 @@ export default function RootLayout() {
     "/home/service-scheduled",
     "/home/schedule-booking",
     "/booking/review-service",
+    "/booking/payment-qr",
+    "/booking/ScheduleDetail",
     "/notification",
     "/(user)/(tabs)/messages/chat"
   ];

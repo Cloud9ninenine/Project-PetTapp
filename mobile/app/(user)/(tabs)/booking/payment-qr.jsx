@@ -26,6 +26,7 @@ const PaymentQRScreen = () => {
   const [qrNotAvailable, setQrNotAvailable] = useState(false);
   const [businessId, setBusinessId] = useState(null);
   const [authToken, setAuthToken] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState('pending');
 
   const { bookingId, businessName, amount } = params;
 
@@ -74,7 +75,9 @@ const PaymentQRScreen = () => {
       }
 
       setBusinessId(fetchedBusinessId);
+      setPaymentStatus(booking.paymentStatus || 'pending');
       console.log('Fetched Business ID:', fetchedBusinessId);
+      console.log('Payment Status:', booking.paymentStatus);
 
       // Step 2: Fetch payment QR codes from the business endpoint
       const qrResponse = await apiClient.get(`/businesses/${fetchedBusinessId}/payment-qr`);
@@ -156,6 +159,28 @@ const PaymentQRScreen = () => {
     if (!amt) return '₱0.00';
     const numAmount = typeof amt === 'string' ? parseFloat(amt) : amt;
     return `₱${numAmount.toFixed(2)}`;
+  };
+
+  const getPaymentStatusLabel = (status) => {
+    const labels = {
+      'pending': 'Awaiting payment',
+      'proof-uploaded': 'Proof uploaded',
+      'paid': 'Payment verified',
+      'failed': 'Payment rejected',
+      'refunded': 'Refunded'
+    };
+    return labels[status] || 'Unknown';
+  };
+
+  const getPaymentStatusColor = (status) => {
+    const colors = {
+      'pending': '#FF9B79',      // Orange - awaiting action
+      'proof-uploaded': '#FFC107', // Amber - under review
+      'paid': '#4CAF50',         // Green - success
+      'failed': '#FF5252',       // Red - rejected
+      'refunded': '#2196F3'      // Blue - refunded
+    };
+    return colors[status] || '#9E9E9E'; // Gray - unknown
   };
 
   const getPaymentTypeLabel = (type) => {
@@ -264,6 +289,14 @@ const PaymentQRScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Note */}
+        <View style={styles.noteCard}>
+          <Ionicons name="alert-circle-outline" size={moderateScale(20)} color="#FF9B79" />
+          <Text style={styles.noteText}>
+            Please upload your payment proof after completing the transaction to verify your booking.
+          </Text>
+        </View>
+
         {/* Payment Info Card */}
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -272,8 +305,18 @@ const PaymentQRScreen = () => {
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Booking ID</Text>
-            <Text style={styles.infoValueSmall}>{bookingId?.slice(-8) || 'N/A'}</Text>
+            <Text style={styles.infoLabel}>Payment Status</Text>
+            <View style={[
+              styles.paymentStatusBadge,
+              { backgroundColor: getPaymentStatusColor(paymentStatus) + '20' }
+            ]}>
+              <Text style={[
+                styles.paymentStatusText,
+                { color: getPaymentStatusColor(paymentStatus) }
+              ]}>
+                {getPaymentStatusLabel(paymentStatus)}
+              </Text>
+            </View>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>
@@ -324,7 +367,7 @@ const PaymentQRScreen = () => {
               <Ionicons name="alert-circle-outline" size={moderateScale(80)} color="#FF9B79" />
               <Text style={styles.notAvailableText}>QR Code Not Available</Text>
               <Text style={styles.notAvailableSubtext}>
-                The business hasn't uploaded their payment QR code yet. Please contact them or try again later.
+                The business hasn't uploaded their payment QR code yet. Please try again later or change to CASH payment.
               </Text>
               <TouchableOpacity style={styles.retryButton} onPress={fetchQRCodes}>
                 <Text style={styles.retryButtonText}>Retry</Text>
@@ -397,14 +440,6 @@ const PaymentQRScreen = () => {
                 <Text style={styles.stepText}>Upload the screenshot as payment proof below</Text>
               </View>
           </View>
-
-        {/* Note */}
-        <View style={styles.noteCard}>
-          <Ionicons name="alert-circle-outline" size={moderateScale(20)} color="#FF9B79" />
-          <Text style={styles.noteText}>
-            Please upload your payment proof after completing the transaction to verify your booking.
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Action Button */}
@@ -491,6 +526,17 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f0f0f0',
     marginVertical: moderateScale(4),
+  },
+  paymentStatusBadge: {
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(20),
+    alignSelf: 'flex-end',
+  },
+  paymentStatusText: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '700',
+    textAlign: 'center',
   },
   tabsContainer: {
     marginBottom: hp(2),
@@ -693,6 +739,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     borderLeftWidth: 4,
     borderLeftColor: '#FF9B79',
+    marginBottom: hp(2),
   },
   noteText: {
     flex: 1,

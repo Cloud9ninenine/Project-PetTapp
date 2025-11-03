@@ -17,8 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Header from '@components/Header';
 import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
-import apiClient from "../../../config/api";
-import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
+import apiClient from "@config/api";
+import { useProfileCompletion } from "@_hooks/useProfileCompletion";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notificationEvents, { NOTIFICATION_EVENTS } from '@utils/notificationEvents';
 
