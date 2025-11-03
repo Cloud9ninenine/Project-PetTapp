@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,13 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  PanResponder,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
 import { Calendar } from 'react-native-calendars';
+import { useRouter } from 'expo-router';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 
@@ -27,7 +29,13 @@ export default function BookingConfirmationModal({
   onConfirm,
   bookingData,
 }) {
+  const router = useRouter();
   const [slideAnim] = useState(new Animated.Value(screenHeight));
+  const scrollViewRef = useRef(null);
+  const [isScrollAtTop, setIsScrollAtTop] = useState(true);
+
+  // Store booking ID for navigation
+  const [createdBookingId, setCreatedBookingId] = useState(null);
 
   // Fetch pets from API
   const [pets, setPets] = useState([]);
@@ -55,6 +63,12 @@ export default function BookingConfirmationModal({
 
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Modal states for custom selection modals
+  const [petPickerVisible, setPetPickerVisible] = useState(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [addressPickerVisible, setAddressPickerVisible] = useState(false);
+  const [paymentPickerVisible, setPaymentPickerVisible] = useState(false);
 
   // Modal states for custom styled alerts
   const [alertModal, setAlertModal] = useState({
@@ -150,6 +164,71 @@ export default function BookingConfirmationModal({
       setServiceDuration(bookingData.service.durationMinutes);
     }
   }, [bookingData]);
+
+  // PanResponder for swipe-down-to-dismiss
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Activate on any vertical movement
+        return Math.abs(gestureState.dy) > 2;
+      },
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Capture gesture if swiping down
+        return gestureState.dy > 2;
+      },
+      onPanResponderGrant: () => {
+        // Stop any ongoing animation when user starts dragging
+        slideAnim.stopAnimation();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Only allow dragging down, not up
+        if (gestureState.dy > 0) {
+          slideAnim.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const threshold = 150; // Distance threshold to dismiss
+        const velocity = gestureState.vy; // Velocity for flick gesture
+
+        // Dismiss if dragged beyond threshold OR flicked down quickly
+        if (gestureState.dy > threshold || velocity > 0.5) {
+          // Dismiss modal
+          Animated.timing(slideAnim, {
+            toValue: screenHeight,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          // Spring back to original position
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 8,
+          }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        // If gesture is interrupted, spring back
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 8,
+        }).start();
+      },
+    })
+  ).current;
+
+  // Handle scroll events to track if we're at the top
+  const handleScroll = (event) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    setIsScrollAtTop(scrollY <= 0);
+  };
 
   // Helper functions for showing styled alerts
   const showAlert = (type, title, message) => {
@@ -342,6 +421,28 @@ export default function BookingConfirmationModal({
       return;
     }
 
+    // TEMPORARY: Bypass API call for testing
+    /*
+    try {
+      setIsSubmitting(true);
+
+      // Simulate a delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Mock booking ID for testing navigation
+      const mockBookingId = 'test-booking-id-' + Date.now();
+      setCreatedBookingId(mockBookingId);
+
+      showAlert('success', 'Success!', 'Your booking request has been submitted successfully. The business will review and confirm your appointment.');
+
+      setIsSubmitting(false);
+      return;
+    } catch (error) {
+      setIsSubmitting(false);
+    }
+    */
+
+    // ORIGINAL CODE (commented out for testing)
     try {
       setIsSubmitting(true);
 
@@ -381,11 +482,10 @@ export default function BookingConfirmationModal({
           specialRequests,
         };
 
+        // Store the booking ID for navigation
+        setCreatedBookingId(response.data.data._id);
+
         showAlert('success', 'Success!', 'Your booking request has been submitted successfully. The business will review and confirm your appointment.');
-        setTimeout(() => {
-          hideAlert();
-          onConfirm(bookingResult);
-        }, 2000);
       } else {
         showAlert('error', 'Booking Failed', response.data.message || 'Failed to create booking');
       }
@@ -422,13 +522,22 @@ export default function BookingConfirmationModal({
             }
           ]}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Swipeable Header Area - Large touch area for easy swiping */}
+          <View style={styles.swipeableHeader} {...panResponder.panHandlers}>
             <View style={styles.handleBar} />
-
             <Text style={styles.modalTitle}>Book Appointment</Text>
             <Text style={styles.modalSubtitle}>
               Fill in the details to submit your booking request.
             </Text>
+          </View>
+
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollContent}
+          >
 
             {/* Status Information Notice */}
             <View style={styles.statusInfoBox}>
@@ -452,24 +561,19 @@ export default function BookingConfirmationModal({
                   <Text style={styles.loadingText}>Loading your pets...</Text>
                 </View>
               ) : pets.length > 0 ? (
-                <View style={styles.pickerContainer}>
-                  <Ionicons name="paw" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
-                  <Picker
-                    selectedValue={selectedPet}
-                    onValueChange={(itemValue) => setSelectedPet(itemValue)}
-                    style={styles.picker}
-                    dropdownIconColor="#fff"
-                  >
-                    <Picker.Item label="Choose your pet" value="" />
-                    {pets.map((pet) => (
-                      <Picker.Item
-                        key={pet._id}
-                        label={`${pet.name} (${pet.species} - ${pet.breed || 'Mixed'})`}
-                        value={pet._id}
-                      />
-                    ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity
+                  style={styles.pickerContainer}
+                  onPress={() => setPetPickerVisible(true)}
+                >
+                  <Ionicons name="paw" size={moderateScale(22)} color="#fff" style={styles.inputIcon} />
+                  <Text style={styles.pickerText}>
+                    {selectedPet ?
+                      pets.find(p => p._id === selectedPet)?.name +
+                      ` (${pets.find(p => p._id === selectedPet)?.species} - ${pets.find(p => p._id === selectedPet)?.breed || 'Mixed'})`
+                      : 'Choose your pet'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={moderateScale(20)} color="#fff" />
+                </TouchableOpacity>
               ) : (
                 <View style={styles.noPetsContainer}>
                   <Ionicons name="paw-outline" size={moderateScale(32)} color="#999" />
@@ -559,23 +663,16 @@ export default function BookingConfirmationModal({
               <Text style={styles.inputLabel}>
                 Service Location <Text style={styles.requiredAsterisk}>*</Text>
               </Text>
-              <View style={styles.pickerContainer}>
-                <Ionicons name="location-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
-                <Picker
-                  selectedValue={locationType}
-                  onValueChange={(itemValue) => {
-                    setLocationType(itemValue);
-                    if (itemValue === 'clinic') {
-                      setSelectedAddress('');
-                    }
-                  }}
-                  style={styles.picker}
-                  dropdownIconColor="#fff"
-                >
-                  <Picker.Item label="Clinic" value="clinic" />
-                  <Picker.Item label="Home Service" value="home" />
-                </Picker>
-              </View>
+              <TouchableOpacity
+                style={styles.pickerContainer}
+                onPress={() => setLocationPickerVisible(true)}
+              >
+                <Ionicons name="location-outline" size={moderateScale(22)} color="#fff" style={styles.inputIcon} />
+                <Text style={styles.pickerText}>
+                  {locationType === 'clinic' ? 'Clinic' : 'Home Service'}
+                </Text>
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#fff" />
+              </TouchableOpacity>
             </View>
 
             {/* Address Selection - REQUIRED for home service */}
@@ -590,24 +687,18 @@ export default function BookingConfirmationModal({
                     <Text style={styles.loadingText}>Loading addresses...</Text>
                   </View>
                 ) : addresses.length > 0 ? (
-                  <View style={styles.pickerContainer}>
-                    <Ionicons name="home-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
-                    <Picker
-                      selectedValue={selectedAddress}
-                      onValueChange={(itemValue) => setSelectedAddress(itemValue)}
-                      style={styles.picker}
-                      dropdownIconColor="#fff"
-                    >
-                      <Picker.Item label="Select an address" value="" />
-                      {addresses.map((addr) => (
-                        <Picker.Item
-                          key={addr._id}
-                          label={`${addr.label} — ${addr.city}`}
-                          value={addr._id}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
+                  <TouchableOpacity
+                    style={styles.pickerContainer}
+                    onPress={() => setAddressPickerVisible(true)}
+                  >
+                    <Ionicons name="home-outline" size={moderateScale(22)} color="#fff" style={styles.inputIcon} />
+                    <Text style={styles.pickerText}>
+                      {selectedAddress ?
+                        `${addresses.find(a => a._id === selectedAddress)?.label} — ${addresses.find(a => a._id === selectedAddress)?.city}`
+                        : 'Select an address'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={moderateScale(20)} color="#fff" />
+                  </TouchableOpacity>
                 ) : (
                   <View style={styles.noPetsContainer}>
                     <Ionicons name="home-outline" size={moderateScale(32)} color="#999" />
@@ -622,24 +713,18 @@ export default function BookingConfirmationModal({
               <Text style={styles.inputLabel}>
                 Payment Method <Text style={styles.requiredAsterisk}>*</Text>
               </Text>
-              <View style={styles.pickerContainer}>
-                <Ionicons name="wallet-outline" size={moderateScale(20)} color="#fff" style={styles.inputIcon} />
-                <Picker
-                  selectedValue={paymentMethod}
-                  onValueChange={(itemValue) => setPaymentMethod(itemValue)}
-                  style={styles.picker}
-                  dropdownIconColor="#fff"
-                >
-                  <Picker.Item label="Choose payment method" value="" />
-                  {paymentMethods.map((method) => (
-                    <Picker.Item
-                      key={method.value}
-                      label={method.label}
-                      value={method.value}
-                    />
-                  ))}
-                </Picker>
-              </View>
+              <TouchableOpacity
+                style={styles.pickerContainer}
+                onPress={() => setPaymentPickerVisible(true)}
+              >
+                <Ionicons name="wallet-outline" size={moderateScale(22)} color="#fff" style={styles.inputIcon} />
+                <Text style={styles.pickerText}>
+                  {paymentMethod ?
+                    paymentMethods.find(m => m.value === paymentMethod)?.label
+                    : 'Choose payment method'}
+                </Text>
+                <Ionicons name="chevron-down" size={moderateScale(20)} color="#fff" />
+              </TouchableOpacity>
             </View>
 
             {/* Notes - OPTIONAL (max 500 chars) */}
@@ -731,18 +816,88 @@ export default function BookingConfirmationModal({
             {/* Message */}
             <Text style={styles.alertMessage}>{alertModal.message}</Text>
 
-            {/* OK Button */}
-            <TouchableOpacity
-              style={[
-                styles.alertButton,
-                alertModal.type === 'success' && styles.successButton,
-                alertModal.type === 'error' && styles.errorButton,
-                alertModal.type === 'validation' && styles.validationButton,
-              ]}
-              onPress={hideAlert}
-            >
-              <Text style={styles.alertButtonText}>OK</Text>
-            </TouchableOpacity>
+            {/* Conditional Buttons for Success */}
+            {alertModal.type === 'success' ? (
+              <>
+                {paymentMethod === 'cash' ? (
+                  <View style={styles.successButtonsContainer}>
+                    <TouchableOpacity
+                      style={[styles.alertButton, styles.successButtonSecondary]}
+                      onPress={() => {
+                        hideAlert();
+                        onClose();
+                        // Navigate to ScheduleDetail page with bookingId
+                        if (createdBookingId) {
+                          router.push({
+                            pathname: '/(user)/(tabs)/booking/ScheduleDetail',
+                            params: { bookingId: createdBookingId }
+                          });
+                        }
+                      }}
+                    >
+                      <Text style={styles.alertButtonTextSecondary}>See Appointment</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.alertButton, styles.successButton]}
+                      onPress={() => {
+                        hideAlert();
+                        onClose();
+                        // Navigate to services page
+                        router.push('/(user)/(tabs)/services');
+                      }}
+                    >
+                      <Text style={styles.alertButtonText}>Browse More</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : paymentMethod === 'qr-payment' ? (
+                  <View style={styles.successButtonsContainer}>
+                    <TouchableOpacity
+                      style={[styles.alertButton, styles.successButtonSecondary]}
+                      onPress={() => {
+                        hideAlert();
+                        onClose();
+                        // Navigate to services page
+                        router.push('/(user)/(tabs)/services');
+                      }}
+                    >
+                      <Text style={styles.alertButtonTextSecondary}>Browse More</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.alertButton, styles.successButton]}
+                      onPress={() => {
+                        hideAlert();
+                        onClose();
+                        // Navigate to payment-qr page with booking details
+                        if (createdBookingId && bookingData?.service) {
+                          router.push({
+                            pathname: '/(user)/(tabs)/booking/payment-qr',
+                            params: {
+                              bookingId: createdBookingId,
+                              businessName: bookingData.service.businessName || 'Business',
+                              amount: bookingData.service.price || '0'
+                            }
+                          });
+                        }
+                      }}
+                    >
+                      <Text style={styles.alertButtonText}>Proceed to Payment</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              /* OK Button for error and validation types */
+              <TouchableOpacity
+                style={[
+                  styles.alertButton,
+                  alertModal.type === 'error' && styles.errorButton,
+                  alertModal.type === 'validation' && styles.validationButton,
+                ]}
+                onPress={hideAlert}
+              >
+                <Text style={styles.alertButtonText}>OK</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>
@@ -756,6 +911,273 @@ export default function BookingConfirmationModal({
           onChange={handleTimeChange}
         />
       )}
+
+      {/* Custom Pet Picker Modal */}
+      <Modal
+        visible={petPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPetPickerVisible(false)}
+      >
+        <View style={styles.selectionModalOverlay}>
+          <View style={styles.selectionModalContainer}>
+            <View style={styles.selectionModalHeader}>
+              <Text style={styles.selectionModalTitle}>Select Your Pet</Text>
+              <TouchableOpacity onPress={() => setPetPickerVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.selectionModalScroll} showsVerticalScrollIndicator={false}>
+              {pets.map((pet) => (
+                <TouchableOpacity
+                  key={pet._id}
+                  style={[
+                    styles.selectionModalItem,
+                    selectedPet === pet._id && styles.selectionModalItemSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedPet(pet._id);
+                    setPetPickerVisible(false);
+                  }}
+                >
+                  <View style={styles.selectionModalItemContent}>
+                    {pet.images?.profile ? (
+                      <Image
+                        source={{ uri: pet.images.profile }}
+                        style={styles.petImage}
+                        onError={() => {
+                          // Fallback to placeholder if image fails to load
+                          console.log('Failed to load pet image');
+                        }}
+                      />
+                    ) : (
+                      <View style={styles.petImagePlaceholder}>
+                        <Ionicons
+                          name="paw"
+                          size={moderateScale(24)}
+                          color={selectedPet === pet._id ? '#1C86FF' : '#666'}
+                        />
+                      </View>
+                    )}
+                    <View style={styles.selectionModalItemText}>
+                      <Text style={[
+                        styles.selectionModalItemLabel,
+                        selectedPet === pet._id && styles.selectionModalItemLabelSelected
+                      ]}>
+                        {pet.name}
+                      </Text>
+                      <Text style={styles.selectionModalItemDescription}>
+                        {pet.species} - {pet.breed || 'Mixed'}
+                      </Text>
+                    </View>
+                  </View>
+                  {selectedPet === pet._id && (
+                    <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#1C86FF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Location Picker Modal */}
+      <Modal
+        visible={locationPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setLocationPickerVisible(false)}
+      >
+        <View style={styles.selectionModalOverlay}>
+          <View style={styles.selectionModalContainer}>
+            <View style={styles.selectionModalHeader}>
+              <Text style={styles.selectionModalTitle}>Service Location</Text>
+              <TouchableOpacity onPress={() => setLocationPickerVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.selectionModalScroll}>
+              <TouchableOpacity
+                style={[
+                  styles.selectionModalItem,
+                  locationType === 'clinic' && styles.selectionModalItemSelected
+                ]}
+                onPress={() => {
+                  setLocationType('clinic');
+                  setSelectedAddress('');
+                  setLocationPickerVisible(false);
+                }}
+              >
+                <View style={styles.selectionModalItemContent}>
+                  <Ionicons
+                    name="business"
+                    size={moderateScale(24)}
+                    color={locationType === 'clinic' ? '#1C86FF' : '#666'}
+                  />
+                  <View style={styles.selectionModalItemText}>
+                    <Text style={[
+                      styles.selectionModalItemLabel,
+                      locationType === 'clinic' && styles.selectionModalItemLabelSelected
+                    ]}>
+                      Clinic
+                    </Text>
+                    <Text style={styles.selectionModalItemDescription}>
+                      Visit the clinic for service
+                    </Text>
+                  </View>
+                </View>
+                {locationType === 'clinic' && (
+                  <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#1C86FF" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.selectionModalItem,
+                  locationType === 'home' && styles.selectionModalItemSelected
+                ]}
+                onPress={() => {
+                  setLocationType('home');
+                  setLocationPickerVisible(false);
+                }}
+              >
+                <View style={styles.selectionModalItemContent}>
+                  <Ionicons
+                    name="home"
+                    size={moderateScale(24)}
+                    color={locationType === 'home' ? '#1C86FF' : '#666'}
+                  />
+                  <View style={styles.selectionModalItemText}>
+                    <Text style={[
+                      styles.selectionModalItemLabel,
+                      locationType === 'home' && styles.selectionModalItemLabelSelected
+                    ]}>
+                      Home Service
+                    </Text>
+                    <Text style={styles.selectionModalItemDescription}>
+                      Service at your location
+                    </Text>
+                  </View>
+                </View>
+                {locationType === 'home' && (
+                  <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#1C86FF" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Address Picker Modal */}
+      <Modal
+        visible={addressPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setAddressPickerVisible(false)}
+      >
+        <View style={styles.selectionModalOverlay}>
+          <View style={styles.selectionModalContainer}>
+            <View style={styles.selectionModalHeader}>
+              <Text style={styles.selectionModalTitle}>Select Address</Text>
+              <TouchableOpacity onPress={() => setAddressPickerVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.selectionModalScroll} showsVerticalScrollIndicator={false}>
+              {addresses.map((addr) => (
+                <TouchableOpacity
+                  key={addr._id}
+                  style={[
+                    styles.selectionModalItem,
+                    selectedAddress === addr._id && styles.selectionModalItemSelected
+                  ]}
+                  onPress={() => {
+                    setSelectedAddress(addr._id);
+                    setAddressPickerVisible(false);
+                  }}
+                >
+                  <View style={styles.selectionModalItemContent}>
+                    <Ionicons
+                      name="location"
+                      size={moderateScale(24)}
+                      color={selectedAddress === addr._id ? '#1C86FF' : '#666'}
+                    />
+                    <View style={styles.selectionModalItemText}>
+                      <Text style={[
+                        styles.selectionModalItemLabel,
+                        selectedAddress === addr._id && styles.selectionModalItemLabelSelected
+                      ]}>
+                        {addr.label}
+                      </Text>
+                      <Text style={styles.selectionModalItemDescription}>
+                        {addr.city}
+                      </Text>
+                    </View>
+                  </View>
+                  {selectedAddress === addr._id && (
+                    <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#1C86FF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Payment Method Picker Modal */}
+      <Modal
+        visible={paymentPickerVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setPaymentPickerVisible(false)}
+      >
+        <View style={styles.selectionModalOverlay}>
+          <View style={styles.selectionModalContainer}>
+            <View style={styles.selectionModalHeader}>
+              <Text style={styles.selectionModalTitle}>Payment Method</Text>
+              <TouchableOpacity onPress={() => setPaymentPickerVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.selectionModalScroll}>
+              {paymentMethods.map((method) => (
+                <TouchableOpacity
+                  key={method.value}
+                  style={[
+                    styles.selectionModalItem,
+                    paymentMethod === method.value && styles.selectionModalItemSelected
+                  ]}
+                  onPress={() => {
+                    setPaymentMethod(method.value);
+                    setPaymentPickerVisible(false);
+                  }}
+                >
+                  <View style={styles.selectionModalItemContent}>
+                    <Ionicons
+                      name={method.icon}
+                      size={moderateScale(24)}
+                      color={paymentMethod === method.value ? '#1C86FF' : '#666'}
+                    />
+                    <View style={styles.selectionModalItemText}>
+                      <Text style={[
+                        styles.selectionModalItemLabel,
+                        paymentMethod === method.value && styles.selectionModalItemLabelSelected
+                      ]}>
+                        {method.label}
+                      </Text>
+                      <Text style={styles.selectionModalItemDescription}>
+                        {method.description}
+                      </Text>
+                    </View>
+                  </View>
+                  {paymentMethod === method.value && (
+                    <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#1C86FF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -773,10 +1195,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: moderateScale(20),
     borderTopRightRadius: moderateScale(20),
-    paddingHorizontal: moderateScale(18),
     paddingBottom: moderateScale(30),
-    paddingTop: moderateScale(10),
     maxHeight: screenHeight * 0.95,
+  },
+  swipeableHeader: {
+    paddingHorizontal: moderateScale(18),
+    paddingTop: moderateScale(10),
+    paddingBottom: moderateScale(20),
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    minHeight: moderateScale(100),
+  },
+  scrollContent: {
+    paddingHorizontal: moderateScale(18),
   },
   handleBar: {
     width: moderateScale(40),
@@ -797,17 +1229,17 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#666',
     textAlign: 'center',
-    marginBottom: moderateScale(20),
     lineHeight: moderateScale(20),
   },
   inputContainer: {
-    marginBottom: moderateScale(12),
+    marginBottom: moderateScale(16),
   },
   inputLabel: {
-    fontSize: scaleFontSize(13),
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: moderateScale(8),
+    fontSize: scaleFontSize(14),
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: moderateScale(10),
+    letterSpacing: 0.3,
   },
   inputField: {
     backgroundColor: '#1C86FF',
@@ -819,7 +1251,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   inputIcon: {
-    marginRight: moderateScale(10),
+    marginRight: moderateScale(12),
+    opacity: 0.95,
   },
   inputText: {
     flex: 1,
@@ -849,16 +1282,35 @@ const styles = StyleSheet.create({
   // Picker styles
   pickerContainer: {
     backgroundColor: '#1C86FF',
-    borderRadius: moderateScale(8),
+    borderRadius: moderateScale(12),
     paddingHorizontal: moderateScale(15),
-    height: moderateScale(50),
+    height: moderateScale(56),
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   picker: {
     flex: 1,
     color: '#fff',
-    height: moderateScale(50),
+    height: moderateScale(56),
+    fontSize: scaleFontSize(15),
+    fontWeight: '500',
+  },
+  pickerItem: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '500',
+  },
+  pickerText: {
+    flex: 1,
+    fontSize: scaleFontSize(15),
+    color: '#fff',
+    fontWeight: '500',
   },
   loadingContainer: {
     backgroundColor: '#E3F2FD',
@@ -1022,6 +1474,11 @@ const styles = StyleSheet.create({
   successButton: {
     backgroundColor: '#4CAF50',
   },
+  successButtonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
   errorButton: {
     backgroundColor: '#F44336',
   },
@@ -1032,5 +1489,112 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
+  },
+  alertButtonTextSecondary: {
+    color: '#4CAF50',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+  },
+  successButtonsContainer: {
+    width: '100%',
+    flexDirection: 'column',
+    gap: moderateScale(12),
+  },
+  // Custom Selection Modal Styles
+  selectionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  selectionModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    paddingBottom: moderateScale(30),
+    maxHeight: screenHeight * 0.7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  selectionModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(20),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  selectionModalTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: '700',
+    color: '#2C3E50',
+    letterSpacing: 0.3,
+  },
+  selectionModalScroll: {
+    paddingHorizontal: moderateScale(20),
+    paddingTop: moderateScale(12),
+  },
+  selectionModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(16),
+    marginVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+    transition: 'all 0.2s ease',
+  },
+  selectionModalItemSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#1C86FF',
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  selectionModalItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  selectionModalItemText: {
+    marginLeft: moderateScale(14),
+    flex: 1,
+  },
+  selectionModalItemLabel: {
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginBottom: moderateScale(4),
+  },
+  selectionModalItemLabelSelected: {
+    color: '#1C86FF',
+    fontWeight: '700',
+  },
+  selectionModalItemDescription: {
+    fontSize: scaleFontSize(13),
+    color: '#7F8C8D',
+    lineHeight: scaleFontSize(18),
+  },
+  petImage: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#F0F0F0',
+  },
+  petImagePlaceholder: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
