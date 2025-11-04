@@ -95,14 +95,25 @@ export default function RevenueScreen() {
     setRefreshing(false);
   };
 
-  // Load data on mount and when screen is focused
+  // Quiet refresh data without loading indicators
+  const quietRefresh = async () => {
+    try {
+      await fetchRevenueData();
+    } catch (error) {
+      console.error('Error during quiet refresh:', error);
+      // Don't show alerts during quiet refresh
+    }
+  };
+
+  // Load data on mount and when period changes
   useEffect(() => {
     loadData();
   }, [selectedPeriod]);
 
+  // Quiet refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      quietRefresh();
     }, [selectedPeriod])
   );
 

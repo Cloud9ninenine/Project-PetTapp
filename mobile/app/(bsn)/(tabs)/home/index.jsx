@@ -152,7 +152,12 @@ export default function BusinessDashboard() {
       });
 
       if (response.data && response.data.success) {
-        setDashboardData(response.data.data);
+        setDashboardData(prevData => ({
+          ...response.data.data,
+          // Preserve rescheduleRequests and todaysSchedule if they exist in previous state
+          rescheduleRequests: prevData.rescheduleRequests || response.data.data.rescheduleRequests || [],
+          todaysSchedule: prevData.todaysSchedule || response.data.data.todaysSchedule || []
+        }));
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -186,6 +191,85 @@ export default function BusinessDashboard() {
     } catch (error) {
       console.error('Error fetching services:', error);
       // Don't show alert for services error, just log it
+    }
+  };
+
+  // Fetch reschedule requests
+  const fetchRescheduleRequests = async () => {
+    try {
+      const response = await apiClient.get('/bookings', {
+        params: { hasEditRequest: true, limit: 10 }
+      });
+
+      if (response.data && response.data.success) {
+        const rescheduleData = response.data.data
+          .filter(booking => booking.editRequest?.approvalStatus === 'pending')
+          .map(booking => ({
+            _id: booking._id,
+            name: booking.petOwnerId
+              ? `${booking.petOwnerId.firstName} ${booking.petOwnerId.lastName}`
+              : 'Unknown',
+            service: booking.serviceId?.name || 'Unknown Service',
+            petName: booking.petId?.name || 'Unknown Pet',
+            currentDateTime: booking.appointmentDateTime,
+            requestedDateTime: booking.editRequest?.appointmentDateTime || booking.appointmentDateTime,
+            requestedAt: booking.editRequest?.requestedAt,
+            status: booking.status
+          }));
+
+        setDashboardData(prevData => ({
+          ...prevData,
+          rescheduleRequests: rescheduleData
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching reschedule requests:', error);
+      // Don't show alert for reschedule requests error, just log it
+    }
+  };
+
+  // Fetch today's schedule
+  const fetchTodaysSchedule = async () => {
+    try {
+      // Get today's date range
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Fetch bookings with a reasonable limit
+      const response = await apiClient.get('/bookings', {
+        params: {
+          limit: 100
+        }
+      });
+
+      if (response.data && response.data.success) {
+        // Filter bookings to only include today's appointments
+        const scheduleData = response.data.data
+          .filter(booking => {
+            const appointmentDate = new Date(booking.appointmentDateTime);
+            return appointmentDate >= today && appointmentDate < tomorrow;
+          })
+          .map(booking => ({
+            _id: booking._id,
+            time: booking.appointmentDateTime,
+            name: booking.petOwnerId
+              ? `${booking.petOwnerId.firstName} ${booking.petOwnerId.lastName}`
+              : 'Unknown',
+            service: booking.serviceId?.name || 'Unknown Service',
+            petName: booking.petId?.name || 'Unknown Pet',
+            status: booking.status
+          }));
+
+        setDashboardData(prevData => ({
+          ...prevData,
+          todaysSchedule: scheduleData
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching today\'s schedule:', error);
+      // Don't show alert for schedule error, just log it
     }
   };
 
@@ -254,10 +338,12 @@ export default function BusinessDashboard() {
         setBusinessId(bId);
         await AsyncStorage.setItem('businessId', bId);
 
-        // Load dashboard data and services only if both profiles are complete
+        // Load dashboard data, services, reschedule requests, and today's schedule only if both profiles are complete
         await Promise.all([
           fetchDashboardData(bId, business),
-          fetchServices(bId)
+          fetchServices(bId),
+          fetchRescheduleRequests(),
+          fetchTodaysSchedule()
         ]);
       }
     } catch (error) {
@@ -275,15 +361,34 @@ export default function BusinessDashboard() {
     setRefreshing(false);
   };
 
-  // Load data on mount and when screen is focused
+  // Quiet refresh data without loading indicators
+  const quietRefresh = async () => {
+    if (!businessId) return;
+
+    try {
+      // Fetch all data quietly in the background
+      await Promise.all([
+        fetchDashboardData(businessId),
+        fetchServices(businessId),
+        fetchRescheduleRequests(),
+        fetchTodaysSchedule()
+      ]);
+    } catch (error) {
+      console.error('Error during quiet refresh:', error);
+      // Don't show alerts during quiet refresh
+    }
+  };
+
+  // Load data on mount
   useEffect(() => {
     loadData();
   }, []);
 
+  // Quiet refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (businessId) {
-        loadData();
+        quietRefresh();
       }
     }, [businessId])
   );

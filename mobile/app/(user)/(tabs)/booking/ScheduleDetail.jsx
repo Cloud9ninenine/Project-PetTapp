@@ -25,6 +25,8 @@ import { Calendar } from 'react-native-calendars';
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
+import { AlertModalWithButton } from '@components/modals/SharedModals';
+import { COLORS } from '@styles/modalStyles';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -676,28 +678,7 @@ const ScheduleDetail = () => {
           )}
         </View>
 
-        {/* Rescheduled Alert - if approved */}
-        {booking.editRequest?.approvalStatus === 'approved' && booking.editRequest?.appointmentDateTime && (
-          <View style={styles.rescheduledAlertCard}>
-            <Ionicons name="checkmark-circle" size={moderateScale(24)} color="#4CAF50" />
-            <View style={styles.rescheduledAlertContent}>
-              <Text style={styles.rescheduledAlertTitle}>Reschedule Approved</Text>
-              <Text style={styles.rescheduledAlertText}>
-                Your appointment has been successfully rescheduled to {formatDate(booking.appointmentDateTime)} at {formatTime(booking.appointmentDateTime)}
-              </Text>
-              {booking.editRequest.originalAppointmentDateTime && (
-                <View style={styles.originalDateContainer}>
-                  <Text style={styles.originalDateLabel}>Original Date:</Text>
-                  <Text style={styles.originalDateValue}>
-                    {formatDate(booking.editRequest.originalAppointmentDateTime)} at {formatTime(booking.editRequest.originalAppointmentDateTime)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Edit Request Section - Awaiting Approval / Rejected */}
+        {/* Edit Request Section - Awaiting Approval / Rejected / Approved */}
         {booking.editRequest && (
           <View style={[
             styles.editRequestSection,
@@ -775,14 +756,8 @@ const ScheduleDetail = () => {
                     </View>
                   )}
 
-                  {/* Arrow Indicator */}
-                  <View style={styles.arrowIndicator}>
-                    <Ionicons name="arrow-down" size={moderateScale(20)} color="#1C86FF" />
-                  </View>
-
                   {/* New Date & Time */}
-                  <View style={styles.editRequestDetailItem}>
-                    <Ionicons name="calendar" size={moderateScale(16)} color="#1C86FF" />
+                  <View style={styles.editRequestDetailItemCentered}>
                     <View style={styles.editRequestDetailTextContainer}>
                       <Text style={styles.editRequestDetailLabel}>New Date & Time</Text>
                       <Text style={[styles.editRequestDetailValue, styles.highlightedText]}>
@@ -1409,58 +1384,18 @@ const ScheduleDetail = () => {
       </Modal>
 
       {/* Custom Alert Modal */}
-      <Modal
+      <AlertModalWithButton
         visible={showAlertModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAlertModal(false)}
-      >
-        <View style={styles.customAlertOverlay}>
-          <View style={styles.customAlertContainer}>
-            {/* Icon */}
-            <View style={[
-              styles.customAlertIconContainer,
-              alertConfig.type === 'success' && styles.alertSuccess,
-              alertConfig.type === 'error' && styles.alertError,
-              alertConfig.type === 'info' && styles.alertInfo,
-            ]}>
-              <Ionicons
-                name={
-                  alertConfig.type === 'success' ? 'checkmark-circle' :
-                  alertConfig.type === 'error' ? 'close-circle' :
-                  'information-circle'
-                }
-                size={moderateScale(48)}
-                color="#fff"
-              />
-            </View>
-
-            {/* Title */}
-            <Text style={styles.customAlertTitle}>{alertConfig.title}</Text>
-
-            {/* Message */}
-            <Text style={styles.customAlertMessage}>{alertConfig.message}</Text>
-
-            {/* Button */}
-            <TouchableOpacity
-              style={[
-                styles.customAlertButton,
-                alertConfig.type === 'success' && styles.alertButtonSuccess,
-                alertConfig.type === 'error' && styles.alertButtonError,
-                alertConfig.type === 'info' && styles.alertButtonInfo,
-              ]}
-              onPress={() => {
-                setShowAlertModal(false);
-                if (alertConfig.onConfirm) {
-                  alertConfig.onConfirm();
-                }
-              }}
-            >
-              <Text style={styles.customAlertButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onDismiss={() => {
+          setShowAlertModal(false);
+          if (alertConfig.onConfirm) {
+            alertConfig.onConfirm();
+          }
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -1974,60 +1909,6 @@ const styles = StyleSheet.create({
     lineHeight: scaleFontSize(19),
     marginLeft: moderateScale(10),
   },
-  // Rescheduled alert card
-  rescheduledAlertCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(16),
-    marginHorizontal: wp(5),
-    marginTop: moderateScale(16),
-    gap: moderateScale(12),
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  rescheduledAlertContent: {
-    flex: 1,
-  },
-  rescheduledAlertTitle: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '700',
-    color: '#4CAF50',
-    marginBottom: moderateScale(6),
-  },
-  rescheduledAlertText: {
-    fontSize: scaleFontSize(13),
-    color: '#666',
-    lineHeight: scaleFontSize(19),
-    marginBottom: moderateScale(8),
-  },
-  originalDateContainer: {
-    marginTop: moderateScale(8),
-    paddingTop: moderateScale(8),
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  originalDateLabel: {
-    fontSize: scaleFontSize(12),
-    fontWeight: '600',
-    color: '#999',
-    marginRight: moderateScale(6),
-  },
-  originalDateValue: {
-    fontSize: scaleFontSize(12),
-    color: '#666',
-    textDecorationLine: 'line-through',
-    fontStyle: 'italic',
-  },
   // Edit modal styles
   editModalOverlay: {
     flex: 1,
@@ -2413,21 +2294,30 @@ const styles = StyleSheet.create({
   editRequestDetailItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: moderateScale(12),
+  },
+  editRequestDetailItemCentered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(12),
   },
   editRequestDetailTextContainer: {
     flex: 1,
+    alignItems: 'center',
   },
   editRequestDetailLabel: {
     fontSize: scaleFontSize(12),
     fontWeight: '600',
     color: '#7F8C8D',
     marginBottom: moderateScale(4),
+    textAlign: 'center',
   },
   editRequestDetailValue: {
     fontSize: scaleFontSize(14),
     color: '#2C3E50',
     fontWeight: '600',
+    textAlign: 'center',
   },
   strikethroughText: {
     textDecorationLine: 'line-through',
@@ -2437,10 +2327,6 @@ const styles = StyleSheet.create({
   highlightedText: {
     color: '#1C86FF',
     fontWeight: '700',
-  },
-  arrowIndicator: {
-    alignItems: 'center',
-    paddingVertical: moderateScale(8),
   },
   editRequestFooter: {
     flexDirection: 'row',
@@ -2543,89 +2429,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: 'bold',
-  },
-  // Custom Alert Modal Styles
-  customAlertOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: moderateScale(20),
-  },
-  customAlertContainer: {
-    backgroundColor: '#fff',
-    borderRadius: moderateScale(20),
-    padding: moderateScale(28),
-    width: '90%',
-    maxWidth: moderateScale(380),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  customAlertIconContainer: {
-    width: moderateScale(80),
-    height: moderateScale(80),
-    borderRadius: moderateScale(40),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: moderateScale(20),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  alertSuccess: {
-    backgroundColor: '#4CAF50',
-  },
-  alertError: {
-    backgroundColor: '#FF6B6B',
-  },
-  alertInfo: {
-    backgroundColor: '#1C86FF',
-  },
-  customAlertTitle: {
-    fontSize: scaleFontSize(22),
-    fontWeight: '700',
-    color: '#2C3E50',
-    marginBottom: moderateScale(12),
-    textAlign: 'center',
-  },
-  customAlertMessage: {
-    fontSize: scaleFontSize(15),
-    color: '#7F8C8D',
-    lineHeight: scaleFontSize(22),
-    textAlign: 'center',
-    marginBottom: moderateScale(24),
-  },
-  customAlertButton: {
-    width: '100%',
-    paddingVertical: moderateScale(14),
-    borderRadius: moderateScale(12),
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  alertButtonSuccess: {
-    backgroundColor: '#4CAF50',
-  },
-  alertButtonError: {
-    backgroundColor: '#FF6B6B',
-  },
-  alertButtonInfo: {
-    backgroundColor: '#1C86FF',
-  },
-  customAlertButtonText: {
-    color: '#fff',
-    fontSize: scaleFontSize(16),
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
 });
 

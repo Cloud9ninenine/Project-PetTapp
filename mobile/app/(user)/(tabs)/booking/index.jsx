@@ -575,6 +575,10 @@ const Bookings = () => {
     const isRescheduleRejected = item.editRequest?.approvalStatus === 'rejected';
     const isRescheduled = item.editRequest?.approvalStatus === 'approved';
 
+    // Check if service has actual image or fallback icon
+    const serviceImage = getServiceImage(item.serviceId);
+    const isActualImage = serviceImage && serviceImage.uri;
+
     return (
       <TouchableOpacity
         style={[
@@ -602,8 +606,8 @@ const Bookings = () => {
         {/* Service Image inside colored circle */}
         <View style={[styles.circlePlaceholder, { backgroundColor: getServiceColor(item.serviceId) }]}>
           <Image
-            source={getServiceImage(item.serviceId)}
-            style={styles.serviceIconImage}
+            source={serviceImage}
+            style={isActualImage ? styles.serviceIconImage : styles.serviceIconPlaceholder}
             resizeMode="cover"
           />
         </View>
@@ -995,6 +999,11 @@ const styles = StyleSheet.create({
   serviceIconImage: {
     width: '100%',
     height: '100%',
+    borderRadius: hp(4.5),
+  },
+  serviceIconPlaceholder: {
+    width: '65%',
+    height: '65%',
     borderRadius: hp(4.5),
   },
   scheduleDetails: {

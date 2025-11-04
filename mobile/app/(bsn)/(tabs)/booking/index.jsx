@@ -40,10 +40,8 @@ const CustomerBookings = () => {
     paymentStatus: 'all', // all, pending, proof-uploaded, paid, failed
   });
   const [tempFilterOptions, setTempFilterOptions] = useState(filterOptions);
-  const [hasUpdates, setHasUpdates] = useState(false);
 
   const router = useRouter();
-  const pollingIntervalRef = useRef(null);
   const appState = useRef(AppState.currentState);
   const lastFetchTimeRef = useRef(Date.now());
 
@@ -56,17 +54,6 @@ const CustomerBookings = () => {
     fetchAllBookingsForStats();
   }, [selectedStatus, filterOptions]);
 
-  // Polling effect for real-time updates
-  useEffect(() => {
-    // Start polling when component mounts
-    startPolling();
-
-    // Clean up polling on unmount
-    return () => {
-      stopPolling();
-    };
-  }, []);
-
   // App state listener (foreground/background)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -76,23 +63,19 @@ const CustomerBookings = () => {
     };
   }, []);
 
-  // Screen focus listener - refresh when screen comes into focus
+  // Screen focus listener - automatically refresh when returning to screen
   useFocusEffect(
     useCallback(() => {
-      // Refresh data when screen is focused
+      // Automatically refresh data when screen comes into focus
       const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
 
-      // Only fetch if more than 5 seconds have passed since last fetch
-      if (timeSinceLastFetch > 5000) {
+      // Fetch if more than 2 seconds have passed since last fetch
+      if (timeSinceLastFetch > 2000) {
         silentRefresh();
       }
 
-      // Resume polling when screen is focused
-      startPolling();
-
       return () => {
-        // Pause polling when screen loses focus
-        stopPolling();
+        // Cleanup if needed
       };
     }, [])
   );
@@ -102,121 +85,9 @@ const CustomerBookings = () => {
       // App has come to the foreground
       console.log('App is now active - refreshing bookings');
       silentRefresh();
-      startPolling();
-    } else if (nextAppState.match(/inactive|background/)) {
-      // App has gone to the background
-      console.log('App is now in background - pausing polling');
-      stopPolling();
     }
 
     appState.current = nextAppState;
-  };
-
-  const startPolling = () => {
-    // Clear any existing interval
-    stopPolling();
-
-    // Poll every 30 seconds for booking updates
-    pollingIntervalRef.current = setInterval(() => {
-      checkForUpdates();
-    }, 30000); // 30 seconds
-
-    console.log('Started polling for booking updates');
-  };
-
-  const stopPolling = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-      console.log('Stopped polling for booking updates');
-    }
-  };
-
-  const checkForUpdates = async () => {
-    try {
-      // Fetch latest bookings silently
-      const params = {
-        page: 1,
-        limit: 20,
-      };
-
-      // Apply same filters as current view
-      if (filterOptions.sortBy === 'dateAsc') {
-        params.sort = 'appointmentDateTime';
-      } else {
-        params.sort = '-appointmentDateTime';
-      }
-
-      if (filterOptions.paymentMethod && filterOptions.paymentMethod !== 'all') {
-        params.paymentMethod = filterOptions.paymentMethod;
-      }
-
-      if (filterOptions.bookingStatus && filterOptions.bookingStatus !== 'all') {
-        params.bookingStatus = filterOptions.bookingStatus;
-      }
-
-      if (filterOptions.paymentStatus && filterOptions.paymentStatus !== 'all') {
-        params.paymentStatus = filterOptions.paymentStatus;
-      }
-
-      if (selectedStatus === 'active') {
-        params.status = 'pending,confirmed,in-progress';
-      } else if (selectedStatus !== 'all') {
-        params.status = selectedStatus;
-      }
-
-      const response = await apiClient.get('/bookings', { params });
-
-      if (response.data && response.data.success) {
-        const latestBookings = response.data.data || [];
-
-        // Compare with current bookings to detect changes
-        if (hasBookingChanges(latestBookings)) {
-          console.log('Booking changes detected!');
-          setHasUpdates(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking for updates:', error);
-    }
-  };
-
-  const hasBookingChanges = (latestBookings) => {
-    if (latestBookings.length !== bookings.length) {
-      return true;
-    }
-
-    // Check if any booking status or payment status has changed
-    for (let i = 0; i < latestBookings.length; i++) {
-      const latest = latestBookings[i];
-      const current = bookings.find(b => b._id === latest._id);
-
-      if (!current) {
-        return true; // New booking
-      }
-
-      // Check for status changes
-      if (current.status !== latest.status) {
-        console.log(`Booking ${latest._id} status changed: ${current.status} -> ${latest.status}`);
-        return true;
-      }
-
-      // Check for payment status changes
-      if (current.paymentStatus !== latest.paymentStatus) {
-        console.log(`Booking ${latest._id} payment status changed: ${current.paymentStatus} -> ${latest.paymentStatus}`);
-        return true;
-      }
-
-      // Check for payment proof changes
-      const currentHasProof = !!(current.paymentProof?.imageUrl);
-      const latestHasProof = !!(latest.paymentProof?.imageUrl);
-      if (currentHasProof !== latestHasProof) {
-        console.log(`Booking ${latest._id} payment proof changed`);
-        return true;
-      }
-    }
-
-    return false;
   };
 
   const silentRefresh = async () => {
@@ -224,15 +95,9 @@ const CustomerBookings = () => {
       lastFetchTimeRef.current = Date.now();
       await fetchBookings(1);
       await fetchAllBookingsForStats();
-      setHasUpdates(false);
     } catch (error) {
       console.error('Error during silent refresh:', error);
     }
-  };
-
-  const handleRefreshUpdates = () => {
-    setHasUpdates(false);
-    onRefresh();
   };
 
   const fetchAllBookingsForStats = async () => {
@@ -1068,24 +933,6 @@ const CustomerBookings = () => {
       {/* Filter Modal */}
       {renderFilterModal()}
 
-      {/* Update Notification Banner */}
-      {hasUpdates && (
-        <TouchableOpacity
-          style={styles.updateBanner}
-          onPress={handleRefreshUpdates}
-          activeOpacity={0.8}
-        >
-          <View style={styles.updateBannerContent}>
-            <Ionicons name="refresh-circle" size={moderateScale(24)} color="#fff" />
-            <View style={styles.updateTextContainer}>
-              <Text style={styles.updateBannerText}>New updates available</Text>
-              <Text style={styles.updateBannerSubtext}>Tap to refresh and see changes</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-up" size={moderateScale(20)} color="#fff" />
-        </TouchableOpacity>
-      )}
-
       {/* List */}
       <FlatList
         data={filteredBookings}
@@ -1569,42 +1416,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#999',
     textAlign: 'center',
-  },
-  updateBanner: {
-    backgroundColor: '#4CAF50',
-    marginHorizontal: wp(4),
-    marginVertical: moderateScale(10),
-    borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(14),
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  updateBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: moderateScale(12),
-  },
-  updateTextContainer: {
-    flex: 1,
-  },
-  updateBannerText: {
-    fontSize: scaleFontSize(15),
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: moderateScale(2),
-  },
-  updateBannerSubtext: {
-    fontSize: scaleFontSize(12),
-    color: '#fff',
-    opacity: 0.9,
   },
 });
 

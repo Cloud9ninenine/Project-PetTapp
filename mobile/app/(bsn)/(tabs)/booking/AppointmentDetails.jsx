@@ -24,6 +24,8 @@ import apiClient from '@config/api';
 import { getOrCreateConversation } from '@services/api/messageApiService';
 import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
 import { getConversationDetails } from '@utils/messageService';
+import { ConfirmationModal, AlertModal, InputModal } from '@components/modals/SharedModals';
+import { modalStyles, COLORS } from '@styles/modalStyles';
 
 const AppointmentDetail = () => {
   const router = useRouter();
@@ -215,6 +217,8 @@ const AppointmentDetail = () => {
       // Check if action is mark-as-paid
       if (confirmationModal.action === 'mark-as-paid') {
         await confirmMarkAsPaid();
+      } else if (confirmationModal.action === 'approve-edit') {
+        await confirmApproveEdit();
       } else {
         await handleStatusUpdate(confirmationModal.action);
       }
@@ -379,6 +383,45 @@ const AppointmentDetail = () => {
     }
   };
 
+  const handleOpenMaps = () => {
+    const addressSnapshot = bookingData?.addressSnapshot;
+
+    if (!addressSnapshot) {
+      Alert.alert('No Location', 'No address information available for this appointment');
+      return;
+    }
+
+    let mapsUrl;
+    // Prefer coordinates for more accurate location
+    if (addressSnapshot.latitude && addressSnapshot.longitude) {
+      mapsUrl = `https://www.google.com/maps?q=${addressSnapshot.latitude},${addressSnapshot.longitude}`;
+    } else {
+      // Build address string from components
+      const addressParts = [
+        addressSnapshot.street,
+        addressSnapshot.city,
+        addressSnapshot.state,
+        addressSnapshot.zipCode,
+        addressSnapshot.country
+      ].filter(Boolean); // Remove empty/null values
+
+      if (addressParts.length > 0) {
+        const addressString = addressParts.join(', ');
+        const encodedAddress = encodeURIComponent(addressString);
+        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+      }
+    }
+
+    if (mapsUrl) {
+      Linking.openURL(mapsUrl).catch(err => {
+        console.error('Error opening maps:', err);
+        Alert.alert('Error', 'Could not open Google Maps');
+      });
+    } else {
+      Alert.alert('No Location', 'No valid address information available for this appointment');
+    }
+  };
+
   const handleChatCustomer = async () => {
     if (!bookingData || !bookingData.petOwnerId) {
       Alert.alert('Error', 'Customer information not available');
@@ -490,35 +533,33 @@ const AppointmentDetail = () => {
   };
 
   const handleApproveEdit = async () => {
-    Alert.alert(
-      'Approve Edit Request',
-      'Are you sure you want to approve this booking edit request? The changes will be applied immediately.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Approve',
-          onPress: async () => {
-            try {
-              setUpdating(true);
-              await apiClient.patch(`/bookings/${params.bookingId}/approve-edit`);
-              setUpdating(false);
-              showSuccessModal(
-                'Edit Request Approved',
-                'Booking edit request has been approved successfully!',
-                'checkmark-circle',
-                '#4CAF50'
-              );
-              // Refresh booking details after modal closes (2 seconds + buffer)
-              setTimeout(() => fetchBookingDetails(), 2200);
-            } catch (error) {
-              console.error('Error approving edit request:', error);
-              setUpdating(false);
-              Alert.alert('Error', error.response?.data?.message || 'Failed to approve edit request');
-            }
-          },
-        },
-      ]
+    showConfirmationModal(
+      'Approve Reschedule Request',
+      'Are you sure you want to approve this reschedule request? The appointment date/time will be updated immediately.',
+      'approve-edit',
+      'Approve',
+      '#4CAF50'
     );
+  };
+
+  const confirmApproveEdit = async () => {
+    try {
+      setUpdating(true);
+      await apiClient.patch(`/bookings/${params.bookingId}/approve-edit`);
+      setUpdating(false);
+      showSuccessModal(
+        'Reschedule Approved',
+        'The reschedule request has been approved successfully!',
+        'checkmark-circle',
+        '#4CAF50'
+      );
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
+    } catch (error) {
+      console.error('Error approving edit request:', error);
+      setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to approve reschedule request');
+    }
   };
 
   const handleRejectEdit = () => {
@@ -541,8 +582,8 @@ const AppointmentDetail = () => {
 
       setUpdating(false);
       showSuccessModal(
-        'Edit Request Rejected',
-        'Booking edit request has been rejected successfully!',
+        'Reschedule Rejected',
+        'The reschedule request has been rejected successfully!',
         'close-circle',
         '#FF6B6B'
       );
@@ -551,11 +592,55 @@ const AppointmentDetail = () => {
       setTimeout(() => fetchBookingDetails(), 2200);
     } catch (error) {
       console.error('Error rejecting edit request:', error);
+      console.error('Error details:', error.response?.data);
       setUpdating(false);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to reject edit request');
+
+      // Show detailed error message
+      const errorMessage = error.response?.data?.message ||
+                          error.response?.data?.error ||
+                          'Failed to reject reschedule request. There may be no pending reschedule request for this booking.';
+
+      Alert.alert(
+        'Error Rejecting Request',
+        errorMessage,
+        [{ text: 'OK', style: 'default' }]
+      );
     }
   };
 
+
+  const renderEditRequestButtons = () => {
+    if (!bookingData || bookingData.editRequest?.approvalStatus !== 'pending') {
+      return null;
+    }
+
+    return (
+      <View style={styles.editRequestStickyActions}>
+        <TouchableOpacity
+          style={[styles.approveEditButtonSticky, updating && styles.buttonDisabled]}
+          onPress={handleApproveEdit}
+          disabled={updating}
+        >
+          {updating ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#fff" />
+              <Text style={styles.approveEditButtonStickyText}>Approve Reschedule</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.rejectEditButtonSticky, updating && styles.buttonDisabled]}
+          onPress={handleRejectEdit}
+          disabled={updating}
+        >
+          <Ionicons name="close-circle" size={moderateScale(22)} color="#FF6B6B" />
+          <Text style={styles.rejectEditButtonStickyText}>Reject</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderActionButtons = () => {
     if (!bookingData) return null;
@@ -884,13 +969,8 @@ const AppointmentDetail = () => {
                   </View>
                 )}
 
-                {/* Arrow */}
-                <View style={styles.dateArrowContainer}>
-                  <Ionicons name="arrow-down" size={moderateScale(24)} color="#FF9B79" />
-                </View>
-
                 {/* New Requested Date */}
-                <View style={styles.dateComparisonRow}>
+                <View style={[styles.dateComparisonRow, styles.dateComparisonRowLast]}>
                   <Ionicons name="calendar" size={moderateScale(18)} color="#FF9B79" />
                   <View style={styles.dateComparisonContent}>
                     <Text style={styles.dateComparisonLabel}>New Requested Date/Time</Text>
@@ -940,33 +1020,6 @@ const AppointmentDetail = () => {
               <View style={styles.editRejectionBox}>
                 <Text style={styles.editRejectionLabel}>Your Rejection Reason:</Text>
                 <Text style={styles.editRejectionText}>{bookingData.editRequest.rejectionReason}</Text>
-              </View>
-            )}
-
-            {bookingData.editRequest.approvalStatus === 'pending' && (
-              <View style={styles.editRequestActions}>
-                <TouchableOpacity
-                  style={[styles.approveEditButton, updating && styles.buttonDisabled]}
-                  onPress={handleApproveEdit}
-                  disabled={updating}
-                >
-                  {updating ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                      <Text style={styles.approveEditButtonText}>Approve</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.rejectEditButton, updating && styles.buttonDisabled]}
-                  onPress={handleRejectEdit}
-                  disabled={updating}
-                >
-                  <Ionicons name="close-circle" size={moderateScale(20)} color="#FF6B6B" />
-                  <Text style={styles.rejectEditButtonText}>Reject</Text>
-                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1124,7 +1177,71 @@ const AppointmentDetail = () => {
           )}
         </View>
 
-        {/* 5. Payment Information */}
+        {/* 5. Service Location */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="location-outline" size={moderateScale(22)} color="#1C86FF" />
+            <Text style={styles.sectionTitle}>Service Location</Text>
+          </View>
+          <View style={styles.dataRow}>
+            <Text style={styles.dataLabel}>Location Type</Text>
+            <View style={[styles.locationTypeBadge, {
+              backgroundColor: bookingData?.locationType === 'home' ? '#E8F5E9' : '#E3F2FD'
+            }]}>
+              <Ionicons
+                name={bookingData?.locationType === 'home' ? 'home' : 'business'}
+                size={moderateScale(16)}
+                color={bookingData?.locationType === 'home' ? '#4CAF50' : '#1C86FF'}
+              />
+              <Text style={[styles.locationTypeText, {
+                color: bookingData?.locationType === 'home' ? '#4CAF50' : '#1C86FF'
+              }]}>
+                {bookingData?.locationType === 'home' ? 'Home Service' : 'Clinic'}
+              </Text>
+            </View>
+          </View>
+
+          {bookingData?.locationType === 'home' && bookingData?.addressSnapshot && (
+            <>
+              <View style={[styles.dataRow, styles.dataRowLast]}>
+                <Text style={styles.dataLabel}>Address</Text>
+                <View style={styles.addressContainer}>
+                  {bookingData.addressSnapshot.label && (
+                    <Text style={styles.addressLabel}>{bookingData.addressSnapshot.label}</Text>
+                  )}
+                  <Text style={styles.addressText}>
+                    {[
+                      bookingData.addressSnapshot.street,
+                      bookingData.addressSnapshot.city,
+                      bookingData.addressSnapshot.state,
+                      bookingData.addressSnapshot.zipCode,
+                      bookingData.addressSnapshot.country
+                    ].filter(Boolean).join(', ')}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.mapsButton}
+                onPress={handleOpenMaps}
+              >
+                <Ionicons name="map" size={moderateScale(20)} color="#fff" />
+                <Text style={styles.mapsButtonText}>See Maps</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {bookingData?.locationType === 'clinic' && (
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Note</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline]}>
+                Service will be provided at the clinic
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* 6. Payment Information */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
             <Ionicons name="wallet-outline" size={moderateScale(22)} color="#1C86FF" />
@@ -1150,7 +1267,7 @@ const AppointmentDetail = () => {
           </View>
         </View>
 
-        {/* 6. Payment Proof */}
+        {/* 7. Payment Proof */}
         {paymentProofUri && (
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
@@ -1199,7 +1316,7 @@ const AppointmentDetail = () => {
           </View>
         )}
 
-        {/* 7. Mark as Paid Button for Cash Payments - Show in content when status is NOT completed */}
+        {/* 8. Mark as Paid Button for Cash Payments - Show in content when status is NOT completed */}
         {bookingData.paymentMethod?.toLowerCase() === 'cash' &&
          paymentStatus === 'pending' &&
          bookingData.status?.toLowerCase() !== 'completed' && (
@@ -1231,257 +1348,80 @@ const AppointmentDetail = () => {
           </View>
         )}
 
-        {/* 7. Action Buttons */}
+        {/* 9. Action Buttons */}
         </ScrollView>
       </View>
 
       {/* Sticky Action Buttons Footer */}
-      {renderActionButtons() && (
+      {(renderActionButtons() || renderEditRequestButtons()) && (
         <View style={styles.stickyButtonFooter}>
-          {renderActionButtons()}
+          {renderEditRequestButtons() || renderActionButtons()}
         </View>
       )}
 
       {/* Reject Payment Modal */}
-      <Modal
+      <InputModal
         visible={rejectModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setRejectModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reject Payment Proof</Text>
-              <TouchableOpacity onPress={() => {
-                setRejectModal(false);
-                setRejectionReason('');
-              }}>
-                <Ionicons name="close" size={moderateScale(28)} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>
-                Rejection Reason <Text style={{ color: '#FF6B6B' }}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.rejectInput}
-                value={rejectionReason}
-                onChangeText={setRejectionReason}
-                placeholder="Please provide a reason for rejection..."
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
-              <View style={styles.modalButtonsRow}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setRejectModal(false);
-                    setRejectionReason('');
-                  }}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalConfirmButton, { backgroundColor: '#FF6B6B' }]}
-                  onPress={confirmRejectPayment}
-                  disabled={updating}
-                >
-                  {updating ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.modalConfirmButtonText}>Reject Payment</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title="Reject Payment Proof"
+        label="Rejection Reason"
+        placeholder="Please provide a reason for rejection..."
+        value={rejectionReason}
+        onChangeText={setRejectionReason}
+        onConfirm={confirmRejectPayment}
+        onCancel={() => {
+          setRejectModal(false);
+          setRejectionReason('');
+        }}
+        confirmText="Reject Payment"
+        confirmColor={COLORS.error}
+        loading={updating}
+      />
 
       {/* Reject Edit Request Modal */}
-      <Modal
+      <InputModal
         visible={rejectEditModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setRejectEditModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reject Edit Request</Text>
-              <TouchableOpacity onPress={() => {
-                setRejectEditModal(false);
-                setEditRejectionReason('');
-              }}>
-                <Ionicons name="close" size={moderateScale(28)} color="#333" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>
-                Rejection Reason <Text style={{ color: '#FF6B6B' }}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.rejectInput}
-                value={editRejectionReason}
-                onChangeText={setEditRejectionReason}
-                placeholder="Please provide a reason for rejecting this edit request..."
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
-              <View style={styles.modalButtonsRow}>
-                <TouchableOpacity
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setRejectEditModal(false);
-                    setEditRejectionReason('');
-                  }}
-                >
-                  <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalConfirmButton, { backgroundColor: '#FF6B6B' }]}
-                  onPress={confirmRejectEdit}
-                  disabled={updating}
-                >
-                  {updating ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.modalConfirmButtonText}>Reject Edit</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title="Reject Reschedule Request"
+        label="Rejection Reason"
+        placeholder="Please provide a reason for rejecting this reschedule request..."
+        value={editRejectionReason}
+        onChangeText={setEditRejectionReason}
+        onConfirm={confirmRejectEdit}
+        onCancel={() => {
+          setRejectEditModal(false);
+          setEditRejectionReason('');
+        }}
+        confirmText="Reject Reschedule"
+        confirmColor={COLORS.error}
+        loading={updating}
+      />
 
       {/* Confirmation Modal */}
-      <Modal
+      <ConfirmationModal
         visible={confirmationModal.visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={handleConfirmationCancel}
-      >
-        <View style={styles.confirmationOverlay}>
-          <View style={styles.confirmationContent}>
-            {/* Icon Container */}
-            <View
-              style={[
-                styles.confirmationIconContainer,
-                { backgroundColor: `${confirmationModal.confirmColor}20` }
-              ]}
-            >
-              <Ionicons
-                name={confirmationModal.action === 'mark-as-paid' ? 'cash' : 'checkmark-circle'}
-                size={moderateScale(60)}
-                color={confirmationModal.confirmColor}
-              />
-            </View>
-
-            {/* Title and Message */}
-            <Text
-              style={[
-                styles.confirmationTitle,
-                { color: confirmationModal.confirmColor }
-              ]}
-            >
-              {confirmationModal.title}
-            </Text>
-            <Text style={styles.confirmationMessage}>
-              {confirmationModal.message}
-            </Text>
-
-            {/* Action Buttons */}
-            <View style={styles.confirmationButtonContainer}>
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={[
-                  styles.confirmationCancelButton,
-                  updating && styles.confirmationButtonDisabled
-                ]}
-                onPress={handleConfirmationCancel}
-                disabled={updating}
-              >
-                <Ionicons
-                  name="close-circle"
-                  size={moderateScale(18)}
-                  color="#FF6B6B"
-                />
-                <Text style={styles.confirmationCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              {/* Confirm Button */}
-              <TouchableOpacity
-                style={[
-                  styles.confirmationConfirmButton,
-                  { backgroundColor: confirmationModal.confirmColor },
-                  updating && styles.confirmationButtonDisabled
-                ]}
-                onPress={handleConfirmationConfirm}
-                disabled={updating}
-              >
-                {updating ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={moderateScale(18)}
-                      color="#fff"
-                    />
-                    <Text style={styles.confirmationConfirmButtonText}>
-                      {confirmationModal.confirmText}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        icon={
+          confirmationModal.action === 'mark-as-paid' ? 'cash' :
+          confirmationModal.action === 'approve-edit' ? 'calendar-sharp' :
+          'checkmark-circle'
+        }
+        iconColor={confirmationModal.confirmColor}
+        confirmText={confirmationModal.confirmText}
+        cancelText={confirmationModal.cancelText}
+        onConfirm={handleConfirmationConfirm}
+        onCancel={handleConfirmationCancel}
+        loading={updating}
+      />
 
       {/* Success Modal */}
-      <Modal
+      <AlertModal
         visible={successModal.visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setSuccessModal(prev => ({ ...prev, visible: false }))}
-      >
-        <View style={styles.successOverlay}>
-          <View style={styles.successContent}>
-            {/* Icon Container */}
-            <View
-              style={[
-                styles.successIconContainer,
-                { backgroundColor: `${successModal.iconColor}20` }
-              ]}
-            >
-              <Ionicons
-                name={successModal.icon}
-                size={moderateScale(64)}
-                color={successModal.iconColor}
-              />
-            </View>
-
-            {/* Title and Message */}
-            <Text style={[styles.successTitle, { color: successModal.iconColor }]}>
-              {successModal.title}
-            </Text>
-            <Text style={styles.successMessage}>
-              {successModal.message}
-            </Text>
-          </View>
-        </View>
-      </Modal>
+        title={successModal.title}
+        message={successModal.message}
+        type="success"
+        iconColor={successModal.iconColor}
+        icon={successModal.icon}
+      />
     </SafeAreaView>
   );
 };
@@ -2118,6 +2058,54 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     fontWeight: '600',
   },
+  // Sticky Edit Request Action Buttons
+  editRequestStickyActions: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+    width: '100%',
+  },
+  approveEditButtonSticky: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  approveEditButtonStickyText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+  },
+  rejectEditButtonSticky: {
+    flex: 0.5,
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rejectEditButtonStickyText: {
+    color: '#FF6B6B',
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+  },
   // Confirmation Modal Styles
   confirmationOverlay: {
     flex: 1,
@@ -2265,10 +2253,21 @@ const styles = StyleSheet.create({
   dateComparisonRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    justifyContent:'center',
     gap: moderateScale(12),
+    paddingBottom: moderateScale(12),
+    marginBottom: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  dateComparisonRowLast: {
+    paddingBottom: 0,
+    marginBottom: 0,
+    borderBottomWidth: 0,
   },
   dateComparisonContent: {
     flex: 1,
+    alignItems: 'center',
   },
   dateComparisonLabel: {
     fontSize: scaleFontSize(12),
@@ -2277,21 +2276,72 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(6),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   dateComparisonOriginalValue: {
     fontSize: scaleFontSize(14),
     color: '#999',
     textDecorationLine: 'line-through',
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   dateComparisonNewValue: {
     fontSize: scaleFontSize(16),
     color: '#FF9B79',
     fontWeight: '700',
+    textAlign: 'center',
   },
-  dateArrowContainer: {
+  // Service Location Styles
+  locationTypeBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(8),
+    gap: moderateScale(6),
+    alignSelf: 'flex-end',
+  },
+  locationTypeText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+  },
+  addressContainer: {
+    flex: 1.5,
+    alignItems: 'flex-end',
+  },
+  addressLabel: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '700',
+    color: '#1C86FF',
+    marginBottom: moderateScale(4),
+    textAlign: 'right',
+  },
+  addressText: {
+    fontSize: scaleFontSize(14),
+    color: '#333',
+    lineHeight: scaleFontSize(20),
+    textAlign: 'right',
+  },
+  mapsButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4285F4',
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    marginTop: moderateScale(12),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapsButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '600',
   },
 });
 

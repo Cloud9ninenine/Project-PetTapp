@@ -32,6 +32,19 @@ import { formatPrice } from "@utils/formatters";
 import { getServiceCategoryIcon, renderStars, getDefaultCarouselImages } from "@utils/serviceHelpers";
 import { isBusinessOpen } from "@utils/businessHelpers";
 
+// Status color mapping - matches backend status values
+const getStatusColor = (status) => {
+  const colors = {
+    pending: "#FFA500", // Orange
+    confirmed: "#4169E1", // Royal Blue
+    "in-progress": "#9370DB", // Medium Purple
+    completed: "#32CD32", // Lime Green
+    cancelled: "#DC143C", // Crimson
+    "no-show": "#A9A9A9", // Dark Gray
+  };
+  return colors[status] || "#808080";
+};
+
 export default function HomeScreen() {
   // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
@@ -47,6 +60,7 @@ export default function HomeScreen() {
   const [allAppointments, setAllAppointments] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [loadingAppointments, setLoadingAppointments] = useState(true);
+  const [selectedDateAppointments, setSelectedDateAppointments] = useState([]);
 
   // Carousel states
   const [carouselImages, setCarouselImages] = useState([]);
@@ -376,7 +390,8 @@ export default function HomeScreen() {
     const loadAppointments = async () => {
       try {
         setLoadingAppointments(true);
-        const bookings = await fetchUserBookings({ status: 'confirmed,pending' });
+        // Fetch all appointments (not just confirmed/pending)
+        const bookings = await fetchUserBookings({});
 
         // Sort by appointment time
         bookings.sort((a, b) => {
@@ -394,6 +409,16 @@ export default function HomeScreen() {
 
     loadAppointments();
   }, []);
+
+  // Update selected date appointments when date or appointments change
+  useEffect(() => {
+    const appointmentsForDate = allAppointments.filter(appointment => {
+      if (!appointment.appointmentDateTime) return false;
+      const appointmentDate = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
+      return appointmentDate === selectedDate;
+    });
+    setSelectedDateAppointments(appointmentsForDate);
+  }, [selectedDate, allAppointments]);
 
   const handleServicePress = (service) => {
     // Check if profile is complete before allowing access
@@ -461,19 +486,52 @@ export default function HomeScreen() {
   };
 
 
-  // Create marked dates object for calendar
+  // Create marked dates object for calendar with status-based colors
   const getMarkedDates = () => {
     const marked = {};
     const today = new Date().toISOString().split('T')[0];
 
-    // Mark dates with appointments
+    // Status priority for multiple appointments on same date (higher priority = more important)
+    const statusPriority = {
+      'pending': 5,
+      'confirmed': 4,
+      'in-progress': 6,
+      'cancelled': 2,
+      'completed': 3,
+      'no-show': 1,
+    };
+
+    // Group appointments by date
+    const appointmentsByDate = {};
     allAppointments.forEach(appointment => {
-      if (appointment.appointmentDateTime) {
+      if (appointment.appointmentDateTime && appointment.status) {
         const dateStr = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
-        if (!marked[dateStr]) {
-          marked[dateStr] = { marked: true, dotColor: '#FF9B79' };
+        if (!appointmentsByDate[dateStr]) {
+          appointmentsByDate[dateStr] = [];
         }
+        appointmentsByDate[dateStr].push(appointment);
       }
+    });
+
+    // Mark dates with appointments using status-based colors
+    Object.keys(appointmentsByDate).forEach(dateStr => {
+      const appointments = appointmentsByDate[dateStr];
+
+      // Sort by priority and get the highest priority appointment
+      const sortedByPriority = appointments.sort((a, b) => {
+        return (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0);
+      });
+
+      const highestPriorityAppointment = sortedByPriority[0];
+      const statusColor = getStatusColor(highestPriorityAppointment.status);
+
+      marked[dateStr] = {
+        marked: true,
+        dotColor: statusColor,
+        appointmentStatus: highestPriorityAppointment.status,
+        // Add dots array for better visibility (supports up to 3 dots)
+        dots: [{ color: statusColor }]
+      };
     });
 
     // Mark selected date
@@ -598,17 +656,6 @@ export default function HomeScreen() {
                       markedDates={markedDates}
                       onDayPress={(day) => {
                         setSelectedDate(day.dateString);
-                        // Check if the selected date has appointments
-                        const hasAppointments = allAppointments.some(appointment => {
-                          if (!appointment.appointmentDateTime) return false;
-                          const appointmentDate = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
-                          return appointmentDate === day.dateString;
-                        });
-
-                        // Navigate to booking tab if there are appointments
-                        if (hasAppointments) {
-                          router.push('/(user)/(tabs)/booking');
-                        }
                       }}
                       theme={{
                         backgroundColor: '#ffffff',
@@ -632,7 +679,80 @@ export default function HomeScreen() {
                         textDayHeaderFontSize: scaleFontSize(12),
                       }}
                     />
+
+                    {/* Status Legend */}
+                    <View style={styles.legendContainer}>
+                      <Text style={styles.legendTitle}>Status:</Text>
+                      <View style={styles.legendItems}>
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: getStatusColor('pending') }]} />
+                          <Text style={styles.legendText}>Pending</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: getStatusColor('confirmed') }]} />
+                          <Text style={styles.legendText}>Confirmed</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: getStatusColor('in-progress') }]} />
+                          <Text style={styles.legendText}>In Progress</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: getStatusColor('completed') }]} />
+                          <Text style={styles.legendText}>Completed</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                          <View style={[styles.legendDot, { backgroundColor: getStatusColor('cancelled') }]} />
+                          <Text style={styles.legendText}>Cancelled</Text>
+                        </View>
+                      </View>
+                    </View>
                   </View>
+
+                  {/* Selected Date Appointments */}
+                  {selectedDateAppointments.length > 0 && (
+                    <View style={styles.selectedDateAppointments}>
+                      <Text style={styles.selectedDateTitle}>
+                        Appointments on {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </Text>
+                      {selectedDateAppointments.map((appointment) => {
+                        const serviceData = typeof appointment.serviceId === 'object' ? appointment.serviceId : null;
+                        const petData = typeof appointment.petId === 'object' ? appointment.petId : null;
+                        const appointmentTime = new Date(appointment.appointmentDateTime);
+                        const statusColor = getStatusColor(appointment.status);
+
+                        return (
+                          <TouchableOpacity
+                            key={appointment._id}
+                            style={styles.appointmentCard}
+                            onPress={() => router.push('/(user)/(tabs)/booking')}
+                          >
+                            <View style={[styles.appointmentStatusBar, { backgroundColor: statusColor }]} />
+                            <View style={styles.appointmentCardContent}>
+                              <View style={styles.appointmentTimeSection}>
+                                <Ionicons name="time-outline" size={moderateScale(16)} color="#666" />
+                                <Text style={styles.appointmentTime}>
+                                  {appointmentTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                                </Text>
+                              </View>
+                              <View style={styles.appointmentDetails}>
+                                <Text style={styles.appointmentServiceName} numberOfLines={1}>
+                                  {serviceData?.name || 'Service'}
+                                </Text>
+                                <Text style={styles.appointmentPetName} numberOfLines={1}>
+                                  {petData?.name || 'Pet'} • {appointment.duration} mins
+                                </Text>
+                              </View>
+                              <View style={[styles.appointmentStatusBadge, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
+                                <Text style={[styles.appointmentStatusText, { color: statusColor }]}>
+                                  {appointment.status.toUpperCase()}
+                                </Text>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
                 </>
               )}
             </View>
@@ -824,6 +944,109 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  legendContainer: {
+    paddingHorizontal: moderateScale(16),
+    paddingTop: moderateScale(12),
+    paddingBottom: moderateScale(8),
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+    marginTop: moderateScale(8),
+  },
+  legendTitle: {
+    fontSize: scaleFontSize(12),
+    fontFamily: "SFProSB",
+    color: "#666",
+    marginBottom: moderateScale(8),
+  },
+  legendItems: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: moderateScale(12),
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: moderateScale(4),
+  },
+  legendDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    marginRight: moderateScale(6),
+  },
+  legendText: {
+    fontSize: scaleFontSize(11),
+    fontFamily: "SFProReg",
+    color: "#666",
+  },
+  selectedDateAppointments: {
+    width: "100%",
+    marginTop: moderateScale(12),
+    marginBottom: moderateScale(8),
+  },
+  selectedDateTitle: {
+    fontSize: scaleFontSize(16),
+    fontFamily: "SFProBold",
+    color: "#333",
+    marginBottom: moderateScale(12),
+  },
+  appointmentCard: {
+    backgroundColor: "#fff",
+    borderRadius: moderateScale(12),
+    marginBottom: moderateScale(10),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: "hidden",
+  },
+  appointmentStatusBar: {
+    width: "100%",
+    height: moderateScale(4),
+  },
+  appointmentCardContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: moderateScale(14),
+    gap: moderateScale(12),
+  },
+  appointmentTimeSection: {
+    flexDirection: "column",
+    alignItems: "center",
+    minWidth: moderateScale(60),
+  },
+  appointmentTime: {
+    fontSize: scaleFontSize(12),
+    fontFamily: "SFProSB",
+    color: "#333",
+    marginTop: moderateScale(4),
+    textAlign: "center",
+  },
+  appointmentDetails: {
+    flex: 1,
+  },
+  appointmentServiceName: {
+    fontSize: scaleFontSize(15),
+    fontFamily: "SFProBold",
+    color: "#1C86FF",
+    marginBottom: moderateScale(4),
+  },
+  appointmentPetName: {
+    fontSize: scaleFontSize(13),
+    fontFamily: "SFProReg",
+    color: "#666",
+  },
+  appointmentStatusBadge: {
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+  },
+  appointmentStatusText: {
+    fontSize: scaleFontSize(10),
+    fontFamily: "SFProSB",
   },
   categoriesLabel: {
     fontSize: scaleFontSize(20),

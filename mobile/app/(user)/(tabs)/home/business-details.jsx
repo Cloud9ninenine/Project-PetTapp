@@ -12,6 +12,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Share,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -196,6 +197,46 @@ export default function BusinessDetailsScreen() {
         location: businessData?.location
       });
       Alert.alert('Location Not Available', 'This business has not set their location coordinates.');
+    }
+  };
+
+  // Handle share
+  const handleShare = async () => {
+    try {
+      if (!businessData) {
+        Alert.alert('Error', 'Business information not available');
+        return;
+      }
+
+      const businessName = businessData.businessName || 'Pet Service Business';
+      const rating = businessData.ratings?.averageRating ? businessData.ratings.averageRating.toFixed(1) : 'No ratings yet';
+      const businessTypes = Array.isArray(businessData.businessType)
+        ? businessData.businessType.map(type => type.charAt(0).toUpperCase() + type.slice(1)).join(', ')
+        : (businessData.businessType || 'Pet Services');
+
+      const address = businessData.address
+        ? [businessData.address.street, businessData.address.city, businessData.address.state].filter(Boolean).join(', ')
+        : 'Location available';
+
+      const message = `Check out this pet service business!\n\n🏢 ${businessName}\n📋 ${businessTypes}\n⭐ ${rating}\n📍 ${address}\n\n${businessData.description || 'Providing quality pet services!'}`;
+
+      const result = await Share.share({
+        message: message,
+        title: businessName,
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          console.log('Shared with activity type:', result.activityType);
+        } else {
+          console.log('Business shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      console.error('Error sharing business:', error);
+      Alert.alert('Error', 'Could not share business. Please try again.');
     }
   };
 
@@ -643,21 +684,33 @@ export default function BusinessDetailsScreen() {
               })()}
             </View>
 
-            {/* Chat Button */}
-            <TouchableOpacity
-              style={[styles.chatButton, loadingMessage && styles.chatButtonDisabled]}
-              onPress={handleMessage}
-              disabled={loadingMessage}
-            >
-              {loadingMessage ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="chatbubbles-outline" size={moderateScale(20)} color="#fff" />
-                  <Text style={styles.chatButtonText}>Send a message</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              {/* Chat Button */}
+              <TouchableOpacity
+                style={[styles.chatButton, loadingMessage && styles.chatButtonDisabled]}
+                onPress={handleMessage}
+                disabled={loadingMessage}
+              >
+                {loadingMessage ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="chatbubbles-outline" size={moderateScale(20)} color="#fff" />
+                    <Text style={styles.chatButtonText}>Message</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Share Button */}
+              <TouchableOpacity
+                style={styles.shareButtonBusiness}
+                onPress={handleShare}
+              >
+                <Ionicons name="share-social" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.shareButtonText}>Share</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -1135,22 +1188,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'SFProSB',
   },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    marginTop: moderateScale(15),
+    gap: moderateScale(10),
+    width: '100%',
+  },
   chatButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1C86FF',
     paddingVertical: moderateScale(12),
-    paddingHorizontal: moderateScale(20),
+    paddingHorizontal: moderateScale(15),
     borderRadius: moderateScale(10),
-    marginTop: moderateScale(15),
     gap: moderateScale(8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
-    width: '100%',
   },
   chatButtonText: {
     color: '#fff',
@@ -1160,5 +1218,29 @@ const styles = StyleSheet.create({
   },
   chatButtonDisabled: {
     opacity: 0.7,
+  },
+  shareButtonBusiness: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(15),
+    borderRadius: moderateScale(10),
+    gap: moderateScale(8),
+    borderWidth: 2,
+    borderColor: '#1C86FF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  shareButtonText: {
+    color: '#1C86FF',
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    fontFamily: 'SFProSB',
   },
 });
