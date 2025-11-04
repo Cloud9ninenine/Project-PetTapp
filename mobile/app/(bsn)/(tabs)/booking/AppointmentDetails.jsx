@@ -181,17 +181,18 @@ const AppointmentDetail = () => {
         'cancelled': 'Cancelled',
       };
 
+      setUpdating(false);
       showSuccessModal(
         `${statusLabels[newStatus] || newStatus}`,
         `Booking status updated successfully!`
       );
 
-      setTimeout(() => fetchBookingDetails(), 500);
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
     } catch (error) {
       console.error('Error updating booking status:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to update booking status');
-    } finally {
       setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to update booking status');
     }
   };
 
@@ -210,7 +211,13 @@ const AppointmentDetail = () => {
   const handleConfirmationConfirm = async () => {
     if (confirmationModal.action) {
       setConfirmationModal(prev => ({ ...prev, visible: false }));
-      await handleStatusUpdate(confirmationModal.action);
+
+      // Check if action is mark-as-paid
+      if (confirmationModal.action === 'mark-as-paid') {
+        await confirmMarkAsPaid();
+      } else {
+        await handleStatusUpdate(confirmationModal.action);
+      }
     }
   };
 
@@ -274,13 +281,54 @@ const AppointmentDetail = () => {
 
       await apiClient.patch(`/bookings/${params.bookingId}/payment-proof/verify`);
 
-      showSuccessModal("Payment Verified", "Payment has been verified successfully!");
-      setTimeout(() => fetchBookingDetails(), 500);
+      // Only show success modal after API call succeeds
+      setUpdating(false);
+      showSuccessModal(
+        "Payment Verified",
+        "Payment has been verified successfully!",
+        'checkmark-circle',
+        '#4CAF50'
+      );
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
     } catch (error) {
       console.error('Error verifying payment:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to verify payment');
-    } finally {
       setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to verify payment');
+    }
+  };
+
+  const handleMarkAsPaid = () => {
+    showConfirmationModal(
+      "Confirm Cash Payment",
+      "Have you received the cash payment from the customer? This action will mark the payment as completed.",
+      'mark-as-paid',
+      'Mark as Paid',
+      '#4CAF50'
+    );
+  };
+
+  const confirmMarkAsPaid = async () => {
+    try {
+      setUpdating(true);
+
+      await apiClient.patch(`/bookings/${params.bookingId}/status`, {
+        paymentStatus: 'paid',
+      });
+
+      setUpdating(false);
+      showSuccessModal(
+        "Marked as Paid",
+        "Payment has been marked as paid successfully!",
+        'checkmark-circle',
+        '#4CAF50'
+      );
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
+    } catch (error) {
+      console.error('Error marking payment as paid:', error);
+      setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to mark payment as paid');
     }
   };
 
@@ -302,6 +350,8 @@ const AppointmentDetail = () => {
         rejectionReason: rejectionReason,
       });
 
+      // Only show success modal after API call succeeds
+      setUpdating(false);
       showSuccessModal(
         "Payment Rejected",
         "Payment proof has been rejected successfully!",
@@ -309,12 +359,12 @@ const AppointmentDetail = () => {
         '#FF6B6B'
       );
       setRejectionReason('');
-      setTimeout(() => fetchBookingDetails(), 500);
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
     } catch (error) {
       console.error('Error rejecting payment:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to reject payment');
-    } finally {
       setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reject payment');
     }
   };
 
@@ -451,18 +501,19 @@ const AppointmentDetail = () => {
             try {
               setUpdating(true);
               await apiClient.patch(`/bookings/${params.bookingId}/approve-edit`);
+              setUpdating(false);
               showSuccessModal(
                 'Edit Request Approved',
                 'Booking edit request has been approved successfully!',
                 'checkmark-circle',
                 '#4CAF50'
               );
-              setTimeout(() => fetchBookingDetails(), 500);
+              // Refresh booking details after modal closes (2 seconds + buffer)
+              setTimeout(() => fetchBookingDetails(), 2200);
             } catch (error) {
               console.error('Error approving edit request:', error);
-              Alert.alert('Error', error.response?.data?.message || 'Failed to approve edit request');
-            } finally {
               setUpdating(false);
+              Alert.alert('Error', error.response?.data?.message || 'Failed to approve edit request');
             }
           },
         },
@@ -488,6 +539,7 @@ const AppointmentDetail = () => {
         rejectionReason: editRejectionReason,
       });
 
+      setUpdating(false);
       showSuccessModal(
         'Edit Request Rejected',
         'Booking edit request has been rejected successfully!',
@@ -495,12 +547,12 @@ const AppointmentDetail = () => {
         '#FF6B6B'
       );
       setEditRejectionReason('');
-      setTimeout(() => fetchBookingDetails(), 500);
+      // Refresh booking details after modal closes (2 seconds + buffer)
+      setTimeout(() => fetchBookingDetails(), 2200);
     } catch (error) {
       console.error('Error rejecting edit request:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to reject edit request');
-    } finally {
       setUpdating(false);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to reject edit request');
     }
   };
 
@@ -509,6 +561,8 @@ const AppointmentDetail = () => {
     if (!bookingData) return null;
 
     const status = bookingData.status?.toLowerCase();
+    const paymentStatus = bookingData.paymentStatus?.toLowerCase();
+    const paymentMethod = bookingData.paymentMethod?.toLowerCase();
 
     // If there's a pending edit request, hide action buttons (notice shown at top)
     if (bookingData.editRequest?.approvalStatus === 'pending') {
@@ -516,6 +570,34 @@ const AppointmentDetail = () => {
     }
 
     if (status === "completed") {
+      // Show Mark as Paid button for cash payments with pending payment status
+      if (paymentMethod === 'cash' && paymentStatus === 'pending') {
+        return (
+          <View style={styles.actionButtonsContainer}>
+            <View style={styles.cashPaymentStickyInfo}>
+              <Ionicons name="information-circle" size={moderateScale(20)} color="#FF9B79" />
+              <Text style={styles.cashPaymentStickyInfoText}>
+                Service completed. Please confirm cash payment received.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.markAsPaidButtonSticky, updating && styles.buttonDisabled]}
+              onPress={handleMarkAsPaid}
+              disabled={updating}
+            >
+              {updating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={moderateScale(22)} color="#fff" />
+                  <Text style={styles.markAsPaidButtonStickyText}>Mark as Paid (Cash)</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
       // Show rating/review if available
       if (bookingData.rating?.score) {
         return (
@@ -788,11 +870,35 @@ const AppointmentDetail = () => {
             )}
 
             {bookingData.editRequest.appointmentDateTime && (
-              <View style={styles.dataRow}>
-                <Text style={styles.dataLabel}>Requested Date/Time</Text>
-                <Text style={[styles.dataValue, { color: '#FF9B79', fontWeight: '700' }]}>
-                  {formatDateTime(bookingData.editRequest.appointmentDateTime)}
-                </Text>
+              <View style={styles.dateComparisonContainer}>
+                {/* Original Date */}
+                {bookingData.editRequest.originalAppointmentDateTime && (
+                  <View style={styles.dateComparisonRow}>
+                    <Ionicons name="calendar-outline" size={moderateScale(18)} color="#999" />
+                    <View style={styles.dateComparisonContent}>
+                      <Text style={styles.dateComparisonLabel}>Original Date/Time</Text>
+                      <Text style={styles.dateComparisonOriginalValue}>
+                        {formatDateTime(bookingData.editRequest.originalAppointmentDateTime)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Arrow */}
+                <View style={styles.dateArrowContainer}>
+                  <Ionicons name="arrow-down" size={moderateScale(24)} color="#FF9B79" />
+                </View>
+
+                {/* New Requested Date */}
+                <View style={styles.dateComparisonRow}>
+                  <Ionicons name="calendar" size={moderateScale(18)} color="#FF9B79" />
+                  <View style={styles.dateComparisonContent}>
+                    <Text style={styles.dateComparisonLabel}>New Requested Date/Time</Text>
+                    <Text style={styles.dateComparisonNewValue}>
+                      {formatDateTime(bookingData.editRequest.appointmentDateTime)}
+                    </Text>
+                  </View>
+                </View>
               </View>
             )}
 
@@ -849,7 +955,7 @@ const AppointmentDetail = () => {
                   ) : (
                     <>
                       <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                      <Text style={styles.approveEditButtonText}>Approve Changes</Text>
+                      <Text style={styles.approveEditButtonText}>Approve</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1057,10 +1163,10 @@ const AppointmentDetail = () => {
               resizeMode="contain"
             />
 
-            {rejectionReason && (
+            {proofRejectionReason && (
               <View style={styles.rejectionReasonBox}>
                 <Text style={styles.rejectionReasonLabel}>Rejection Reason:</Text>
-                <Text style={styles.rejectionReasonText}>{rejectionReason}</Text>
+                <Text style={styles.rejectionReasonText}>{proofRejectionReason}</Text>
               </View>
             )}
 
@@ -1076,7 +1182,7 @@ const AppointmentDetail = () => {
                   ) : (
                     <>
                       <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
-                      <Text style={styles.verifyButtonText}>Verify Payment</Text>
+                      <Text style={styles.verifyButtonText}>Verify</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1090,6 +1196,38 @@ const AppointmentDetail = () => {
                 </TouchableOpacity>
               </View>
             )}
+          </View>
+        )}
+
+        {/* 7. Mark as Paid Button for Cash Payments - Show in content when status is NOT completed */}
+        {bookingData.paymentMethod?.toLowerCase() === 'cash' &&
+         paymentStatus === 'pending' &&
+         bookingData.status?.toLowerCase() !== 'completed' && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="cash-outline" size={moderateScale(22)} color="#4CAF50" />
+              <Text style={styles.sectionTitle}>Cash Payment</Text>
+            </View>
+            <View style={styles.cashPaymentInfo}>
+              <Ionicons name="information-circle" size={moderateScale(20)} color="#FF9B79" />
+              <Text style={styles.cashPaymentInfoText}>
+                Please confirm that you have received the cash payment from the customer.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.markAsPaidButton, updating && styles.buttonDisabled]}
+              onPress={handleMarkAsPaid}
+              disabled={updating}
+            >
+              {updating ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={moderateScale(20)} color="#fff" />
+                  <Text style={styles.markAsPaidButtonText}>Mark as Paid (Cash)</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -1124,7 +1262,9 @@ const AppointmentDetail = () => {
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>Rejection Reason *</Text>
+              <Text style={styles.modalSectionTitle}>
+                Rejection Reason <Text style={{ color: '#FF6B6B' }}>*</Text>
+              </Text>
               <TextInput
                 style={styles.rejectInput}
                 value={rejectionReason}
@@ -1183,7 +1323,9 @@ const AppointmentDetail = () => {
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalSectionTitle}>Rejection Reason *</Text>
+              <Text style={styles.modalSectionTitle}>
+                Rejection Reason <Text style={{ color: '#FF6B6B' }}>*</Text>
+              </Text>
               <TextInput
                 style={styles.rejectInput}
                 value={editRejectionReason}
@@ -1239,7 +1381,7 @@ const AppointmentDetail = () => {
               ]}
             >
               <Ionicons
-                name="checkmark-circle"
+                name={confirmationModal.action === 'mark-as-paid' ? 'cash' : 'checkmark-circle'}
                 size={moderateScale(60)}
                 color={confirmationModal.confirmColor}
               />
@@ -1337,15 +1479,6 @@ const AppointmentDetail = () => {
             <Text style={styles.successMessage}>
               {successModal.message}
             </Text>
-
-            {/* Success Indicator */}
-            <View style={styles.successIndicator}>
-              <Ionicons
-                name="checkmark"
-                size={moderateScale(24)}
-                color={successModal.iconColor}
-              />
-            </View>
           </View>
         </View>
       </Modal>
@@ -1581,6 +1714,79 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     fontSize: scaleFontSize(14),
     fontWeight: '600',
+  },
+  cashPaymentInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(8),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(16),
+    gap: moderateScale(10),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#FF9B79',
+  },
+  cashPaymentInfoText: {
+    flex: 1,
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    lineHeight: scaleFontSize(20),
+  },
+  markAsPaidButton: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  markAsPaidButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+  },
+  cashPaymentStickyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF4E6',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(12),
+    gap: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+  },
+  cashPaymentStickyInfoText: {
+    flex: 1,
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    fontWeight: '500',
+    lineHeight: scaleFontSize(18),
+  },
+  markAsPaidButtonSticky: {
+    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    paddingVertical: moderateScale(16),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  markAsPaidButtonStickyText: {
+    color: '#fff',
+    fontSize: scaleFontSize(17),
+    fontWeight: '700',
   },
   ratingContainer: {
     backgroundColor: '#FFF9E6',
@@ -2046,6 +2252,46 @@ const styles = StyleSheet.create({
   },
   successIndicator: {
     marginTop: hp(1),
+  },
+  // Date Comparison Styles
+  dateComparisonContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginVertical: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  dateComparisonRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: moderateScale(12),
+  },
+  dateComparisonContent: {
+    flex: 1,
+  },
+  dateComparisonLabel: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: moderateScale(6),
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dateComparisonOriginalValue: {
+    fontSize: scaleFontSize(14),
+    color: '#999',
+    textDecorationLine: 'line-through',
+    fontStyle: 'italic',
+  },
+  dateComparisonNewValue: {
+    fontSize: scaleFontSize(16),
+    color: '#FF9B79',
+    fontWeight: '700',
+  },
+  dateArrowContainer: {
+    alignItems: 'center',
+    paddingVertical: moderateScale(12),
   },
 });
 

@@ -148,23 +148,54 @@ const Bookings = () => {
           }
         }
 
-        // Frontend date sorting: Ensure appointment date sorting is applied correctly
-        // If backend doesn't sort properly, we sort client-side
-        if (filterOptions.sortBy === 'dateDesc') {
-          // Sort by appointment date descending (newest/most recent first)
-          newBookings.sort((a, b) => {
+        // Frontend sorting: Multi-level sorting with reschedule awareness
+        const now = Date.now();
+
+        newBookings.sort((a, b) => {
+          // CRITICAL PRIORITY: Pending reschedule requests
+          const aHasPendingEdit = a.editRequest?.approvalStatus === 'pending';
+          const bHasPendingEdit = b.editRequest?.approvalStatus === 'pending';
+
+          if (aHasPendingEdit && !bHasPendingEdit) return -1;
+          if (!aHasPendingEdit && bHasPendingEdit) return 1;
+
+          // PRIMARY SORT: Closeness to current date (by default)
+          if (filterOptions.sortBy === 'dateDesc' || filterOptions.sortBy === 'dateAsc') {
             const dateA = new Date(a.appointmentDateTime).getTime();
             const dateB = new Date(b.appointmentDateTime).getTime();
-            return dateB - dateA; // Newest first
-          });
-        } else if (filterOptions.sortBy === 'dateAsc') {
-          // Sort by appointment date ascending (oldest first)
-          newBookings.sort((a, b) => {
-            const dateA = new Date(a.appointmentDateTime).getTime();
-            const dateB = new Date(b.appointmentDateTime).getTime();
-            return dateA - dateB; // Oldest first
-          });
-        }
+
+            if (filterOptions.sortBy === 'dateDesc') {
+              return dateB - dateA; // Newest first
+            } else {
+              // For dateAsc, show appointments closest to today first
+              const distanceA = Math.abs(dateA - now);
+              const distanceB = Math.abs(dateB - now);
+              return distanceA - distanceB;
+            }
+          }
+
+          // SECONDARY SORT: Status priority
+          const statusPriority = {
+            'pending': 1,
+            'confirmed': 2,
+            'in-progress': 3,
+            'completed': 4,
+            'cancelled': 5,
+            'no-show': 6,
+          };
+
+          const aPriority = statusPriority[a.status] || 999;
+          const bPriority = statusPriority[b.status] || 999;
+
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+          }
+
+          // Default: by appointment date ascending
+          const defaultDateA = new Date(a.appointmentDateTime).getTime();
+          const defaultDateB = new Date(b.appointmentDateTime).getTime();
+          return defaultDateA - defaultDateB;
+        });
 
         // Bookings loaded and sorted
 
@@ -538,54 +569,84 @@ const Bookings = () => {
     </Modal>
   );
 
-  const renderScheduleItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.scheduleItem}
-      onPress={() => router.push({
-        pathname: "../booking/ScheduleDetail",
-        params: {
-          bookingId: item._id,
-          serviceName: item.serviceId?.name || 'Service',
-          businessName: item.businessId?.businessName || 'Business',
-          date: formatDate(item.appointmentDateTime),
-          time: formatTime(item.appointmentDateTime),
-          status: item.status,
-          petName: item.petId?.name || 'Pet',
-          paymentMethod: item.paymentMethod,
-          totalAmount: item.totalAmount?.amount,
-          currency: item.totalAmount?.currency,
-          notes: item.notes,
-          specialRequests: item.specialRequests,
-        }
-      })}
-    >
-      {/* Service Image inside colored circle */}
-      <View style={[styles.circlePlaceholder, { backgroundColor: getServiceColor(item.serviceId) }]}>
-        <Image
-          source={getServiceImage(item.serviceId)}
-          style={styles.serviceIconImage}
-          resizeMode="cover"
-        />
-      </View>
+  const renderScheduleItem = ({ item }) => {
+    // Check reschedule status
+    const hasPendingReschedule = item.editRequest?.approvalStatus === 'pending';
+    const isRescheduleRejected = item.editRequest?.approvalStatus === 'rejected';
+    const isRescheduled = item.editRequest?.approvalStatus === 'approved';
 
-      {/* Details */}
-      <View style={styles.scheduleDetails}>
-        <Text style={styles.scheduleTitle}>{item.serviceId?.name || 'Service'}</Text>
-        <Text style={styles.businessName}>{item.businessId?.businessName || 'Business'}</Text>
-        <Text style={styles.petName}>
-          <Ionicons name="paw" size={moderateScale(12)} color="#666" /> {item.petId?.name || 'Pet'}
-        </Text>
-        <Text style={styles.scheduleDateTime}>
-          {formatDate(item.appointmentDateTime)} | {formatTime(item.appointmentDateTime)}
-        </Text>
-      </View>
+    return (
+      <TouchableOpacity
+        style={[
+          styles.scheduleItem,
+          hasPendingReschedule && styles.scheduleItemPendingReschedule
+        ]}
+        onPress={() => router.push({
+          pathname: "../booking/ScheduleDetail",
+          params: {
+            bookingId: item._id,
+            serviceName: item.serviceId?.name || 'Service',
+            businessName: item.businessId?.businessName || 'Business',
+            date: formatDate(item.appointmentDateTime),
+            time: formatTime(item.appointmentDateTime),
+            status: item.status,
+            petName: item.petId?.name || 'Pet',
+            paymentMethod: item.paymentMethod,
+            totalAmount: item.totalAmount?.amount,
+            currency: item.totalAmount?.currency,
+            notes: item.notes,
+            specialRequests: item.specialRequests,
+          }
+        })}
+      >
+        {/* Service Image inside colored circle */}
+        <View style={[styles.circlePlaceholder, { backgroundColor: getServiceColor(item.serviceId) }]}>
+          <Image
+            source={getServiceImage(item.serviceId)}
+            style={styles.serviceIconImage}
+            resizeMode="cover"
+          />
+        </View>
 
-      {/* Status */}
-      <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-        {getStatusDisplay(item.status)}
-      </Text>
-    </TouchableOpacity>
-  );
+        {/* Details */}
+        <View style={styles.scheduleDetails}>
+          <View style={styles.titleRow}>
+            <Text style={styles.scheduleTitle}>{item.serviceId?.name || 'Service'}</Text>
+            {hasPendingReschedule && (
+              <View style={styles.pendingBadge}>
+                <Ionicons name="time-outline" size={moderateScale(12)} color="#FF9B79" />
+                <Text style={styles.pendingBadgeText}>Pending</Text>
+              </View>
+            )}
+            {isRescheduleRejected && (
+              <View style={styles.rejectedBadge}>
+                <Ionicons name="close-circle" size={moderateScale(12)} color="#FF6B6B" />
+                <Text style={styles.rejectedBadgeText}>Rejected</Text>
+              </View>
+            )}
+            {isRescheduled && (
+              <View style={styles.approvedBadge}>
+                <Ionicons name="checkmark-circle" size={moderateScale(12)} color="#4CAF50" />
+                <Text style={styles.approvedBadgeText}>Rescheduled</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.businessName}>{item.businessId?.businessName || 'Business'}</Text>
+          <Text style={styles.petName}>
+            <Ionicons name="paw" size={moderateScale(12)} color="#666" /> {item.petId?.name || 'Pet'}
+          </Text>
+          <Text style={styles.scheduleDateTime}>
+            {formatDate(item.appointmentDateTime)} | {formatTime(item.appointmentDateTime)}
+          </Text>
+        </View>
+
+        {/* Status */}
+        <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+          {getStatusDisplay(item.status)}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTitle = () => (
     <View style={styles.titleContainer}>
@@ -857,6 +918,65 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1C86FF',
     minHeight: hp(12),
+  },
+  scheduleItemPendingReschedule: {
+    borderWidth: 2,
+    borderColor: '#FF9B79',
+    backgroundColor: '#FFF9F5',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(2),
+  },
+  pendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF4E6',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
+    gap: moderateScale(4),
+    borderWidth: 1,
+    borderColor: '#FF9B79',
+  },
+  pendingBadgeText: {
+    fontSize: scaleFontSize(10),
+    fontWeight: '600',
+    color: '#FF9B79',
+  },
+  rejectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
+    gap: moderateScale(4),
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  rejectedBadgeText: {
+    fontSize: scaleFontSize(10),
+    fontWeight: '600',
+    color: '#FF6B6B',
+  },
+  approvedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
+    gap: moderateScale(4),
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  approvedBadgeText: {
+    fontSize: scaleFontSize(10),
+    fontWeight: '600',
+    color: '#4CAF50',
   },
   circlePlaceholder: {
     width: hp(9),

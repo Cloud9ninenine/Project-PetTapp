@@ -33,9 +33,9 @@ const userTabs = [
   },
 
   {
-    name: "booking",
+    name: "appointments",
     route: "/(user)/(tabs)/booking",
-    label: "Booking",
+    label: "Appointments",
     icon: require("@assets/images/service_icon/calendar icon.png"),
   },
 ];

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -29,12 +30,21 @@ const UploadPaymentProofScreen = () => {
   const [isLoadingBooking, setIsLoadingBooking] = useState(true);
   const [alreadyUploaded, setAlreadyUploaded] = useState(false);
   const [canReupload, setCanReupload] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Hide tab bar on this screen
   useEffect(() => {
     navigation.setOptions({
-      tabBarStyle: { display: 'none' }
+      tabBarStyle: { display: 'none' },
+      headerShown: false
     });
+
+    // Cleanup: show tab bar when leaving this screen
+    return () => {
+      navigation.setOptions({
+        tabBarStyle: { display: 'flex' }
+      });
+    };
   }, [navigation]);
 
   // Fetch booking details to check payment proof status
@@ -147,6 +157,21 @@ const UploadPaymentProofScreen = () => {
     try {
       setUploading(true);
 
+      // TESTING MODE: Bypass actual upload
+      /*
+      console.log('TEST MODE: Simulating upload for booking:', bookingId);
+
+      // Simulate network delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Simulate successful upload
+      console.log('TEST MODE: Upload simulated successfully');
+
+      // Show success modal
+      // Don't refresh booking details here to avoid showing "Already Uploaded" card
+      setShowSuccessModal(true);
+      */
+
       // Create FormData
       const formData = new FormData();
 
@@ -180,9 +205,8 @@ const UploadPaymentProofScreen = () => {
       console.log('Upload response:', response.status, response.data);
 
       if (response.status === 200 || response.status === 201) {
-        // Refresh booking details to update status
-        await fetchBookingDetails();
-
+        // Show success alert and navigate back
+        // Don't refresh booking details here to avoid showing "Already Uploaded" card
         Alert.alert(
           'Success',
           canReupload
@@ -200,6 +224,7 @@ const UploadPaymentProofScreen = () => {
       } else {
         throw new Error('Upload failed');
       }
+
     } catch (error) {
       console.error('Error uploading payment proof:', error);
       console.error('Error response:', error.response?.data);
@@ -430,6 +455,61 @@ const UploadPaymentProofScreen = () => {
         </TouchableOpacity>
         </View>
       )}
+
+      {/* Success Modal */}
+      <Modal
+        transparent={true}
+        visible={showSuccessModal}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          router.back();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContainer}>
+            {/* Success Icon with Animation Effect */}
+            <View style={styles.successIconContainer}>
+              <View style={styles.successIconCircle}>
+                <Ionicons name="checkmark-circle" size={moderateScale(80)} color="#4CAF50" />
+              </View>
+            </View>
+
+            {/* Success Title */}
+            <Text style={styles.successModalTitle}>
+              {canReupload ? 'Successfully Re-uploaded!' : 'Upload Successful!'}
+            </Text>
+
+            {/* Success Message */}
+            <Text style={styles.successModalMessage}>
+              {canReupload
+                ? 'Your new payment proof has been submitted. The business owner will review it again shortly.'
+                : 'Your payment proof has been submitted successfully. The business owner will review it shortly.'}
+            </Text>
+
+            {/* Info Box */}
+            <View style={styles.successInfoBox}>
+              <Ionicons name="information-circle-outline" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.successInfoText}>
+                You'll receive a notification once your payment is verified.
+              </Text>
+            </View>
+
+            {/* OK Button */}
+            <TouchableOpacity
+              style={styles.successModalButton}
+              onPress={() => {
+                setShowSuccessModal(false);
+                router.back();
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.successModalButtonText}>Got it!</Text>
+              <Ionicons name="arrow-forward" size={moderateScale(20)} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -776,6 +856,93 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(13),
     color: '#333',
     lineHeight: scaleFontSize(18),
+  },
+  // Success Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
+  },
+  successModalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(30),
+    width: '100%',
+    maxWidth: moderateScale(400),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  successIconContainer: {
+    marginBottom: moderateScale(20),
+  },
+  successIconCircle: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: moderateScale(60),
+    padding: moderateScale(15),
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  successModalTitle: {
+    fontSize: scaleFontSize(24),
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  successModalMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: scaleFontSize(22),
+    marginBottom: moderateScale(20),
+    paddingHorizontal: moderateScale(10),
+  },
+  successInfoBox: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(25),
+    borderLeftWidth: 3,
+    borderLeftColor: '#1C86FF',
+  },
+  successInfoText: {
+    flex: 1,
+    fontSize: scaleFontSize(13),
+    color: '#333',
+    marginLeft: moderateScale(10),
+    lineHeight: scaleFontSize(18),
+  },
+  successModalButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: moderateScale(12),
+    paddingVertical: moderateScale(14),
+    paddingHorizontal: moderateScale(30),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  successModalButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+    marginRight: moderateScale(8),
   },
 });
 

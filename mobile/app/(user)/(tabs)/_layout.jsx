@@ -16,6 +16,7 @@ export default function RootLayout() {
     "/booking/review-service",
     "/booking/payment-qr",
     "/booking/ScheduleDetail",
+    "/booking/upload-payment-proof",
     "/notification",
     "/(user)/(tabs)/messages/chat"
   ];

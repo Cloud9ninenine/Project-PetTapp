@@ -57,6 +57,18 @@ const ScheduleDetail = () => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
 
+  // State for payment proof modal
+  const [showPaymentProofModal, setShowPaymentProofModal] = useState(false);
+
+  // State for custom alert modal
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    type: 'success', // 'success', 'error', 'info'
+    title: '',
+    message: '',
+    onConfirm: null,
+  });
+
   // Animation and scroll tracking for edit modal
   const [editSlideAnim] = useState(new Animated.Value(screenHeight));
   const editScrollViewRef = useRef(null);
@@ -127,7 +139,7 @@ const ScheduleDetail = () => {
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        Booking Details
+        Appointment Details
       </Text>
     </View>
   );
@@ -237,8 +249,14 @@ const ScheduleDetail = () => {
     }
   };
 
+  // Show custom alert
+  const showAlert = (type, title, message, onConfirm = null) => {
+    setAlertConfig({ type, title, message, onConfirm });
+    setShowAlertModal(true);
+  };
+
   const copyBookingId = () => {
-    Alert.alert("Copied", "Booking ID copied to clipboard");
+    showAlert('success', 'Copied', 'Booking ID copied to clipboard');
   };
 
   const handleCancelPress = () => {
@@ -248,12 +266,12 @@ const ScheduleDetail = () => {
 
   const handleCancelBooking = async () => {
     if (!cancellationReason.trim()) {
-      Alert.alert('Required', 'Please provide a cancellation reason');
+      showAlert('error', 'Required', 'Please provide a cancellation reason');
       return;
     }
 
     if (cancellationReason.length > 200) {
-      Alert.alert('Validation Error', 'Cancellation reason must be 200 characters or less');
+      showAlert('error', 'Validation Error', 'Cancellation reason must be 200 characters or less');
       return;
     }
 
@@ -266,16 +284,16 @@ const ScheduleDetail = () => {
       });
 
       if (response.data.success) {
-        Alert.alert('Success', 'Booking cancelled successfully');
         setShowCancelModal(false);
         setCancellationReason('');
-        // Refresh booking data
-        fetchBookingDetail();
+        showAlert('success', 'Success', 'Appointment cancelled successfully', () => {
+          fetchBookingDetail();
+        });
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to cancel booking';
-      Alert.alert('Error', errorMessage);
+      showAlert('error', 'Error', errorMessage);
     } finally {
       setIsCancelling(false);
     }
@@ -436,19 +454,20 @@ const ScheduleDetail = () => {
       const response = await apiClient.put(`/bookings/${booking._id}`, editData);
 
       if (response.data.success) {
-        Alert.alert(
+        setShowEditModal(false);
+        showAlert(
+          'success',
           'Edit Request Submitted',
-          'Your booking edit request has been submitted. The business owner will review and approve your changes.',
-          [{ text: 'OK', onPress: () => {
-            setShowEditModal(false);
+          'Your reschedule appointment has been submitted. The business owner will review and approve your changes.',
+          () => {
             fetchBookingDetail(); // Refresh booking data
-          }}]
+          }
         );
       }
     } catch (error) {
       console.error('Error submitting edit request:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to submit edit request';
-      Alert.alert('Error', errorMessage);
+      showAlert('error', 'Error', errorMessage);
     } finally {
       setIsSubmittingEdit(false);
     }
@@ -591,7 +610,7 @@ const ScheduleDetail = () => {
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading booking details...</Text>
+          <Text style={styles.loadingText}>Loading appointment details...</Text>
         </View>
       </SafeAreaView>
     );
@@ -609,7 +628,7 @@ const ScheduleDetail = () => {
         />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={moderateScale(60)} color="#FF6B6B" />
-          <Text style={styles.errorText}>Booking not found</Text>
+          <Text style={styles.errorText}>Appointment not found</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
             <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -666,6 +685,120 @@ const ScheduleDetail = () => {
               <Text style={styles.rescheduledAlertText}>
                 Your appointment has been successfully rescheduled to {formatDate(booking.appointmentDateTime)} at {formatTime(booking.appointmentDateTime)}
               </Text>
+              {booking.editRequest.originalAppointmentDateTime && (
+                <View style={styles.originalDateContainer}>
+                  <Text style={styles.originalDateLabel}>Original Date:</Text>
+                  <Text style={styles.originalDateValue}>
+                    {formatDate(booking.editRequest.originalAppointmentDateTime)} at {formatTime(booking.editRequest.originalAppointmentDateTime)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Edit Request Section - Awaiting Approval / Rejected */}
+        {booking.editRequest && (
+          <View style={[
+            styles.editRequestSection,
+            booking.editRequest.approvalStatus === 'approved' && styles.editRequestApproved,
+            booking.editRequest.approvalStatus === 'rejected' && styles.editRequestRejected,
+            booking.editRequest.approvalStatus === 'pending' && styles.editRequestPending,
+          ]}>
+            <View style={styles.editRequestHeader}>
+              <View style={[
+                styles.editRequestIconContainer,
+                booking.editRequest.approvalStatus === 'approved' && styles.iconApproved,
+                booking.editRequest.approvalStatus === 'rejected' && styles.iconRejected,
+                booking.editRequest.approvalStatus === 'pending' && styles.iconPending,
+              ]}>
+                <Ionicons
+                  name={
+                    booking.editRequest.approvalStatus === 'approved' ? 'checkmark-circle' :
+                    booking.editRequest.approvalStatus === 'rejected' ? 'close-circle' :
+                    'time-outline'
+                  }
+                  size={moderateScale(28)}
+                  color="#fff"
+                />
+              </View>
+              <View style={styles.editRequestTitleContainer}>
+                <Text style={styles.editRequestTitle}>
+                  {booking.editRequest.approvalStatus === 'approved' ? 'Reschedule Approved' :
+                   booking.editRequest.approvalStatus === 'rejected' ? 'Reschedule Rejected' :
+                   'Awaiting Approval'}
+                </Text>
+                <Text style={styles.editRequestSubtitle}>
+                  {booking.editRequest.approvalStatus === 'approved' ? 'Your reschedule request has been approved' :
+                   booking.editRequest.approvalStatus === 'rejected' ? 'Your reschedule request was declined' :
+                   'Business owner is reviewing your request'}
+                </Text>
+              </View>
+            </View>
+
+            {booking.editRequest.approvalStatus === 'pending' && (
+              <View style={styles.editRequestInfoBox}>
+                <Ionicons name="information-circle" size={moderateScale(20)} color="#1C86FF" />
+                <Text style={styles.editRequestInfoText}>
+                  You'll be notified once the business owner reviews your changes.
+                </Text>
+              </View>
+            )}
+
+            {booking.editRequest.approvalStatus === 'rejected' && booking.editRequest.rejectionReason && (
+              <View style={styles.editRequestRejectionBox}>
+                <View style={styles.rejectionHeader}>
+                  <Ionicons name="alert-circle" size={moderateScale(18)} color="#FF6B6B" />
+                  <Text style={styles.editRequestRejectionLabel}>Reason for Rejection</Text>
+                </View>
+                <Text style={styles.editRequestRejectionText}>{booking.editRequest.rejectionReason}</Text>
+              </View>
+            )}
+
+            {booking.editRequest.appointmentDateTime && (
+              <View style={styles.editRequestDetailCard}>
+                <View style={styles.editRequestDetailHeader}>
+                  <Ionicons name="calendar-outline" size={moderateScale(18)} color="#666" />
+                  <Text style={styles.editRequestDetailHeaderText}>Requested Changes</Text>
+                </View>
+                <View style={styles.editRequestDetailContent}>
+                  {/* Original Date & Time */}
+                  {booking.editRequest.originalAppointmentDateTime && (
+                    <View style={styles.editRequestDetailItem}>
+                      <Ionicons name="calendar-outline" size={moderateScale(16)} color="#999" />
+                      <View style={styles.editRequestDetailTextContainer}>
+                        <Text style={styles.editRequestDetailLabel}>Original Date & Time</Text>
+                        <Text style={[styles.editRequestDetailValue, styles.strikethroughText]}>
+                          {formatDateTime(booking.editRequest.originalAppointmentDateTime)}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Arrow Indicator */}
+                  <View style={styles.arrowIndicator}>
+                    <Ionicons name="arrow-down" size={moderateScale(20)} color="#1C86FF" />
+                  </View>
+
+                  {/* New Date & Time */}
+                  <View style={styles.editRequestDetailItem}>
+                    <Ionicons name="calendar" size={moderateScale(16)} color="#1C86FF" />
+                    <View style={styles.editRequestDetailTextContainer}>
+                      <Text style={styles.editRequestDetailLabel}>New Date & Time</Text>
+                      <Text style={[styles.editRequestDetailValue, styles.highlightedText]}>
+                        {formatDateTime(booking.editRequest.appointmentDateTime)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.editRequestFooter}>
+              <Ionicons name="time-outline" size={moderateScale(14)} color="#999" />
+              <Text style={styles.editRequestTimestamp}>
+                Submitted {formatDateTime(booking.editRequest.requestedAt)}
+              </Text>
             </View>
           </View>
         )}
@@ -699,7 +832,7 @@ const ScheduleDetail = () => {
 
               <View style={styles.cashInstructionItem}>
                 <Ionicons name="checkmark-circle" size={moderateScale(16)} color="#4CAF50" />
-                <Text style={styles.cashInstructionItemText}>Present your booking details when you arrive</Text>
+                <Text style={styles.cashInstructionItemText}>Present your appointment details when you arrive</Text>
               </View>
             </View>
 
@@ -714,7 +847,7 @@ const ScheduleDetail = () => {
 
         {/* Booking Details */}
         <View style={styles.detailsBox}>
-          <Text style={styles.sectionTitle}>Booking Details</Text>
+          <Text style={styles.sectionTitle}>Appointment Details</Text>
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Status</Text>
@@ -833,14 +966,14 @@ const ScheduleDetail = () => {
 
         {/* Conditional sections - only show if they have content */}
         {(booking.paymentProof || booking.paymentRejectionReason || booking.notes ||
-          booking.specialRequests || booking.cancellationReason || booking.editRequest || booking.rating) && (
+          booking.specialRequests || booking.cancellationReason || booking.rating) && (
           <View style={styles.detailsBox}>
             {booking.paymentProof && (
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Payment Proof</Text>
                 <TouchableOpacity
                   style={styles.viewProofButton}
-                  onPress={() => {/* View image logic */}}
+                  onPress={() => setShowPaymentProofModal(true)}
                 >
                   <Ionicons name="image-outline" size={moderateScale(16)} color="#1C86FF" />
                   <Text style={styles.viewProofText}>View</Text>
@@ -873,57 +1006,6 @@ const ScheduleDetail = () => {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Cancellation Reason</Text>
                 <Text style={styles.detailValueNote}>{booking.cancellationReason}</Text>
-              </View>
-            )}
-
-            {booking.editRequest && (
-              <View style={styles.editRequestSection}>
-                <View style={styles.editRequestHeader}>
-                  <Ionicons
-                    name={
-                      booking.editRequest.approvalStatus === 'approved' ? 'checkmark-circle' :
-                      booking.editRequest.approvalStatus === 'rejected' ? 'close-circle' :
-                      'time-outline'
-                    }
-                    size={moderateScale(24)}
-                    color={
-                      booking.editRequest.approvalStatus === 'approved' ? '#4CAF50' :
-                      booking.editRequest.approvalStatus === 'rejected' ? '#FF6B6B' :
-                      '#FF9B79'
-                    }
-                  />
-                  <Text style={styles.editRequestTitle}>
-                    {booking.editRequest.approvalStatus === 'approved' ? 'Edit Request Approved' :
-                     booking.editRequest.approvalStatus === 'rejected' ? 'Edit Request Rejected' :
-                     'Edit Request Pending'}
-                  </Text>
-                </View>
-
-                {booking.editRequest.approvalStatus === 'pending' && (
-                  <Text style={styles.editRequestMessage}>
-                    Your edit request is waiting for business owner approval.
-                  </Text>
-                )}
-
-                {booking.editRequest.approvalStatus === 'rejected' && booking.editRequest.rejectionReason && (
-                  <View style={styles.editRequestRejectionBox}>
-                    <Text style={styles.editRequestRejectionLabel}>Rejection Reason:</Text>
-                    <Text style={styles.editRequestRejectionText}>{booking.editRequest.rejectionReason}</Text>
-                  </View>
-                )}
-
-                {booking.editRequest.appointmentDateTime && (
-                  <View style={styles.editRequestDetailRow}>
-                    <Text style={styles.editRequestDetailLabel}>Requested Date:</Text>
-                    <Text style={styles.editRequestDetailValue}>
-                      {formatDateTime(booking.editRequest.appointmentDateTime)}
-                    </Text>
-                  </View>
-                )}
-
-                <Text style={styles.editRequestTimestamp}>
-                  Requested on {formatDateTime(booking.editRequest.requestedAt)}
-                </Text>
               </View>
             )}
 
@@ -967,7 +1049,7 @@ const ScheduleDetail = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Cancel Booking</Text>
+            <Text style={styles.modalTitle}>Cancel Appointment</Text>
             <Text style={styles.modalSubtitle}>Please provide a reason for cancellation</Text>
 
             <View style={styles.modalInputContainer}>
@@ -1038,8 +1120,8 @@ const ScheduleDetail = () => {
             {/* Swipeable Header Area */}
             <View style={styles.swipeableHeader} {...editPanResponder.panHandlers}>
               <View style={styles.handleBar} />
-              <Text style={styles.modalTitle}>Edit Booking</Text>
-              <Text style={styles.modalSubtitle}>Request changes to your booking</Text>
+              <Text style={styles.modalTitle}>Edit Appointment</Text>
+              <Text style={styles.modalSubtitle}>Request changes to your Appointment</Text>
             </View>
 
             <ScrollView
@@ -1265,6 +1347,117 @@ const ScheduleDetail = () => {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Payment Proof Modal */}
+      <Modal
+        visible={showPaymentProofModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowPaymentProofModal(false)}
+      >
+        <View style={styles.paymentProofModalOverlay}>
+          <View style={styles.paymentProofModalContainer}>
+            {/* Header */}
+            <View style={styles.paymentProofModalHeader}>
+              <Text style={styles.paymentProofModalTitle}>Payment Proof</Text>
+              <TouchableOpacity
+                onPress={() => setShowPaymentProofModal(false)}
+                style={styles.paymentProofCloseButton}
+              >
+                <Ionicons name="close-circle" size={moderateScale(32)} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Payment Proof Image */}
+            {booking?.paymentProof?.imageUrl ? (
+              <View style={styles.paymentProofImageContainer}>
+                <Image
+                  source={{ uri: booking.paymentProof.imageUrl }}
+                  style={styles.paymentProofImage}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={styles.paymentProofPlaceholder}>
+                <Ionicons name="image-outline" size={moderateScale(80)} color="#ccc" />
+                <Text style={styles.paymentProofPlaceholderText}>No image available</Text>
+              </View>
+            )}
+
+            {/* Upload Date */}
+            {booking?.paymentProof?.uploadedAt && (
+              <View style={styles.paymentProofInfoBox}>
+                <Ionicons name="time-outline" size={moderateScale(18)} color="#666" />
+                <Text style={styles.paymentProofInfoText}>
+                  Uploaded on {formatDateTime(booking.paymentProof.uploadedAt)}
+                </Text>
+              </View>
+            )}
+
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.paymentProofDoneButton}
+              onPress={() => setShowPaymentProofModal(false)}
+            >
+              <Text style={styles.paymentProofDoneButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Alert Modal */}
+      <Modal
+        visible={showAlertModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAlertModal(false)}
+      >
+        <View style={styles.customAlertOverlay}>
+          <View style={styles.customAlertContainer}>
+            {/* Icon */}
+            <View style={[
+              styles.customAlertIconContainer,
+              alertConfig.type === 'success' && styles.alertSuccess,
+              alertConfig.type === 'error' && styles.alertError,
+              alertConfig.type === 'info' && styles.alertInfo,
+            ]}>
+              <Ionicons
+                name={
+                  alertConfig.type === 'success' ? 'checkmark-circle' :
+                  alertConfig.type === 'error' ? 'close-circle' :
+                  'information-circle'
+                }
+                size={moderateScale(48)}
+                color="#fff"
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={styles.customAlertTitle}>{alertConfig.title}</Text>
+
+            {/* Message */}
+            <Text style={styles.customAlertMessage}>{alertConfig.message}</Text>
+
+            {/* Button */}
+            <TouchableOpacity
+              style={[
+                styles.customAlertButton,
+                alertConfig.type === 'success' && styles.alertButtonSuccess,
+                alertConfig.type === 'error' && styles.alertButtonError,
+                alertConfig.type === 'info' && styles.alertButtonInfo,
+              ]}
+              onPress={() => {
+                setShowAlertModal(false);
+                if (alertConfig.onConfirm) {
+                  alertConfig.onConfirm();
+                }
+              }}
+            >
+              <Text style={styles.customAlertButtonText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1812,6 +2005,28 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(13),
     color: '#666',
     lineHeight: scaleFontSize(19),
+    marginBottom: moderateScale(8),
+  },
+  originalDateContainer: {
+    marginTop: moderateScale(8),
+    paddingTop: moderateScale(8),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  originalDateLabel: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#999',
+    marginRight: moderateScale(6),
+  },
+  originalDateValue: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
+    textDecorationLine: 'line-through',
+    fontStyle: 'italic',
   },
   // Edit modal styles
   editModalOverlay: {
@@ -2065,67 +2280,352 @@ const styles = StyleSheet.create({
   },
   editRequestSection: {
     marginTop: moderateScale(12),
-    padding: moderateScale(16),
-    backgroundColor: '#F9F9F9',
-    borderRadius: moderateScale(8),
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    marginBottom: moderateScale(12),
+    padding: moderateScale(18),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  editRequestApproved: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#F1F8F4',
+  },
+  editRequestRejected: {
+    borderColor: '#FF6B6B',
+    backgroundColor: '#FFF5F5',
+  },
+  editRequestPending: {
+    borderColor: '#FF9B79',
+    backgroundColor: '#FFF8F3',
   },
   editRequestHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(10),
-    marginBottom: moderateScale(8),
+    gap: moderateScale(14),
+    marginBottom: moderateScale(16),
+  },
+  editRequestIconContainer: {
+    width: moderateScale(52),
+    height: moderateScale(52),
+    borderRadius: moderateScale(26),
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  iconApproved: {
+    backgroundColor: '#4CAF50',
+  },
+  iconRejected: {
+    backgroundColor: '#FF6B6B',
+  },
+  iconPending: {
+    backgroundColor: '#FF9B79',
+  },
+  editRequestTitleContainer: {
+    flex: 1,
   },
   editRequestTitle: {
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(18),
     fontWeight: '700',
-    color: '#333',
+    color: '#2C3E50',
+    marginBottom: moderateScale(4),
   },
-  editRequestMessage: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
-    lineHeight: scaleFontSize(20),
-    marginBottom: moderateScale(12),
+  editRequestSubtitle: {
+    fontSize: scaleFontSize(13),
+    color: '#7F8C8D',
+    lineHeight: scaleFontSize(18),
+  },
+  editRequestInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(14),
+    marginBottom: moderateScale(14),
+    gap: moderateScale(10),
+    borderLeftWidth: moderateScale(3),
+    borderLeftColor: '#1C86FF',
+  },
+  editRequestInfoText: {
+    flex: 1,
+    fontSize: scaleFontSize(13),
+    color: '#1565C0',
+    lineHeight: scaleFontSize(19),
   },
   editRequestRejectionBox: {
     backgroundColor: '#FFEBEE',
-    borderRadius: moderateScale(6),
-    padding: moderateScale(10),
-    marginBottom: moderateScale(10),
+    borderRadius: moderateScale(10),
+    padding: moderateScale(14),
+    marginBottom: moderateScale(14),
+    borderLeftWidth: moderateScale(3),
+    borderLeftColor: '#FF6B6B',
+  },
+  rejectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(8),
   },
   editRequestRejectionLabel: {
-    fontSize: scaleFontSize(13),
-    fontWeight: '600',
-    color: '#FF6B6B',
-    marginBottom: moderateScale(4),
+    fontSize: scaleFontSize(14),
+    fontWeight: '700',
+    color: '#C62828',
   },
   editRequestRejectionText: {
     fontSize: scaleFontSize(13),
     color: '#333',
-    lineHeight: scaleFontSize(18),
+    lineHeight: scaleFontSize(19),
   },
-  editRequestDetailRow: {
+  editRequestDetailCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(14),
+    marginBottom: moderateScale(14),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  editRequestDetailHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: moderateScale(8),
+    gap: moderateScale(8),
+    marginBottom: moderateScale(12),
+    paddingBottom: moderateScale(10),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
-  editRequestDetailLabel: {
-    fontSize: scaleFontSize(13),
+  editRequestDetailHeaderText: {
+    fontSize: scaleFontSize(14),
     fontWeight: '600',
     color: '#666',
   },
+  editRequestDetailContent: {
+    gap: moderateScale(10),
+  },
+  editRequestDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
+  },
+  editRequestDetailTextContainer: {
+    flex: 1,
+  },
+  editRequestDetailLabel: {
+    fontSize: scaleFontSize(12),
+    fontWeight: '600',
+    color: '#7F8C8D',
+    marginBottom: moderateScale(4),
+  },
   editRequestDetailValue: {
-    fontSize: scaleFontSize(13),
-    color: '#333',
-    fontWeight: '500',
+    fontSize: scaleFontSize(14),
+    color: '#2C3E50',
+    fontWeight: '600',
+  },
+  strikethroughText: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  highlightedText: {
+    color: '#1C86FF',
+    fontWeight: '700',
+  },
+  arrowIndicator: {
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+  },
+  editRequestFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    paddingTop: moderateScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
   },
   editRequestTimestamp: {
     fontSize: scaleFontSize(12),
     color: '#999',
-    marginTop: moderateScale(8),
     fontStyle: 'italic',
+  },
+  // Payment Proof Modal Styles
+  paymentProofModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  paymentProofModalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    width: '100%',
+    maxWidth: moderateScale(500),
+    maxHeight: '90%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  paymentProofModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(20),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F8F9FA',
+  },
+  paymentProofModalTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  paymentProofCloseButton: {
+    padding: moderateScale(4),
+  },
+  paymentProofImageContainer: {
+    width: '100%',
+    height: hp(50),
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paymentProofImage: {
+    width: '100%',
+    height: '100%',
+  },
+  paymentProofPlaceholder: {
+    width: '100%',
+    height: hp(50),
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paymentProofPlaceholderText: {
+    marginTop: moderateScale(16),
+    fontSize: scaleFontSize(16),
+    color: '#999',
+  },
+  paymentProofInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: moderateScale(16),
+    backgroundColor: '#F8F9FA',
+    gap: moderateScale(8),
+  },
+  paymentProofInfoText: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+  },
+  paymentProofDoneButton: {
+    backgroundColor: '#1C86FF',
+    margin: moderateScale(20),
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    shadowColor: '#1C86FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  paymentProofDoneButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: 'bold',
+  },
+  // Custom Alert Modal Styles
+  customAlertOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  customAlertContainer: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(28),
+    width: '90%',
+    maxWidth: moderateScale(380),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  customAlertIconContainer: {
+    width: moderateScale(80),
+    height: moderateScale(80),
+    borderRadius: moderateScale(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  alertSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  alertError: {
+    backgroundColor: '#FF6B6B',
+  },
+  alertInfo: {
+    backgroundColor: '#1C86FF',
+  },
+  customAlertTitle: {
+    fontSize: scaleFontSize(22),
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: moderateScale(12),
+    textAlign: 'center',
+  },
+  customAlertMessage: {
+    fontSize: scaleFontSize(15),
+    color: '#7F8C8D',
+    lineHeight: scaleFontSize(22),
+    textAlign: 'center',
+    marginBottom: moderateScale(24),
+  },
+  customAlertButton: {
+    width: '100%',
+    paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  alertButtonSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  alertButtonError: {
+    backgroundColor: '#FF6B6B',
+  },
+  alertButtonInfo: {
+    backgroundColor: '#1C86FF',
+  },
+  customAlertButtonText: {
+    color: '#fff',
+    fontSize: scaleFontSize(16),
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
 

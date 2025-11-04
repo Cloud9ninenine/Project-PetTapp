@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,13 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  AppState,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useCallback } from 'react';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
@@ -32,11 +34,18 @@ const CustomerBookings = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [filterOptions, setFilterOptions] = useState({
-    sortBy: 'dateDesc', // dateDesc, dateAsc
+    sortBy: 'appointmentAsc', // appointmentAsc, bookingCreatedDesc, serviceAlpha, revenueDesc, customerAlpha
     paymentMethod: 'all', // all, cash, qr-payment
+    bookingStatus: 'all', // all, pending, confirmed, in-progress, completed, cancelled, no-show
+    paymentStatus: 'all', // all, pending, proof-uploaded, paid, failed
   });
   const [tempFilterOptions, setTempFilterOptions] = useState(filterOptions);
+  const [hasUpdates, setHasUpdates] = useState(false);
+
   const router = useRouter();
+  const pollingIntervalRef = useRef(null);
+  const appState = useRef(AppState.currentState);
+  const lastFetchTimeRef = useRef(Date.now());
 
   const handleBackPress = () => {
     router.push('/(bsn)/(tabs)/home');
@@ -46,6 +55,185 @@ const CustomerBookings = () => {
     fetchBookings();
     fetchAllBookingsForStats();
   }, [selectedStatus, filterOptions]);
+
+  // Polling effect for real-time updates
+  useEffect(() => {
+    // Start polling when component mounts
+    startPolling();
+
+    // Clean up polling on unmount
+    return () => {
+      stopPolling();
+    };
+  }, []);
+
+  // App state listener (foreground/background)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
+  // Screen focus listener - refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Refresh data when screen is focused
+      const timeSinceLastFetch = Date.now() - lastFetchTimeRef.current;
+
+      // Only fetch if more than 5 seconds have passed since last fetch
+      if (timeSinceLastFetch > 5000) {
+        silentRefresh();
+      }
+
+      // Resume polling when screen is focused
+      startPolling();
+
+      return () => {
+        // Pause polling when screen loses focus
+        stopPolling();
+      };
+    }, [])
+  );
+
+  const handleAppStateChange = (nextAppState) => {
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      // App has come to the foreground
+      console.log('App is now active - refreshing bookings');
+      silentRefresh();
+      startPolling();
+    } else if (nextAppState.match(/inactive|background/)) {
+      // App has gone to the background
+      console.log('App is now in background - pausing polling');
+      stopPolling();
+    }
+
+    appState.current = nextAppState;
+  };
+
+  const startPolling = () => {
+    // Clear any existing interval
+    stopPolling();
+
+    // Poll every 30 seconds for booking updates
+    pollingIntervalRef.current = setInterval(() => {
+      checkForUpdates();
+    }, 30000); // 30 seconds
+
+    console.log('Started polling for booking updates');
+  };
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+      console.log('Stopped polling for booking updates');
+    }
+  };
+
+  const checkForUpdates = async () => {
+    try {
+      // Fetch latest bookings silently
+      const params = {
+        page: 1,
+        limit: 20,
+      };
+
+      // Apply same filters as current view
+      if (filterOptions.sortBy === 'dateAsc') {
+        params.sort = 'appointmentDateTime';
+      } else {
+        params.sort = '-appointmentDateTime';
+      }
+
+      if (filterOptions.paymentMethod && filterOptions.paymentMethod !== 'all') {
+        params.paymentMethod = filterOptions.paymentMethod;
+      }
+
+      if (filterOptions.bookingStatus && filterOptions.bookingStatus !== 'all') {
+        params.bookingStatus = filterOptions.bookingStatus;
+      }
+
+      if (filterOptions.paymentStatus && filterOptions.paymentStatus !== 'all') {
+        params.paymentStatus = filterOptions.paymentStatus;
+      }
+
+      if (selectedStatus === 'active') {
+        params.status = 'pending,confirmed,in-progress';
+      } else if (selectedStatus !== 'all') {
+        params.status = selectedStatus;
+      }
+
+      const response = await apiClient.get('/bookings', { params });
+
+      if (response.data && response.data.success) {
+        const latestBookings = response.data.data || [];
+
+        // Compare with current bookings to detect changes
+        if (hasBookingChanges(latestBookings)) {
+          console.log('Booking changes detected!');
+          setHasUpdates(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+    }
+  };
+
+  const hasBookingChanges = (latestBookings) => {
+    if (latestBookings.length !== bookings.length) {
+      return true;
+    }
+
+    // Check if any booking status or payment status has changed
+    for (let i = 0; i < latestBookings.length; i++) {
+      const latest = latestBookings[i];
+      const current = bookings.find(b => b._id === latest._id);
+
+      if (!current) {
+        return true; // New booking
+      }
+
+      // Check for status changes
+      if (current.status !== latest.status) {
+        console.log(`Booking ${latest._id} status changed: ${current.status} -> ${latest.status}`);
+        return true;
+      }
+
+      // Check for payment status changes
+      if (current.paymentStatus !== latest.paymentStatus) {
+        console.log(`Booking ${latest._id} payment status changed: ${current.paymentStatus} -> ${latest.paymentStatus}`);
+        return true;
+      }
+
+      // Check for payment proof changes
+      const currentHasProof = !!(current.paymentProof?.imageUrl);
+      const latestHasProof = !!(latest.paymentProof?.imageUrl);
+      if (currentHasProof !== latestHasProof) {
+        console.log(`Booking ${latest._id} payment proof changed`);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const silentRefresh = async () => {
+    try {
+      lastFetchTimeRef.current = Date.now();
+      await fetchBookings(1);
+      await fetchAllBookingsForStats();
+      setHasUpdates(false);
+    } catch (error) {
+      console.error('Error during silent refresh:', error);
+    }
+  };
+
+  const handleRefreshUpdates = () => {
+    setHasUpdates(false);
+    onRefresh();
+  };
 
   const fetchAllBookingsForStats = async () => {
     try {
@@ -77,18 +265,34 @@ const CustomerBookings = () => {
 
       // Apply sort based on filter options
       switch (filterOptions.sortBy) {
-        case 'dateAsc':
-          params.sort = 'appointmentDateTime'; // Ascending (oldest first)
+        case 'appointmentAsc':
+          params.sort = 'appointmentDateTime'; // Ascending (what's next)
           break;
-        case 'dateDesc':
+        case 'bookingCreatedDesc':
+          params.sort = '-createdAt'; // Descending (recent activity)
+          break;
+        case 'serviceAlpha':
+        case 'revenueDesc':
+        case 'customerAlpha':
         default:
-          params.sort = '-appointmentDateTime'; // Descending (most recent first)
+          // These require client-side sorting with populated data
+          params.sort = 'appointmentDateTime'; // Default fetch order
           break;
       }
 
       // Add payment method filter if not 'all'
       if (filterOptions.paymentMethod && filterOptions.paymentMethod !== 'all') {
         params.paymentMethod = filterOptions.paymentMethod;
+      }
+
+      // Add booking status filter if not 'all'
+      if (filterOptions.bookingStatus && filterOptions.bookingStatus !== 'all') {
+        params.bookingStatus = filterOptions.bookingStatus;
+      }
+
+      // Add payment status filter if not 'all'
+      if (filterOptions.paymentStatus && filterOptions.paymentStatus !== 'all') {
+        params.paymentStatus = filterOptions.paymentStatus;
       }
 
       // Handle special filter statuses
@@ -122,46 +326,100 @@ const CustomerBookings = () => {
           }
         }
 
-        // Frontend date sorting: Ensure appointment date sorting is applied correctly
-        if (filterOptions.sortBy === 'dateDesc') {
-          newBookings.sort((a, b) => {
-            const dateA = new Date(a.appointmentDateTime).getTime();
-            const dateB = new Date(b.appointmentDateTime).getTime();
-            return dateB - dateA; // Newest first
-          });
-        } else if (filterOptions.sortBy === 'dateAsc') {
-          newBookings.sort((a, b) => {
-            const dateA = new Date(a.appointmentDateTime).getTime();
-            const dateB = new Date(b.appointmentDateTime).getTime();
-            return dateA - dateB; // Oldest first
-          });
+        // Frontend safety filter: Ensure booking status filter is applied correctly
+        if (filterOptions.bookingStatus && filterOptions.bookingStatus !== 'all') {
+          newBookings = newBookings.filter(booking =>
+            booking.status === filterOptions.bookingStatus
+          );
         }
 
-        // Custom sort for 'all' status: Active first, then Pending, then rest
-        if (selectedStatus === 'all') {
-          newBookings = newBookings.sort((a, b) => {
-            const statusPriority = {
-              'confirmed': 1,
-              'in-progress': 2,
-              'pending': 3,
-              'completed': 4,
-              'cancelled': 5,
-              'no-show': 6,
-            };
+        // Frontend safety filter: Ensure payment status filter is applied correctly
+        if (filterOptions.paymentStatus && filterOptions.paymentStatus !== 'all') {
+          newBookings = newBookings.filter(booking =>
+            booking.paymentStatus === filterOptions.paymentStatus
+          );
+        }
 
-            const aPriority = statusPriority[a.status] || 999;
-            const bPriority = statusPriority[b.status] || 999;
+        // Frontend sorting: Advanced multi-level sorting with reschedule priority
+        const now = Date.now();
 
-            if (aPriority !== bPriority) {
-              return aPriority - bPriority;
-            }
+        newBookings.sort((a, b) => {
+          // CRITICAL PRIORITY: Pending reschedule requests (especially if new date is closer)
+          const aHasPendingEdit = a.editRequest?.approvalStatus === 'pending';
+          const bHasPendingEdit = b.editRequest?.approvalStatus === 'pending';
 
-            // If same priority, sort by appointment date based on filter
+          if (aHasPendingEdit && !bHasPendingEdit) return -1;
+          if (!aHasPendingEdit && bHasPendingEdit) return 1;
+
+          // If both have pending edits, prioritize by closeness of NEW proposed date
+          if (aHasPendingEdit && bHasPendingEdit) {
+            const aNewDate = new Date(a.editRequest.appointmentDateTime).getTime();
+            const bNewDate = new Date(b.editRequest.appointmentDateTime).getTime();
+            const aDistance = Math.abs(aNewDate - now);
+            const bDistance = Math.abs(bNewDate - now);
+            return aDistance - bDistance; // Closer new dates first
+          }
+
+          // PRIMARY SORT: Closeness to current date (by default)
+          if (filterOptions.sortBy === 'appointmentAsc' || selectedStatus === 'all') {
             const dateA = new Date(a.appointmentDateTime).getTime();
             const dateB = new Date(b.appointmentDateTime).getTime();
-            return filterOptions.sortBy === 'dateAsc' ? dateA - dateB : dateB - dateA;
-          });
-        }
+            const distanceA = Math.abs(dateA - now);
+            const distanceB = Math.abs(dateB - now);
+
+            // Closest to today first
+            const closenessCompare = distanceA - distanceB;
+            if (closenessCompare !== 0) return closenessCompare;
+          }
+
+          // SECONDARY SORT: Status priority
+          const statusPriority = {
+            'pending': 1,
+            'confirmed': 2,
+            'in-progress': 3,
+            'completed': 4,
+            'cancelled': 5,
+            'no-show': 6,
+          };
+
+          const aPriority = statusPriority[a.status] || 999;
+          const bPriority = statusPriority[b.status] || 999;
+
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+          }
+
+          // TERTIARY SORT: Apply user-selected sort option
+          switch (filterOptions.sortBy) {
+            case 'bookingCreatedDesc':
+              const createdA = new Date(a.createdAt).getTime();
+              const createdB = new Date(b.createdAt).getTime();
+              return createdB - createdA;
+
+            case 'serviceAlpha':
+              const serviceA = (a.serviceId?.name || '').toLowerCase();
+              const serviceB = (b.serviceId?.name || '').toLowerCase();
+              return serviceA.localeCompare(serviceB);
+
+            case 'revenueDesc':
+              const feeA = a.totalFee || 0;
+              const feeB = b.totalFee || 0;
+              return feeB - feeA;
+
+            case 'customerAlpha':
+              const petOwnerA = a.petOwnerId || {};
+              const petOwnerB = b.petOwnerId || {};
+              const nameA = `${petOwnerA.firstName || ''} ${petOwnerA.lastName || ''}`.trim().toLowerCase();
+              const nameB = `${petOwnerB.firstName || ''} ${petOwnerB.lastName || ''}`.trim().toLowerCase();
+              return nameA.localeCompare(nameB);
+
+            default:
+              // Default: by appointment date ascending (what's coming up)
+              const defaultDateA = new Date(a.appointmentDateTime).getTime();
+              const defaultDateB = new Date(b.appointmentDateTime).getTime();
+              return defaultDateA - defaultDateB;
+          }
+        });
 
         if (pageNum === 1) {
           setBookings(newBookings);
@@ -207,6 +465,14 @@ const CustomerBookings = () => {
   };
 
   const filteredBookings = bookings.filter(booking => {
+    // First, filter by pending edits if that filter is selected
+    if (selectedStatus === 'pending-edits') {
+      if (booking.editRequest?.approvalStatus !== 'pending') {
+        return false;
+      }
+    }
+
+    // Then apply search filter
     const searchLower = searchText.toLowerCase();
     // Access populated fields correctly
     const petOwner = booking.petOwnerId || {};
@@ -293,9 +559,16 @@ const CustomerBookings = () => {
     // Format booking ID for display
     const bookingId = item._id ? `#${item._id.slice(-8).toUpperCase()}` : 'N/A';
 
+    // Check for pending reschedule request
+    const hasPendingReschedule = item.editRequest?.approvalStatus === 'pending';
+    const isRescheduled = item.editRequest?.approvalStatus === 'approved';
+
     return (
       <TouchableOpacity
-        style={styles.bookingCard}
+        style={[
+          styles.bookingCard,
+          hasPendingReschedule && styles.bookingCardPendingReschedule
+        ]}
         onPress={() => router.push({
           pathname: "../booking/AppointmentDetails",
           params: {
@@ -305,11 +578,27 @@ const CustomerBookings = () => {
         activeOpacity={0.6}
       >
         <View style={styles.cardContent}>
+          {/* CRITICAL: Pending Reschedule Alert */}
+          {hasPendingReschedule && (
+            <View style={styles.pendingRescheduleAlert}>
+              <Ionicons name="alarm-outline" size={moderateScale(18)} color="#FF6B00" />
+              <Text style={styles.pendingRescheduleText}>
+                Reschedule Request - Needs Your Approval
+              </Text>
+            </View>
+          )}
+
           {/* Header Row: Booking ID & Status */}
           <View style={styles.headerRow}>
             <View style={styles.bookingIdContainer}>
               <Ionicons name="receipt-outline" size={moderateScale(16)} color="#666" />
               <Text style={styles.bookingId}>{bookingId}</Text>
+              {isRescheduled && (
+                <View style={styles.rescheduledBadge}>
+                  <Ionicons name="sync-outline" size={moderateScale(12)} color="#4CAF50" />
+                  <Text style={styles.rescheduledText}>Rescheduled</Text>
+                </View>
+              )}
             </View>
             <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
               <Text style={styles.statusText}>{getStatusLabel(item.status)}</Text>
@@ -364,6 +653,7 @@ const CustomerBookings = () => {
 
   const statusFilters = [
     { label: 'All', value: 'all', icon: 'list-outline' },
+    { label: 'Pending Edits', value: 'pending-edits', icon: 'alarm-outline', special: true },
     { label: 'Active', value: 'active', icon: 'time-outline' },
     { label: 'Pending', value: 'pending', icon: 'hourglass-outline' },
     { label: 'Confirmed', value: 'confirmed', icon: 'checkmark-circle-outline' },
@@ -406,6 +696,13 @@ const CustomerBookings = () => {
     setFilterModalVisible(true);
   };
 
+  // Handle filter modal close without applying
+  const handleCloseFilterModal = () => {
+    // Reset temp options to current filter options (discard changes)
+    setTempFilterOptions(filterOptions);
+    setFilterModalVisible(false);
+  };
+
   // Handle filter apply
   const handleApplyFilter = () => {
     setFilterOptions(tempFilterOptions);
@@ -415,8 +712,10 @@ const CustomerBookings = () => {
   // Handle filter reset
   const handleResetFilter = () => {
     const defaultOptions = {
-      sortBy: 'dateDesc',
+      sortBy: 'appointmentAsc',
       paymentMethod: 'all',
+      bookingStatus: 'all',
+      paymentStatus: 'all',
     };
     setTempFilterOptions(defaultOptions);
     setFilterOptions(defaultOptions);
@@ -425,7 +724,10 @@ const CustomerBookings = () => {
 
   // Check if filters are active
   const hasActiveFilters = () => {
-    return filterOptions.sortBy !== 'dateDesc' || filterOptions.paymentMethod !== 'all';
+    return filterOptions.sortBy !== 'appointmentAsc' ||
+           filterOptions.paymentMethod !== 'all' ||
+           filterOptions.bookingStatus !== 'all' ||
+           filterOptions.paymentStatus !== 'all';
   };
 
   const renderFilterModal = () => (
@@ -433,18 +735,22 @@ const CustomerBookings = () => {
       visible={filterModalVisible}
       transparent={true}
       animationType="fade"
-      onRequestClose={() => setFilterModalVisible(false)}
+      onRequestClose={handleCloseFilterModal}
     >
       <TouchableOpacity
         style={styles.modalOverlay}
         activeOpacity={1}
-        onPress={() => setFilterModalVisible(false)}
+        onPress={handleCloseFilterModal}
       >
-        <View style={styles.filterModalContent}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View style={styles.filterModalContent}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Filter & Sort</Text>
-            <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+            <TouchableOpacity onPress={handleCloseFilterModal}>
               <Ionicons name="close" size={moderateScale(24)} color="#333" />
             </TouchableOpacity>
           </View>
@@ -459,8 +765,11 @@ const CustomerBookings = () => {
               <Text style={styles.filterSectionTitle}>Sort By</Text>
 
               {[
-                { value: 'dateDesc', label: 'Date - Newest First', icon: 'arrow-down' },
-                { value: 'dateAsc', label: 'Date - Oldest First', icon: 'arrow-up' },
+                { value: 'appointmentAsc', label: 'Appointment Date', icon: 'calendar-outline' },
+                { value: 'bookingCreatedDesc', label: 'Appointment Created', icon: 'time-outline' },
+                { value: 'serviceAlpha', label: 'Service Type (A-Z)', icon: 'cut-outline' },
+                { value: 'revenueDesc', label: 'Highest Revenue', icon: 'cash-outline' },
+                { value: 'customerAlpha', label: 'Customer Name (A-Z)', icon: 'person-outline' },
               ].map((option) => (
                 <TouchableOpacity
                   key={option.value}
@@ -502,6 +811,62 @@ const CustomerBookings = () => {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Booking Status Section */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Booking Status</Text>
+
+              {[
+                { value: 'all', label: 'All Statuses', icon: 'list' },
+                { value: 'pending', label: 'Pending', icon: 'hourglass-outline' },
+                { value: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
+                { value: 'in-progress', label: 'In Progress', icon: 'play-circle-outline' },
+                { value: 'completed', label: 'Completed', icon: 'checkmark-done-outline' },
+                { value: 'cancelled', label: 'Cancelled', icon: 'close-circle-outline' },
+                { value: 'no-show', label: 'No Show', icon: 'ban-outline' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilterOptions({ ...tempFilterOptions, bookingStatus: option.value })}
+                >
+                  <View style={styles.filterCheckbox}>
+                    {tempFilterOptions.bookingStatus === option.value && (
+                      <Ionicons name="checkmark" size={moderateScale(16)} color="#1C86FF" />
+                    )}
+                  </View>
+                  <Ionicons name={option.icon} size={moderateScale(18)} color="#1C86FF" style={styles.optionIcon} />
+                  <Text style={styles.filterOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Payment Status Section */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Payment Status</Text>
+
+              {[
+                { value: 'all', label: 'All Statuses', icon: 'list' },
+                { value: 'pending', label: 'Pending', icon: 'time-outline' },
+                { value: 'proof-uploaded', label: 'Proof Uploaded', icon: 'cloud-upload-outline' },
+                { value: 'paid', label: 'Paid', icon: 'checkmark-circle' },
+                { value: 'failed', label: 'Failed', icon: 'close-circle' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.filterOption}
+                  onPress={() => setTempFilterOptions({ ...tempFilterOptions, paymentStatus: option.value })}
+                >
+                  <View style={styles.filterCheckbox}>
+                    {tempFilterOptions.paymentStatus === option.value && (
+                      <Ionicons name="checkmark" size={moderateScale(16)} color="#1C86FF" />
+                    )}
+                  </View>
+                  <Ionicons name={option.icon} size={moderateScale(18)} color="#1C86FF" style={styles.optionIcon} />
+                  <Text style={styles.filterOptionText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </ScrollView>
 
           {/* Modal Footer */}
@@ -521,7 +886,8 @@ const CustomerBookings = () => {
               <Text style={styles.applyButtonText}>Apply</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );
@@ -537,7 +903,9 @@ const CustomerBookings = () => {
           <TouchableOpacity
             style={[
               styles.filterChip,
-              selectedStatus === item.value && styles.filterChipActive
+              selectedStatus === item.value && styles.filterChipActive,
+              item.special && styles.filterChipSpecial,
+              item.special && selectedStatus === item.value && styles.filterChipSpecialActive
             ]}
             onPress={() => setSelectedStatus(item.value)}
           >
@@ -545,13 +913,19 @@ const CustomerBookings = () => {
               <Ionicons
                 name={item.icon}
                 size={moderateScale(16)}
-                color={selectedStatus === item.value ? '#fff' : '#1C86FF'}
+                color={
+                  item.special
+                    ? (selectedStatus === item.value ? '#fff' : '#FF6B00')
+                    : (selectedStatus === item.value ? '#fff' : '#1C86FF')
+                }
                 style={styles.filterChipIcon}
               />
             )}
             <Text style={[
               styles.filterChipText,
-              selectedStatus === item.value && styles.filterChipTextActive
+              selectedStatus === item.value && styles.filterChipTextActive,
+              item.special && styles.filterChipTextSpecial,
+              item.special && selectedStatus === item.value && styles.filterChipTextSpecialActive
             ]}>
               {item.label}
             </Text>
@@ -694,6 +1068,24 @@ const CustomerBookings = () => {
       {/* Filter Modal */}
       {renderFilterModal()}
 
+      {/* Update Notification Banner */}
+      {hasUpdates && (
+        <TouchableOpacity
+          style={styles.updateBanner}
+          onPress={handleRefreshUpdates}
+          activeOpacity={0.8}
+        >
+          <View style={styles.updateBannerContent}>
+            <Ionicons name="refresh-circle" size={moderateScale(24)} color="#fff" />
+            <View style={styles.updateTextContainer}>
+              <Text style={styles.updateBannerText}>New updates available</Text>
+              <Text style={styles.updateBannerSubtext}>Tap to refresh and see changes</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-up" size={moderateScale(20)} color="#fff" />
+        </TouchableOpacity>
+      )}
+
       {/* List */}
       <FlatList
         data={filteredBookings}
@@ -824,6 +1216,23 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: '#fff',
+  },
+  filterChipSpecial: {
+    backgroundColor: '#FFF4E6',
+    borderColor: '#FF6B00',
+    borderWidth: 2,
+  },
+  filterChipSpecialActive: {
+    backgroundColor: '#FF6B00',
+    borderColor: '#FF6B00',
+  },
+  filterChipTextSpecial: {
+    color: '#FF6B00',
+    fontWeight: '700',
+  },
+  filterChipTextSpecialActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -993,6 +1402,47 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  bookingCardPendingReschedule: {
+    borderWidth: 2,
+    borderColor: '#FF6B00',
+    backgroundColor: '#FFF9F5',
+    shadowColor: '#FF6B00',
+    shadowOpacity: 0.15,
+    elevation: 4,
+  },
+  pendingRescheduleAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE8D6',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(8),
+    marginBottom: moderateScale(12),
+    gap: moderateScale(8),
+    borderLeftWidth: moderateScale(4),
+    borderLeftColor: '#FF6B00',
+  },
+  pendingRescheduleText: {
+    fontSize: scaleFontSize(13),
+    fontWeight: '700',
+    color: '#C55000',
+    flex: 1,
+  },
+  rescheduledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(10),
+    marginLeft: moderateScale(8),
+    gap: moderateScale(4),
+  },
+  rescheduledText: {
+    fontSize: scaleFontSize(10),
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
   cardContent: {
     padding: moderateScale(16),
   },
@@ -1119,6 +1569,42 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(14),
     color: '#999',
     textAlign: 'center',
+  },
+  updateBanner: {
+    backgroundColor: '#4CAF50',
+    marginHorizontal: wp(4),
+    marginVertical: moderateScale(10),
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(14),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  updateBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: moderateScale(12),
+  },
+  updateTextContainer: {
+    flex: 1,
+  },
+  updateBannerText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: moderateScale(2),
+  },
+  updateBannerSubtext: {
+    fontSize: scaleFontSize(12),
+    color: '#fff',
+    opacity: 0.9,
   },
 });
 
