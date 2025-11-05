@@ -11,9 +11,17 @@ export default {
     scheme: "pettapp",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
+    // Universal Links and App Links configuration
+    associatedDomains: [
+      "applinks:pettapp-seven.vercel.app",
+      "webcredentials:pettapp-seven.vercel.app"
+    ],
     ios: {
       bundleIdentifier: "com.leleoj.pettapp",
       supportsTablet: true,
+      associatedDomains: [
+        "applinks:pettapp-seven.vercel.app"
+      ],
       infoPlist: {
         NSLocationWhenInUseUsageDescription: "This app needs access to your location to show nearby pet services and provide directions.",
         ITSAppUsesNonExemptEncryption: false,
@@ -30,6 +38,20 @@ export default {
         backgroundColor: "#1C86FF"
       },
       edgeToEdgeEnabled: true,
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "https",
+              host: "pettapp-seven.vercel.app",
+              pathPrefix: "/pet-owner/businesses"
+            }
+          ],
+          category: ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -98,6 +120,14 @@ export default {
           ios: {
             deploymentTarget: "15.1"
           }
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          photosPermission: "Allow PetTapp to save analytics reports to your device.",
+          savePhotosPermission: "Allow PetTapp to save analytics reports to your device.",
+          isAccessMediaLocationEnabled: false
         }
       ]
     ],

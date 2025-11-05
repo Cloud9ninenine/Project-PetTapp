@@ -200,7 +200,7 @@ export default function BusinessDetailsScreen() {
     }
   };
 
-  // Handle share
+  // Handle share - shares the business information with web link
   const handleShare = async () => {
     try {
       if (!businessData) {
@@ -209,34 +209,31 @@ export default function BusinessDetailsScreen() {
       }
 
       const businessName = businessData.businessName || 'Pet Service Business';
-      const rating = businessData.ratings?.averageRating ? businessData.ratings.averageRating.toFixed(1) : 'No ratings yet';
-      const businessTypes = Array.isArray(businessData.businessType)
-        ? businessData.businessType.map(type => type.charAt(0).toUpperCase() + type.slice(1)).join(', ')
-        : (businessData.businessType || 'Pet Services');
+      const description = businessData.description || 'Check out this pet care business!';
 
-      const address = businessData.address
-        ? [businessData.address.street, businessData.address.city, businessData.address.state].filter(Boolean).join(', ')
-        : 'Location available';
+      // Web app URL - links to the deployed Vercel app
+      const webUrl = `https://pettapp-seven.vercel.app/pet-owner/businesses/${businessData._id}`;
 
-      const message = `Check out this pet service business!\n\n🏢 ${businessName}\n📋 ${businessTypes}\n⭐ ${rating}\n📍 ${address}\n\n${businessData.description || 'Providing quality pet services!'}`;
+      // Share message includes description and clickable link
+      const shareMessage = `${description}\n\n${webUrl}`;
 
       const result = await Share.share({
-        message: message,
         title: businessName,
+        message: shareMessage,
+        url: webUrl, // iOS will use this for sharing
       });
 
       if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          console.log('Shared with activity type:', result.activityType);
-        } else {
-          console.log('Business shared successfully');
-        }
+        console.log('Business shared successfully');
       } else if (result.action === Share.dismissedAction) {
         console.log('Share dismissed');
       }
     } catch (error) {
       console.error('Error sharing business:', error);
-      Alert.alert('Error', 'Could not share business. Please try again.');
+      // Silently handle user cancellation errors
+      if (error.message !== 'User did not share') {
+        Alert.alert('Error', 'Could not share business. Please try again.');
+      }
     }
   };
 

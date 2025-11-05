@@ -12,40 +12,42 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RevenueScreen() {
-  const [selectedPeriod, setSelectedPeriod] = useState("all");
+  const params = useLocalSearchParams();
+  const [selectedPeriod, setSelectedPeriod] = useState(params.filter || "month");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [revenueData, setRevenueData] = useState(null);
 
   // Calculate date range based on selected period
   const getDateRange = () => {
-    // For "all" period, return undefined to fetch all data
-    if (selectedPeriod === 'all') {
-      return {
-        startDate: undefined,
-        endDate: undefined
-      };
-    }
-
     const endDate = new Date();
-    // Extend end date to 30 days in the future to include future bookings
-    endDate.setDate(endDate.getDate() + 30);
-
+    endDate.setDate(endDate.getDate() + 30); // Include future bookings
     const startDate = new Date();
 
-    if (selectedPeriod === 'week') {
-      startDate.setDate(startDate.getDate() - 7);
-    } else if (selectedPeriod === 'month') {
-      startDate.setMonth(startDate.getMonth() - 1);
-    } else if (selectedPeriod === 'year') {
-      startDate.setFullYear(startDate.getFullYear() - 1);
+    switch (selectedPeriod) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(startDate.getMonth() - 1);
+        break;
+      case 'year':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      case 'all':
+      default:
+        return { startDate: undefined, endDate: undefined };
     }
 
     return {
@@ -101,7 +103,6 @@ export default function RevenueScreen() {
       await fetchRevenueData();
     } catch (error) {
       console.error('Error during quiet refresh:', error);
-      // Don't show alerts during quiet refresh
     }
   };
 
@@ -127,7 +128,7 @@ export default function RevenueScreen() {
 
   // Helper functions
   const formatCurrency = (amount) => {
-    return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `₱${(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const formatDate = (dateString) => {
@@ -170,7 +171,7 @@ export default function RevenueScreen() {
           backgroundColor="#1C86FF"
           titleColor="#fff"
           customTitle={renderTitle()}
-          showBack={false}
+          showBack={true}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C86FF" />
@@ -182,7 +183,6 @@ export default function RevenueScreen() {
 
   const growth = calculateGrowth();
   const currentMonthRevenue = revenueData?.monthlyData?.[revenueData.monthlyData.length - 1]?.revenue || 0;
-  const previousMonthRevenue = revenueData?.monthlyData?.[revenueData.monthlyData.length - 2]?.revenue || 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -196,7 +196,7 @@ export default function RevenueScreen() {
         backgroundColor="#1C86FF"
         titleColor="#fff"
         customTitle={renderTitle()}
-        showBack={false}
+        showBack={true}
       />
 
       <ScrollView
@@ -206,129 +206,101 @@ export default function RevenueScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "all" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("all")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "all" && styles.periodButtonTextActive,
-              ]}
-            >
-              All
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "week" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("week")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "week" && styles.periodButtonTextActive,
-              ]}
-            >
-              Week
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "month" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("month")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "month" && styles.periodButtonTextActive,
-              ]}
-            >
-              Month
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.periodButton,
-              selectedPeriod === "year" && styles.periodButtonActive,
-            ]}
-            onPress={() => setSelectedPeriod("year")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "year" && styles.periodButtonTextActive,
-              ]}
-            >
-              Year
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Revenue Summary Cards */}
-        <View style={styles.summaryCardsContainer}>
-          <View style={[styles.summaryCard, styles.totalRevenueCard]}>
-            <Ionicons name="cash-outline" size={moderateScale(32)} color="#fff" />
-            <Text style={styles.summaryCardLabel}>Total Revenue (Paid)</Text>
-            <Text style={styles.summaryCardValue}>{formatCurrency(revenueData?.totalRevenue || 0)}</Text>
-            <Text style={styles.summaryCardSubtext}>
-              {revenueData?.paidBookings || 0} paid bookings
-            </Text>
-          </View>
-
-          <View style={styles.summaryCardsRow}>
-            <View style={styles.summaryCardSmall}>
-              <Ionicons name="trending-up-outline" size={moderateScale(24)} color="#4CAF50" />
-              <Text style={styles.summaryCardLabelSmall}>Current Period</Text>
-              <Text style={styles.summaryCardValueSmall}>{formatCurrency(currentMonthRevenue)}</Text>
-              {growth !== null && (
-                <Text style={[
-                  styles.growthBadge,
-                  { color: growth >= 0 ? '#4CAF50' : '#FF6B6B' }
-                ]}>
-                  {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.summaryCardSmall}>
-              <Ionicons name="hourglass-outline" size={moderateScale(24)} color="#FF9B79" />
-              <Text style={styles.summaryCardLabelSmall}>Pending Payment</Text>
-              <Text style={styles.summaryCardValueSmall}>{formatCurrency(revenueData?.pendingRevenue || 0)}</Text>
-              <Text style={styles.pendingBookingsText}>
-                {revenueData?.pendingBookings || 0} bookings
+        {/* Revenue Overview Card */}
+        <View style={styles.overviewCard}>
+          <View style={styles.overviewHeader}>
+            <View>
+              <Text style={styles.overviewLabel}>Total Revenue</Text>
+              <Text style={styles.overviewValue}>{formatCurrency(revenueData?.totalRevenue || 0)}</Text>
+              <Text style={styles.overviewSubtext}>
+                {revenueData?.paidBookings || 0} paid bookings
               </Text>
             </View>
+            {growth !== null && (
+              <View style={styles.growthBadge}>
+                <Ionicons name="trending-up" size={moderateScale(16)} color="#4CAF50" />
+                <Text style={styles.growthText}>
+                  {growth >= 0 ? '+' : ''}{growth.toFixed(1)}%
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Period Selector */}
+          <View style={styles.periodSelector}>
+            {[
+              { id: 'today', label: 'Today' },
+              { id: 'week', label: 'Week' },
+              { id: 'month', label: 'Month' },
+              { id: 'year', label: 'Year' },
+            ].map((period) => (
+              <TouchableOpacity
+                key={period.id}
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === period.id && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod(period.id)}
+              >
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === period.id && styles.periodButtonTextActive
+                ]}>
+                  {period.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Summary Stats Row */}
+        <View style={styles.summaryCardsRow}>
+          <View style={styles.summaryCardSmall}>
+            <Ionicons name="trending-up-outline" size={moderateScale(24)} color="#4CAF50" />
+            <Text style={styles.summaryCardLabelSmall}>Current Period</Text>
+            <Text style={styles.summaryCardValueSmall}>{formatCurrency(currentMonthRevenue)}</Text>
+          </View>
+
+          <View style={styles.summaryCardSmall}>
+            <Ionicons name="hourglass-outline" size={moderateScale(24)} color="#FF9B79" />
+            <Text style={styles.summaryCardLabelSmall}>Pending Payment</Text>
+            <Text style={styles.summaryCardValueSmall}>{formatCurrency(revenueData?.pendingRevenue || 0)}</Text>
+            <Text style={styles.pendingBookingsText}>
+              {revenueData?.pendingBookings || 0} bookings
+            </Text>
           </View>
         </View>
 
         {/* Payment Method Breakdown */}
         {revenueData?.paymentMethodBreakdown && Object.keys(revenueData.paymentMethodBreakdown).length > 0 && (
-          <View style={styles.paymentMethodSection}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Methods</Text>
             <View style={styles.paymentMethodGrid}>
               {Object.entries(revenueData.paymentMethodBreakdown).map(([method, data]) => (
                 <View key={method} style={styles.paymentMethodCard}>
-                  <Ionicons
-                    name={getPaymentMethodIcon(method)}
-                    size={moderateScale(24)}
-                    color="#1C86FF"
-                  />
+                  <View style={styles.paymentMethodIconContainer}>
+                    <Ionicons
+                      name={getPaymentMethodIcon(method)}
+                      size={moderateScale(28)}
+                      color="#1C86FF"
+                    />
+                  </View>
                   <Text style={styles.paymentMethodName}>
                     {method.charAt(0).toUpperCase() + method.slice(1)}
                   </Text>
                   <Text style={styles.paymentMethodAmount}>{formatCurrency(data.total)}</Text>
                   <Text style={styles.paymentMethodCount}>{data.count} transactions</Text>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        {
+                          width: `${((data.total / revenueData.totalRevenue) * 100).toFixed(0)}%`,
+                          backgroundColor: '#1C86FF'
+                        }
+                      ]}
+                    />
+                  </View>
                 </View>
               ))}
             </View>
@@ -336,7 +308,7 @@ export default function RevenueScreen() {
         )}
 
         {/* Recent Transactions */}
-        <View style={styles.transactionsSection}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Transactions</Text>
           {revenueData?.transactions && revenueData.transactions.length > 0 ? (
             revenueData.transactions.slice(0, 10).map((transaction, index) => (
@@ -365,7 +337,7 @@ export default function RevenueScreen() {
                   </Text>
                   <View style={[
                     styles.statusBadge,
-                    transaction.paymentStatus === 'paid' && styles.statusBadgePaid
+                    transaction.paymentStatus === 'paid' ? styles.statusBadgePaid : styles.statusBadgePending
                   ]}>
                     <Text style={styles.statusBadgeText}>
                       {transaction.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
@@ -389,14 +361,14 @@ export default function RevenueScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#f8f9fa",
   },
   backgroundimg: {
     ...StyleSheet.absoluteFillObject,
     transform: [{ scale: 1.5 }],
   },
   backgroundImageStyle: {
-    opacity: 0.1,
+    opacity: 0.05,
   },
   loadingContainer: {
     flex: 1,
@@ -422,150 +394,185 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: wp(5),
     paddingVertical: moderateScale(20),
+    paddingBottom: moderateScale(100),
+  },
+  overviewCard: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(20),
+    marginBottom: moderateScale(16),
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  overviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: moderateScale(20),
+  },
+  overviewLabel: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginBottom: moderateScale(4),
+  },
+  overviewValue: {
+    fontSize: scaleFontSize(32),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginBottom: moderateScale(4),
+  },
+  overviewSubtext: {
+    fontSize: scaleFontSize(12),
+    color: '#999',
+  },
+  growthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+  },
+  growthText: {
+    fontSize: scaleFontSize(14),
+    fontWeight: '600',
+    color: '#4CAF50',
   },
   periodSelector: {
-    flexDirection: "row",
-    backgroundColor: "#F5F5F5",
-    borderRadius: moderateScale(12),
+    flexDirection: 'row',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(10),
     padding: moderateScale(4),
-    marginBottom: moderateScale(20),
   },
   periodButton: {
     flex: 1,
     paddingVertical: moderateScale(10),
+    alignItems: 'center',
     borderRadius: moderateScale(8),
-    alignItems: "center",
   },
   periodButtonActive: {
-    backgroundColor: "#1C86FF",
+    backgroundColor: '#1C86FF',
   },
   periodButtonText: {
-    fontSize: scaleFontSize(14),
-    fontWeight: "600",
-    color: "#666",
+    fontSize: scaleFontSize(13),
+    color: '#666',
+    fontWeight: '500',
   },
   periodButtonTextActive: {
-    color: "#fff",
-  },
-  summaryCardsContainer: {
-    marginBottom: moderateScale(24),
-  },
-  summaryCard: {
-    backgroundColor: "#fff",
-    borderRadius: moderateScale(16),
-    padding: moderateScale(20),
-    marginBottom: moderateScale(12),
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
-  },
-  totalRevenueCard: {
-    backgroundColor: "#1C86FF",
-    borderColor: "#1C86FF",
-  },
-  summaryCardLabel: {
-    fontSize: scaleFontSize(14),
-    color: "#fff",
-    marginTop: moderateScale(8),
-    fontWeight: "500",
-  },
-  summaryCardValue: {
-    fontSize: scaleFontSize(32),
-    fontWeight: "bold",
-    color: "#fff",
-    marginTop: moderateScale(4),
-  },
-  summaryCardSubtext: {
-    fontSize: scaleFontSize(12),
-    color: "rgba(255,255,255,0.8)",
-    marginTop: moderateScale(4),
+    color: '#fff',
+    fontWeight: '600',
   },
   summaryCardsRow: {
-    flexDirection: "row",
+    flexDirection: 'row',
     gap: moderateScale(12),
+    marginBottom: moderateScale(20),
   },
   summaryCardSmall: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
     borderRadius: moderateScale(16),
     padding: moderateScale(16),
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   summaryCardLabelSmall: {
     fontSize: scaleFontSize(12),
-    color: "#666",
+    color: '#666',
     marginTop: moderateScale(8),
-    fontWeight: "500",
+    fontWeight: '500',
   },
   summaryCardValueSmall: {
-    fontSize: scaleFontSize(20),
-    fontWeight: "bold",
-    color: "#333",
-    marginTop: moderateScale(4),
-  },
-  growthBadge: {
-    fontSize: scaleFontSize(12),
-    fontWeight: "600",
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
     marginTop: moderateScale(4),
   },
   pendingBookingsText: {
     fontSize: scaleFontSize(11),
-    color: "#999",
+    color: '#999',
     marginTop: moderateScale(2),
   },
-  paymentMethodSection: {
-    marginBottom: moderateScale(24),
+  section: {
+    marginBottom: moderateScale(20),
+  },
+  sectionTitle: {
+    fontSize: scaleFontSize(20),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginBottom: moderateScale(15),
   },
   paymentMethodGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: moderateScale(12),
   },
   paymentMethodCard: {
     flex: 1,
-    minWidth: "30%",
-    backgroundColor: "#fff",
+    minWidth: '45%',
+    backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  paymentMethodIconContainer: {
+    width: moderateScale(50),
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: moderateScale(8),
   },
   paymentMethodName: {
     fontSize: scaleFontSize(13),
-    fontWeight: "600",
-    color: "#333",
-    marginTop: moderateScale(8),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(4),
   },
   paymentMethodAmount: {
-    fontSize: scaleFontSize(16),
-    fontWeight: "bold",
-    color: "#1C86FF",
-    marginTop: moderateScale(4),
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#1C86FF',
+    marginBottom: moderateScale(2),
   },
   paymentMethodCount: {
     fontSize: scaleFontSize(11),
-    color: "#999",
-    marginTop: moderateScale(2),
+    color: '#999',
+    marginBottom: moderateScale(8),
   },
-  transactionsSection: {
-    marginBottom: moderateScale(24),
+  progressBarContainer: {
+    height: moderateScale(6),
+    backgroundColor: '#E0E0E0',
+    borderRadius: moderateScale(3),
+    overflow: 'hidden',
   },
-  sectionTitle: {
-    fontSize: scaleFontSize(18),
-    fontWeight: "bold",
-    color: "#1C86FF",
-    marginBottom: moderateScale(16),
+  progressBar: {
+    height: '100%',
+    borderRadius: moderateScale(3),
   },
   transactionCard: {
-    flexDirection: "row",
-    backgroundColor: "#fff",
+    flexDirection: 'row',
+    backgroundColor: '#fff',
     borderRadius: moderateScale(12),
-    padding: moderateScale(16),
+    padding: moderateScale(15),
     marginBottom: moderateScale(12),
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    alignItems: "center",
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   transactionIcon: {
     marginRight: moderateScale(12),
@@ -575,47 +582,50 @@ const styles = StyleSheet.create({
   },
   transactionCustomer: {
     fontSize: scaleFontSize(15),
-    fontWeight: "600",
-    color: "#333",
+    fontWeight: '600',
+    color: '#333',
     marginBottom: moderateScale(4),
   },
   transactionService: {
     fontSize: scaleFontSize(13),
-    color: "#666",
+    color: '#666',
     marginBottom: moderateScale(2),
   },
   transactionDate: {
     fontSize: scaleFontSize(12),
-    color: "#999",
+    color: '#999',
   },
   transactionRight: {
-    alignItems: "flex-end",
+    alignItems: 'flex-end',
+    gap: moderateScale(6),
   },
   transactionAmount: {
     fontSize: scaleFontSize(16),
-    fontWeight: "bold",
-    color: "#4CAF50",
-    marginBottom: moderateScale(6),
+    fontWeight: 'bold',
+    color: '#4CAF50',
   },
   statusBadge: {
-    backgroundColor: "#FFF3E0",
     paddingHorizontal: moderateScale(10),
     paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(10),
   },
   statusBadgePaid: {
-    backgroundColor: "#E8F5E9",
+    backgroundColor: '#E8F5E9',
+  },
+  statusBadgePending: {
+    backgroundColor: '#FFF3E0',
   },
   statusBadgeText: {
-    fontSize: scaleFontSize(11),
-    color: "#FF9B79",
-    fontWeight: "600",
+    fontSize: scaleFontSize(10),
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: moderateScale(40),
     paddingHorizontal: moderateScale(20),
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
   },
   emptyStateText: {
     marginTop: moderateScale(12),

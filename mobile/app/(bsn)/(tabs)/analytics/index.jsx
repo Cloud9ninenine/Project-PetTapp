@@ -8,12 +8,11 @@ import {
   ImageBackground,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useRouter, useLocalSearchParams } from "expo-router";
 import Header from "@components/Header";
 import { hp, wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import {
@@ -30,14 +29,21 @@ import PaymentBreakdown from './components/PaymentBreakdown';
 import TimeDistribution from './components/TimeDistribution';
 import RatingsDisplay from './components/RatingsDisplay';
 import RevenueTrend from './components/RevenueTrend';
+import ReportFilterModal from './components/ReportFilterModal';
+import CustomAlert from './components/CustomAlert';
+import { useCustomAlert } from './hooks/useCustomAlert';
+import { generateReport } from './reportService';
 
 export default function AnalyticsScreen() {
   const router = useRouter();
-  const [selectedPeriod, setSelectedPeriod] = useState("allTime");
+  const params = useLocalSearchParams();
+  const [selectedPeriod, setSelectedPeriod] = useState(params.filter || "allTime");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const { alertConfig, showAlert, hideAlert } = useCustomAlert();
 
   const handleBackPress = () => {
     router.push('/(bsn)/(tabs)/home');
@@ -97,11 +103,11 @@ export default function AnalyticsScreen() {
       console.error('Error details:', error.response?.data);
 
       if (error.response?.status === 404) {
-        Alert.alert('Business Not Found', 'Please complete your business profile first.');
+        showAlert('Business Not Found', 'Please complete your business profile first.', 'error');
       } else if (error.response?.status === 403) {
-        Alert.alert('Access Denied', 'You do not have permission to view analytics.');
+        showAlert('Access Denied', 'You do not have permission to view analytics.', 'error');
       } else {
-        Alert.alert('Error', error.response?.data?.message || 'Failed to load analytics data. Please try again.');
+        showAlert('Error', error.response?.data?.message || 'Failed to load analytics data. Please try again.', 'error');
       }
       setAnalyticsData(null);
     }
@@ -114,7 +120,7 @@ export default function AnalyticsScreen() {
       await fetchAnalyticsData();
     } catch (error) {
       console.error('Error loading analytics data:', error);
-      Alert.alert('Error', 'Failed to load analytics data');
+      showAlert('Error', 'Failed to load analytics data', 'error');
     } finally {
       setLoading(false);
     }
@@ -152,7 +158,7 @@ export default function AnalyticsScreen() {
   const renderTitle = () => (
     <View style={styles.titleContainer}>
       <Text style={styles.titleText} numberOfLines={1}>
-        Business Analytics
+        Analytics
       </Text>
     </View>
   );
@@ -164,6 +170,15 @@ export default function AnalyticsScreen() {
 
   const formatPercentage = (value) => {
     return `${(value || 0).toFixed(1)}%`;
+  };
+
+  // Handle report generation
+  const handleGenerateReport = async (period, format) => {
+    try {
+      await generateReport(period, format, showAlert);
+    } catch (error) {
+      showAlert('Error', error.message || 'Failed to generate report', 'error');
+    }
   };
 
   if (loading) {
@@ -262,19 +277,29 @@ export default function AnalyticsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Period Selector Dropdown */}
-        <TouchableOpacity
-          style={styles.dropdownButton}
-          onPress={() => setDropdownVisible(true)}
-        >
-          <View style={styles.dropdownButtonContent}>
-            <Ionicons name="calendar" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.dropdownButtonText}>
-              {periodOptions.find(opt => opt.value === selectedPeriod)?.label || 'Select Period'}
-            </Text>
-            <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
-          </View>
-        </TouchableOpacity>
+        {/* Period Selector and Generate Report Section */}
+        <View style={styles.topActionsContainer}>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setDropdownVisible(true)}
+          >
+            <View style={styles.dropdownButtonContent}>
+              <Ionicons name="calendar" size={moderateScale(20)} color="#1C86FF" />
+              <Text style={styles.dropdownButtonText}>
+                {periodOptions.find(opt => opt.value === selectedPeriod)?.label || 'Select Period'}
+              </Text>
+              <Ionicons name="chevron-down" size={moderateScale(20)} color="#666" />
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.generateReportButton}
+            onPress={() => setReportModalVisible(true)}
+          >
+            <Ionicons name="download-outline" size={moderateScale(20)} color="#1C86FF" />
+            <Text style={styles.generateReportButtonText}>Generate Report</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Dropdown Modal */}
         <Modal
@@ -496,6 +521,24 @@ export default function AnalyticsScreen() {
         {/* Customer Ratings */}
         <RatingsDisplay data={ratings} />
       </ScrollView>
+
+      {/* Report Filter Modal */}
+      <ReportFilterModal
+        visible={reportModalVisible}
+        onClose={() => setReportModalVisible(false)}
+        onGenerate={handleGenerateReport}
+        currentPeriod={selectedPeriod}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        onClose={hideAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        buttons={alertConfig.buttons}
+      />
     </SafeAreaView>
   );
 }
@@ -538,16 +581,40 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(20),
     paddingBottom: moderateScale(40),
   },
+  topActionsContainer: {
+    marginBottom: moderateScale(20),
+    gap: moderateScale(12),
+  },
   dropdownButton: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
-    marginBottom: moderateScale(20),
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+  },
+  generateReportButton: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    borderWidth: 1.5,
+    borderColor: '#1C86FF',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  generateReportButtonText: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#1C86FF',
   },
   dropdownButtonContent: {
     flexDirection: 'row',

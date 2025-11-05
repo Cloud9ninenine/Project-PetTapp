@@ -464,7 +464,8 @@ export default function BusinessDashboard() {
       value: dashboardData.metrics.todaysBookings.toString(),
       icon: "calendar",
       color: "#4CAF50",
-      route: "../booking",
+      route: "/(bsn)/(tabs)/analytics",
+      params: { filter: "today" },
     },
     {
       id: 2,
@@ -472,7 +473,8 @@ export default function BusinessDashboard() {
       value: formatCurrency(dashboardData.metrics.todaysRevenue),
       icon: "cash",
       color: "#2196F3",
-      route: "../revenue",
+      route: "/(bsn)/(tabs)/revenue",
+      params: { filter: "today" },
     },
     {
       id: 3,
@@ -480,6 +482,8 @@ export default function BusinessDashboard() {
       value: dashboardData.metrics.monthlyBookings.toString(),
       icon: "time",
       color: "#FF9B79",
+      route: "/(bsn)/(tabs)/analytics",
+      params: { filter: "thisMonth" },
     },
     {
       id: 4,
@@ -487,7 +491,8 @@ export default function BusinessDashboard() {
       value: formatCurrency(dashboardData.metrics.monthlyRevenue),
       icon: "trending-up",
       color: "#FFD700",
-      route: "../revenue",
+      route: "/(bsn)/(tabs)/revenue",
+      params: { filter: "month" },
     },
   ];
 
@@ -531,12 +536,15 @@ export default function BusinessDashboard() {
               <TouchableOpacity
                 key={metric.id}
                 style={styles.metricCard}
-                onPress={() => metric.route && router.push(metric.route)}
+                onPress={() => metric.route && router.push({
+                  pathname: metric.route,
+                  params: metric.params
+                })}
               >
                 <View style={[styles.metricIconContainer, { backgroundColor: metric.color }]}>
-                  <Ionicons name={metric.icon} size={moderateScale(24)} color="#fff" />
+                  <Ionicons name={metric.icon} size={moderateScale(22)} color="#fff" />
                 </View>
-                <Text style={styles.metricValue}>{metric.value}</Text>
+                <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>{metric.value}</Text>
                 <Text style={styles.metricTitle} numberOfLines={2}>{metric.title}</Text>
               </TouchableOpacity>
             ))}
@@ -875,13 +883,14 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     marginBottom: moderateScale(30),
-    gap: moderateScale(12),
+    gap: moderateScale(10),
   },
   metricCard: {
-    width: "48%",
+    width: `${(wp(90) - moderateScale(10)) / 2}px`,
+    minWidth: moderateScale(150),
     backgroundColor: "#fff",
-    borderRadius: moderateScale(16),
-    padding: moderateScale(16),
+    borderRadius: moderateScale(14),
+    padding: moderateScale(14),
     alignItems: "center",
     elevation: 3,
     shadowColor: "#000",
@@ -890,23 +899,25 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   metricIconContainer: {
-    width: moderateScale(50),
-    height: moderateScale(50),
-    borderRadius: moderateScale(25),
+    width: moderateScale(45),
+    height: moderateScale(45),
+    borderRadius: moderateScale(22.5),
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: moderateScale(10),
+    marginBottom: moderateScale(8),
   },
   metricValue: {
-    fontSize: scaleFontSize(24),
+    fontSize: scaleFontSize(20),
     fontWeight: "bold",
     color: "#333",
     marginBottom: moderateScale(4),
+    textAlign: "center",
   },
   metricTitle: {
-    fontSize: scaleFontSize(12),
+    fontSize: scaleFontSize(11),
     color: "#666",
     textAlign: "center",
+    lineHeight: scaleFontSize(14),
   },
   sectionHeader: {
     flexDirection: "row",

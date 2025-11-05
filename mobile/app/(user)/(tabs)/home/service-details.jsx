@@ -358,34 +358,6 @@ export default function ServiceDetailsScreen() {
     });
   };
 
-  // Handle share
-  const handleShare = async () => {
-    try {
-      const servicePrice = formatPrice(service.price);
-      const serviceDuration = formatDurationString(service.duration);
-      const businessName = businessData?.name || 'Pet Service Provider';
-
-      const message = `Check out this pet service!\n\n🐾 ${service.name}\n📍 ${businessName}\n💰 ${servicePrice}\n⏱️ ${serviceDuration}\n\n${service.description || 'Discover this amazing pet service!'}`;
-
-      const result = await Share.share({
-        message: message,
-        title: service.name,
-      });
-
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          console.log('Shared with activity type:', result.activityType);
-        } else {
-          console.log('Service shared successfully');
-        }
-      } else if (result.action === Share.dismissedAction) {
-        console.log('Share dismissed');
-      }
-    } catch (error) {
-      console.error('Error sharing service:', error);
-      Alert.alert('Error', 'Could not share service. Please try again.');
-    }
-  };
 
   // Handle see on maps button
   const handleSeeOnMaps = () => {
@@ -543,19 +515,10 @@ export default function ServiceDetailsScreen() {
             pointerEvents="none"
           />
 
-          {/* Back Button and Share Button on Image */}
+          {/* Back Button on Image */}
           <View style={styles.topButtonsContainer}>
             <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="arrow-back" size={moderateScale(28)} color="#fff" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.shareButtonContainer}>
-            <TouchableOpacity
-              onPress={handleShare}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={styles.shareButton}
-            >
-              <Ionicons name="share-social" size={moderateScale(24)} color="#fff" />
             </TouchableOpacity>
           </View>
 

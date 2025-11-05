@@ -516,6 +516,7 @@
       flex: 1,
       justifyContent: 'center',
       paddingRight: moderateScale(8),
+      minWidth: 0,
     },
     itemName: {
       fontSize: scaleFontSize(15),
@@ -523,6 +524,7 @@
       color: '#212121',
       marginBottom: moderateScale(3),
       letterSpacing: 0.2,
+      flexShrink: 1,
     },
     itemType: {
       fontSize: scaleFontSize(12),
@@ -585,6 +587,7 @@
       marginLeft: moderateScale(10),
       flex: 1,
       flexShrink: 1,
+      minWidth: 0,
     },
     profileDropdownDivider: {
       height: 1,

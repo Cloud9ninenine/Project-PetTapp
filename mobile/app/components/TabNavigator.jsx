@@ -209,10 +209,12 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(12),
     fontWeight: "500",
     marginTop: moderateScale(4),
+    flexShrink: 1,
   },
   labelNarrow: {
-    fontSize: scaleFontSize(10),
+    fontSize: scaleFontSize(9),
     marginTop: moderateScale(2),
+    flexShrink: 1,
   },
   iconContainer: {
     position: "relative",

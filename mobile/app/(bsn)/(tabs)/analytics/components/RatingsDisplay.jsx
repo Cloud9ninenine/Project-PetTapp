@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { moderateScale, scaleFontSize } from '@utils/responsive';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const RatingsDisplay = ({ data }) => {
   if (!data || data.totalRatings === 0) {
@@ -61,6 +63,7 @@ const RatingsDisplay = ({ data }) => {
   };
 
   const ratingQuality = getRatingQuality(averageRating);
+  const isThinScreen = SCREEN_WIDTH < 400;
 
   return (
     <View style={styles.section}>
@@ -90,27 +93,55 @@ const RatingsDisplay = ({ data }) => {
       </View>
 
       {/* Rating Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Ionicons name="people" size={moderateScale(24)} color="#1C86FF" />
-          <Text style={styles.statValue}>{totalRatings}</Text>
-          <Text style={styles.statLabel}>Total Reviews</Text>
-        </View>
+      {isThinScreen ? (
+        <View style={styles.statsContainerBento}>
+          {/* Top row: Total Reviews and Satisfaction side by side */}
+          <View style={styles.bentoTopRow}>
+            <View style={[styles.statItem, styles.bentoSmallCard]}>
+              <Ionicons name="people" size={moderateScale(24)} color="#1C86FF" />
+              <Text style={styles.statValue}>{totalRatings}</Text>
+              <Text style={styles.statLabel}>Total Reviews</Text>
+            </View>
 
-        <View style={styles.statItem}>
-          <Ionicons name="thumbs-up" size={moderateScale(24)} color="#4CAF50" />
-          <Text style={styles.statValue}>
-            {((averageRating / 5) * 100).toFixed(0)}%
-          </Text>
-          <Text style={styles.statLabel}>Satisfaction</Text>
-        </View>
+            <View style={[styles.statItem, styles.bentoSmallCard]}>
+              <Ionicons name="thumbs-up" size={moderateScale(24)} color="#4CAF50" />
+              <Text style={styles.statValue}>
+                {((averageRating / 5) * 100).toFixed(0)}%
+              </Text>
+              <Text style={styles.statLabel}>Satisfaction</Text>
+            </View>
+          </View>
 
-        <View style={styles.statItem}>
-          <Ionicons name="trending-up" size={moderateScale(24)} color="#FF9800" />
-          <Text style={styles.statValue}>{averageRating > 4.0 ? 'High' : 'Good'}</Text>
-          <Text style={styles.statLabel}>Performance</Text>
+          {/* Bottom row: Performance full width */}
+          <View style={[styles.statItem, styles.bentoFullCard]}>
+            <Ionicons name="trending-up" size={moderateScale(24)} color="#FF9800" />
+            <Text style={styles.statValue}>{averageRating > 4.0 ? 'High' : 'Good'}</Text>
+            <Text style={styles.statLabel}>Performance</Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Ionicons name="people" size={moderateScale(24)} color="#1C86FF" />
+            <Text style={styles.statValue}>{totalRatings}</Text>
+            <Text style={styles.statLabel}>Total Reviews</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <Ionicons name="thumbs-up" size={moderateScale(24)} color="#4CAF50" />
+            <Text style={styles.statValue}>
+              {((averageRating / 5) * 100).toFixed(0)}%
+            </Text>
+            <Text style={styles.statLabel}>Satisfaction</Text>
+          </View>
+
+          <View style={styles.statItem}>
+            <Ionicons name="trending-up" size={moderateScale(24)} color="#FF9800" />
+            <Text style={styles.statValue}>{averageRating > 4.0 ? 'High' : 'Good'}</Text>
+            <Text style={styles.statLabel}>Performance</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -171,6 +202,22 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     gap: moderateScale(12),
+  },
+  statsContainerBento: {
+    gap: moderateScale(10),
+  },
+  bentoTopRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    marginBottom: moderateScale(10),
+  },
+  bentoSmallCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bentoFullCard: {
+    width: '100%',
+    flex: 0,
   },
   statItem: {
     flex: 1,

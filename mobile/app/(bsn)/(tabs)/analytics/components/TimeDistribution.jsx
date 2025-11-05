@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { moderateScale, scaleFontSize } from '@utils/responsive';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const TimeDistribution = ({ data }) => {
   if (!data || data.length === 0) {
@@ -18,6 +20,11 @@ const TimeDistribution = ({ data }) => {
     .sort((a, b) => b.count - a.count)
     .slice(0, 3);
 
+  const isThinScreen = SCREEN_WIDTH < 400;
+
+  // Debug log to check screen width
+  console.log('TimeDistribution - SCREEN_WIDTH:', SCREEN_WIDTH, 'isThinScreen:', isThinScreen);
+
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Booking Times</Text>
@@ -25,15 +32,45 @@ const TimeDistribution = ({ data }) => {
       {/* Peak Hours Summary */}
       <View style={styles.peakHoursContainer}>
         <Text style={styles.peakHoursLabel}>Peak Hours</Text>
-        <View style={styles.peakHoursGrid}>
-          {peakHours.map((item, index) => (
-            <View key={item.hour} style={styles.peakHourCard}>
-              <Text style={styles.peakHourRank}>#{index + 1}</Text>
-              <Text style={styles.peakHourTime}>{item.timeSlot}</Text>
-              <Text style={styles.peakHourCount}>{item.count} bookings</Text>
+        {isThinScreen ? (
+          <View style={styles.peakHoursGridBento}>
+            {/* Top row: #1 full width */}
+            <View style={[styles.peakHourCard, styles.bentoPeakFullCard]}>
+              <Text style={styles.peakHourRank}>#{1}</Text>
+              <Text style={styles.peakHourTime}>{peakHours[0]?.timeSlot}</Text>
+              <Text style={styles.peakHourCount}>{peakHours[0]?.count} bookings</Text>
             </View>
-          ))}
-        </View>
+
+            {/* Bottom row: #2 and #3 side by side */}
+            <View style={styles.bentoPeakBottomRow}>
+              {peakHours[1] && (
+                <View style={[styles.peakHourCard, styles.bentoPeakSmallCard]}>
+                  <Text style={styles.peakHourRank}>#{2}</Text>
+                  <Text style={styles.peakHourTime}>{peakHours[1]?.timeSlot}</Text>
+                  <Text style={styles.peakHourCount}>{peakHours[1]?.count} bookings</Text>
+                </View>
+              )}
+
+              {peakHours[2] && (
+                <View style={[styles.peakHourCard, styles.bentoPeakSmallCard]}>
+                  <Text style={styles.peakHourRank}>#{3}</Text>
+                  <Text style={styles.peakHourTime}>{peakHours[2]?.timeSlot}</Text>
+                  <Text style={styles.peakHourCount}>{peakHours[2]?.count} bookings</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.peakHoursGrid}>
+            {peakHours.map((item, index) => (
+              <View key={item.hour} style={styles.peakHourCard}>
+                <Text style={styles.peakHourRank}>#{index + 1}</Text>
+                <Text style={styles.peakHourTime}>{item.timeSlot}</Text>
+                <Text style={styles.peakHourCount}>{item.count} bookings</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Hourly Distribution */}
@@ -96,10 +133,28 @@ const styles = StyleSheet.create({
   },
   peakHoursGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: moderateScale(8),
+  },
+  peakHoursGridBento: {
+    gap: moderateScale(10),
+  },
+  bentoPeakBottomRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+  },
+  bentoPeakSmallCard: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bentoPeakFullCard: {
+    width: '100%',
+    flex: 0,
+    marginBottom: moderateScale(10),
   },
   peakHourCard: {
     flex: 1,
+    minWidth: '28%',
     backgroundColor: '#fff',
     borderRadius: moderateScale(8),
     padding: moderateScale(12),
@@ -123,6 +178,7 @@ const styles = StyleSheet.create({
   peakHourCount: {
     fontSize: scaleFontSize(11),
     color: '#666',
+    textAlign: 'center',
   },
   distributionLabel: {
     fontSize: scaleFontSize(14),
@@ -136,12 +192,12 @@ const styles = StyleSheet.create({
   barRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(8),
+    gap: SCREEN_WIDTH < 350 ? moderateScale(6) : moderateScale(8),
   },
   timeLabel: {
-    fontSize: scaleFontSize(11),
+    fontSize: SCREEN_WIDTH < 350 ? scaleFontSize(9) : scaleFontSize(11),
     color: '#666',
-    width: moderateScale(80),
+    width: SCREEN_WIDTH < 350 ? moderateScale(65) : moderateScale(80),
     textAlign: 'right',
   },
   barContainer: {
@@ -161,10 +217,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF9800',
   },
   countLabel: {
-    fontSize: scaleFontSize(12),
+    fontSize: SCREEN_WIDTH < 350 ? scaleFontSize(10) : scaleFontSize(12),
     fontWeight: '600',
     color: '#333',
-    width: moderateScale(32),
+    width: SCREEN_WIDTH < 350 ? moderateScale(28) : moderateScale(32),
     textAlign: 'right',
   },
 });
