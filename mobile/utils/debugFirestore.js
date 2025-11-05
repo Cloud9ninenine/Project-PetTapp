@@ -1,5 +1,5 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { firestore, auth } from '@config/firebase';
+import { db, auth } from '@config/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -35,7 +35,7 @@ export const debugAllConversations = async () => {
 
     // Now query only conversations for current user using Firebase UID
     console.log('\nQUERYING MY CONVERSATIONS:');
-    const conversationsRef = collection(firestore, 'conversations');
+    const conversationsRef = collection(db, 'conversations');
     const q = query(
       conversationsRef,
       where('participants', 'array-contains', expectedFirebaseUid)
@@ -93,7 +93,7 @@ export const checkConversationExists = async (userId1, userId2) => {
     console.log('- User 2:', userId2, '→ Firebase UID:', firebaseUid2);
     console.log('- Expected ID:', expectedConversationId);
 
-    const conversationsRef = collection(firestore, 'conversations');
+    const conversationsRef = collection(db, 'conversations');
     const snapshot = await getDocs(conversationsRef);
 
     const conversation = snapshot.docs.find(doc => doc.id === expectedConversationId);

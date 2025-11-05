@@ -31,6 +31,7 @@ import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";
 import { getServiceCategoryIcon, renderStars, getDefaultCarouselImages } from "@utils/serviceHelpers";
 import { isBusinessOpen } from "@utils/businessHelpers";
+import { CalendarSkeleton, NearbyServicesGridSkeleton, FeaturedBusinessGridSkeleton } from "@components/SkeletonLoader";
 
 // Status color mapping - matches backend status values
 const getStatusColor = (status) => {
@@ -644,10 +645,7 @@ export default function HomeScreen() {
               </View>
 
               {loadingAppointments ? (
-                <View style={styles.appointmentLoadingContainer}>
-                  <ActivityIndicator size="small" color="#1C86FF" />
-                  <Text style={styles.appointmentLoadingText}>Loading calendar...</Text>
-                </View>
+                <CalendarSkeleton />
               ) : (
                 <>
                   {/* Calendar */}
@@ -796,9 +794,7 @@ export default function HomeScreen() {
 
             {/* Nearby Services Grid */}
             {loadingServices ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading nearby services...</Text>
-              </View>
+              <NearbyServicesGridSkeleton />
             ) : nearbyServices.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="location-outline" size={moderateScale(48)} color="#ccc" />
@@ -843,9 +839,7 @@ export default function HomeScreen() {
             </View>
 
             {loadingBusinesses ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>Loading featured businesses...</Text>
-              </View>
+              <FeaturedBusinessGridSkeleton />
             ) : featuredBusinesses.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="business-outline" size={moderateScale(48)} color="#ccc" />

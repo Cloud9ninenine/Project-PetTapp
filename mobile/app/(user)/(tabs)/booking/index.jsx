@@ -23,6 +23,7 @@ import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
+import { BookingListSkeleton } from "@components/SkeletonLoader";
 
 const Bookings = () => {
   const [searchText, setSearchText] = useState('');
@@ -819,10 +820,7 @@ const Bookings = () => {
 
       {/* Loading State */}
       {isLoading && !isRefreshing ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading bookings...</Text>
-        </View>
+        <BookingListSkeleton />
       ) : (
         /* List */
         <FlatList

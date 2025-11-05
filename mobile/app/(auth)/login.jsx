@@ -87,6 +87,21 @@ export default function LoginScreen() {
         // Don't block login if Firebase fails, just log the error
       }
 
+      // Step 4: Send push notification token to backend
+      try {
+        console.log('Sending push notification token to backend...');
+        const pushToken = await getExpoPushToken();
+        if (pushToken) {
+          await sendPushTokenToServer(pushToken, apiClient);
+          console.log('Push notification token registered successfully');
+        } else {
+          console.log('No push token available, user may not have granted notification permissions');
+        }
+      } catch (pushTokenError) {
+        console.error('Failed to send push token to backend:', pushTokenError);
+        // Don't block login if push token registration fails, just log the error
+      }
+
       // Navigate based on role
       const role = user.role;
       if (role === "business-owner") {

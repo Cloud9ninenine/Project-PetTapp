@@ -19,6 +19,7 @@ import CompleteProfileModal from '@components/CompleteProfileModal';
 import { wp, moderateScale, scaleFontSize } from '@utils/responsive';
 import { useProfileCompletion } from '../../../_hooks/useProfileCompletion';
 import apiClient from '@config/api';
+import { MyPetsGridSkeleton } from '@components/SkeletonLoader';
 
 export default function MyPetsScreen() {
   const router = useRouter();
@@ -101,31 +102,34 @@ export default function MyPetsScreen() {
       activeOpacity={0.8}
       onPress={() => router.push(`/(user)/(tabs)/my-pets/${pet._id}`)}
     >
-      <View style={styles.petImageContainer}>
-        {pet.images?.profile ? (
-          <Image source={{ uri: pet.images.profile }} style={styles.petImage} />
-        ) : (
-          <View style={styles.petImagePlaceholder}>
-            <Ionicons name="paw" size={moderateScale(30)} color="#1C86FF" />
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.petInfo}>
+      {/* Background Image */}
+      {pet.images?.profile ? (
+        <Image source={{ uri: pet.images.profile }} style={styles.petCardImage} />
+      ) : (
+        <View style={styles.petCardImagePlaceholder}>
+          <Ionicons name="paw" size={moderateScale(50)} color="#1C86FF" />
+        </View>
+      )}
+
+      {/* Gradient Overlay */}
+      <View style={styles.petCardGradient} />
+
+      {/* Text Overlay */}
+      <View style={styles.petInfoOverlay}>
         <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
-        <Text style={styles.petDetails} numberOfLines={2}>
-          {pet.species?.charAt(0).toUpperCase() + pet.species?.slice(1)}
-          {pet.breed && ` • ${pet.breed}`}
-        </Text>
-        <View style={styles.petMeta}>
-          <Text style={styles.petAge}>{pet.age} years old</Text>
-          <Text style={styles.petGender}>
-            {pet.gender === 'male' ? '♂' : '♀'} {pet.gender}
+        <View style={styles.petDetailsRow}>
+          <Text style={styles.petDetails} numberOfLines={1}>
+            {pet.breed || pet.species?.charAt(0).toUpperCase() + pet.species?.slice(1)} • {pet.age} yrs
           </Text>
+          <View style={[styles.petGenderIcon, pet.gender === 'male' ? styles.maleIcon : styles.femaleIcon]}>
+            <Ionicons
+              name={pet.gender === 'male' ? 'male' : 'female'}
+              size={moderateScale(14)}
+              color="#fff"
+            />
+          </View>
         </View>
       </View>
-      
-      <Ionicons name="chevron-forward" size={moderateScale(20)} color="#666" />
     </TouchableOpacity>
   );
 
@@ -143,10 +147,7 @@ export default function MyPetsScreen() {
   );
 
   const renderLoadingState = () => (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#1C86FF" />
-      <Text style={styles.loadingText}>Loading your pets...</Text>
-    </View>
+    <MyPetsGridSkeleton />
   );
 
 
@@ -172,15 +173,12 @@ export default function MyPetsScreen() {
         {isLoading ? (
           renderLoadingState()
         ) : (
-          <>
-            {pets.length > 0 && (
-              <View style={styles.petsSection}>
-                {pets.map(renderPetCard)}
-              </View>
-            )}
-
-            {renderAddPetCard()}
-          </>
+          <View style={styles.petsSection}>
+            <View style={styles.petsGrid}>
+              {renderAddPetCard()}
+              {pets.map(renderPetCard)}
+            </View>
+          </View>
         )}
       </ScrollView>
 
@@ -221,99 +219,132 @@ const styles = StyleSheet.create({
     paddingTop: moderateScale(16),
   },
   addPetCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: wp(4),
-    marginVertical: moderateScale(8),
-    borderRadius: moderateScale(10),
+    backgroundColor: '#E3F2FD',
+    width: '48%',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: moderateScale(180),
     borderWidth: 2,
     borderColor: '#1C86FF',
     borderStyle: 'dashed',
-    padding: moderateScale(15),
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: moderateScale(8),
   },
   addIconCircle: {
-    width: moderateScale(50),
-    height: moderateScale(50),
-    borderRadius: moderateScale(40),
-    backgroundColor: '#E3F2FD',
+    width: moderateScale(60),
+    height: moderateScale(60),
+    borderRadius: moderateScale(30),
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: moderateScale(12),
   },
   addPetText: {
-    fontSize: scaleFontSize(16),
+    fontSize: scaleFontSize(14),
     fontWeight: '600',
     color: '#1C86FF',
+    textAlign: 'center',
   },
   petsSection: {
-    marginBottom: moderateScale(20),
+    paddingHorizontal: wp(4),
+    paddingBottom: moderateScale(20),
+  },
+  petsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: moderateScale(12),
   },
   sectionTitle: {
     fontSize: scaleFontSize(18),
     fontWeight: '600',
     color: '#333',
-    marginHorizontal: wp(4),
     marginBottom: moderateScale(12),
   },
   petCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: wp(4),
-    marginVertical: moderateScale(6),
+    width: '48%',
+    height: moderateScale(200),
     borderRadius: moderateScale(12),
-    padding: moderateScale(16),
-    flexDirection: 'row',
-    alignItems: 'center',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: moderateScale(8),
+    position: 'relative',
   },
-  petImageContainer: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
-    marginRight: moderateScale(12),
-    overflow: 'hidden',
-  },
-  petImage: {
+  petCardImage: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
-  petImagePlaceholder: {
+  petCardImagePlaceholder: {
     width: '100%',
     height: '100%',
     backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
-  petInfo: {
-    flex: 1,
+  petCardGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '35%',
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  petInfoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: moderateScale(8),
+    paddingBottom: moderateScale(10),
   },
   petName: {
-    fontSize: scaleFontSize(16),
-    fontWeight: '600',
-    color: '#333',
+    fontSize: scaleFontSize(14),
+    fontWeight: '700',
+    color: '#fff',
     marginBottom: moderateScale(4),
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  petDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
   },
   petDetails: {
-    fontSize: scaleFontSize(14),
-    color: '#666',
-    marginBottom: moderateScale(6),
+    fontSize: scaleFontSize(11),
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
-  petMeta: {
-    flexDirection: 'row',
-    gap: moderateScale(12),
+  petGenderIcon: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(10),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  petAge: {
-    fontSize: scaleFontSize(12),
-    color: '#888',
+  maleIcon: {
+    backgroundColor: '#2196F3',
   },
-  petGender: {
-    fontSize: scaleFontSize(12),
-    color: '#888',
+  femaleIcon: {
+    backgroundColor: '#E91E63',
   },
   loadingContainer: {
     flex: 1,

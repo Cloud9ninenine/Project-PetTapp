@@ -8,6 +8,7 @@ import * as Notifications from 'expo-notifications';
 import { registerForPushNotifications, setupNotificationListeners, clearBadgeCount } from "@utils/notificationHelpers";
 import { initializeFirebaseAuth } from "@utils/firebaseAuthPersistence";
 import { wakeServerSequence, initializeAppStateListener } from "@config/api";
+import { handleNotificationNavigation } from "@utils/notificationNavigationHelper";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -134,17 +135,8 @@ export default function RootLayout() {
       },
       (response) => {
         console.log('Notification tapped:', response);
-        // Handle navigation based on notification data
-        // You can add custom navigation logic here based on response.notification.request.content.data
-
-        const data = response.notification.request.content.data;
-
-        // Example navigation based on notification type:
-        // if (data.type === 'booking') {
-        //   router.push(`/bookings/${data.bookingId}`);
-        // } else if (data.type === 'message') {
-        //   router.push(`/messages/${data.chatId}`);
-        // }
+        // Handle navigation based on notification data using smart navigation helper
+        handleNotificationNavigation(response.notification);
       }
     );
 

@@ -29,6 +29,7 @@ import { debugAllConversations } from '@utils/debugFirestore';
 import { toFirebaseUid } from '@utils/messageService';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
+import { MessagesListSkeleton } from "@components/SkeletonLoader";
 
 /**
  * Convert user ID to Firebase UID format
@@ -434,10 +435,7 @@ export default function MessagesScreen() {
           showBack={true}
           onBackPress={() => router.push('/(user)/(tabs)/home')}
         />
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Connecting to messaging...</Text>
-        </View>
+        <MessagesListSkeleton />
       </SafeAreaView>
     );
   }

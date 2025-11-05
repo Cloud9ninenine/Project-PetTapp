@@ -23,6 +23,7 @@ import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from "@config/api";
 import { useProfileCompletion } from "@_hooks/useProfileCompletion";
 import { isBusinessOpen } from "@utils/businessHelpers";
+import { ServicesListSkeleton } from "@components/SkeletonLoader";
 
 export default function ServicesScreen() {
   const params = useLocalSearchParams();
@@ -385,10 +386,7 @@ export default function ServicesScreen() {
 
       {/* Services List */}
       {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading services...</Text>
-        </View>
+        <ServicesListSkeleton />
       ) : services.length > 0 ? (
         <FlatList
           data={services}

@@ -20,6 +20,7 @@ import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import apiClient from "@config/api";
 import BusinessHeader from "@components/BusinessHeader";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BusinessDashboardSkeleton } from "@components/SkeletonLoader";
 
 
 export default function BusinessDashboard() {
@@ -506,10 +507,7 @@ export default function BusinessDashboard() {
       />
 
       {loading ? (
-        <View style={styles.fullScreenLoading}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
-        </View>
+        <BusinessDashboardSkeleton />
       ) : (
         <>
           {/* Business Header - Loads after data is ready */}
@@ -883,11 +881,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     marginBottom: moderateScale(30),
-    gap: moderateScale(10),
+    gap: moderateScale(6),
   },
   metricCard: {
-    width: `${(wp(90) - moderateScale(10)) / 2}px`,
-    minWidth: moderateScale(150),
+    width: "48%",
     backgroundColor: "#fff",
     borderRadius: moderateScale(14),
     padding: moderateScale(14),

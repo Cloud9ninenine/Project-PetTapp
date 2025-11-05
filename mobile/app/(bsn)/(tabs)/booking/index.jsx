@@ -21,6 +21,7 @@ import { useCallback } from 'react';
 import Header from "@components/Header";
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
+import { BookingListSkeleton } from "@components/SkeletonLoader";
 
 const CustomerBookings = () => {
   const [searchText, setSearchText] = useState('');
@@ -875,10 +876,7 @@ const CustomerBookings = () => {
           showBack={true}
           onBackPress={handleBackPress}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading bookings...</Text>
-        </View>
+        <BookingListSkeleton />
       </SafeAreaView>
     );
   }

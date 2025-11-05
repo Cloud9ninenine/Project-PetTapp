@@ -26,7 +26,7 @@ import {
   getConversationDetails,
 } from '@utils/messageService';
 import { auth } from '@config/firebase';
-import { ensureFirebaseAuth } from '@utils/firebaseAuthPersistence';
+import { ensureFirebaseAuth, clearFirebaseToken } from '@utils/firebaseAuthPersistence';
 import { debugConversation } from '@utils/debugConversation';
 
 /**
@@ -81,8 +81,13 @@ export default function ChatScreen() {
 
           // Check if Firebase UID matches expected format
           if (auth.currentUser && auth.currentUser.uid !== expectedFirebaseUid) {
-            console.log('Firebase UID mismatch in chat. Signing out and re-authenticating...');
-            await auth.signOut();
+            console.log('Firebase UID mismatch detected in chat.');
+            console.log('Expected:', expectedFirebaseUid);
+            console.log('Got:', auth.currentUser.uid);
+            console.log('Clearing stored token and re-authenticating...');
+
+            // Clear stored token to force fresh authentication
+            await clearFirebaseToken();
           }
 
           const isAuthenticated = await ensureFirebaseAuth();

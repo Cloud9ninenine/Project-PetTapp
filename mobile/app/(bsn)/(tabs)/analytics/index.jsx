@@ -29,7 +29,6 @@ import PaymentBreakdown from './components/PaymentBreakdown';
 import TimeDistribution from './components/TimeDistribution';
 import RatingsDisplay from './components/RatingsDisplay';
 import RevenueTrend from './components/RevenueTrend';
-import ReportFilterModal from './components/ReportFilterModal';
 import CustomAlert from './components/CustomAlert';
 import { useCustomAlert } from './hooks/useCustomAlert';
 import { generateReport } from './reportService';
@@ -42,7 +41,8 @@ export default function AnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [formatModalVisible, setFormatModalVisible] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const { alertConfig, showAlert, hideAlert } = useCustomAlert();
 
   const handleBackPress = () => {
@@ -172,12 +172,16 @@ export default function AnalyticsScreen() {
     return `${(value || 0).toFixed(1)}%`;
   };
 
-  // Handle report generation
-  const handleGenerateReport = async (period, format) => {
+  // Handle report generation with selected format
+  const handleGenerateReport = async (format) => {
     try {
-      await generateReport(period, format, showAlert);
+      setIsGeneratingReport(true);
+      setFormatModalVisible(false);
+      await generateReport(selectedPeriod, format, showAlert);
     } catch (error) {
       showAlert('Error', error.message || 'Failed to generate report', 'error');
+    } finally {
+      setIsGeneratingReport(false);
     }
   };
 
@@ -294,10 +298,14 @@ export default function AnalyticsScreen() {
 
           <TouchableOpacity
             style={styles.generateReportButton}
-            onPress={() => setReportModalVisible(true)}
+            onPress={() => setFormatModalVisible(true)}
+            disabled={isGeneratingReport}
           >
-            <Ionicons name="download-outline" size={moderateScale(20)} color="#1C86FF" />
-            <Text style={styles.generateReportButtonText}>Generate Report</Text>
+            {isGeneratingReport ? (
+              <ActivityIndicator size="small" color="#1C86FF" />
+            ) : (
+              <Ionicons name="download-outline" size={moderateScale(24)} color="#1C86FF" />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -522,13 +530,66 @@ export default function AnalyticsScreen() {
         <RatingsDisplay data={ratings} />
       </ScrollView>
 
-      {/* Report Filter Modal */}
-      <ReportFilterModal
-        visible={reportModalVisible}
-        onClose={() => setReportModalVisible(false)}
-        onGenerate={handleGenerateReport}
-        currentPeriod={selectedPeriod}
-      />
+      {/* Format Selection Modal */}
+      <Modal
+        visible={formatModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFormatModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFormatModalVisible(false)}
+        >
+          <View style={styles.formatModal}>
+            <View style={styles.formatModalHeader}>
+              <Text style={styles.formatModalTitle}>Select Report Format</Text>
+              <TouchableOpacity onPress={() => setFormatModalVisible(false)}>
+                <Ionicons name="close" size={moderateScale(24)} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.formatModalBody}>
+              <Text style={styles.formatModalSubtitle}>
+                Period: {periodOptions.find(opt => opt.value === selectedPeriod)?.label}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.formatOptionCard}
+                onPress={() => handleGenerateReport('pdf')}
+              >
+                <View style={[styles.formatOptionIcon, { backgroundColor: '#F44336' }]}>
+                  <Ionicons name="document-text" size={moderateScale(28)} color="#fff" />
+                </View>
+                <View style={styles.formatOptionInfo}>
+                  <Text style={styles.formatOptionLabel}>PDF Document</Text>
+                  <Text style={styles.formatOptionDescription}>
+                    Formatted report with charts and graphics
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={moderateScale(20)} color="#666" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.formatOptionCard}
+                onPress={() => handleGenerateReport('csv')}
+              >
+                <View style={[styles.formatOptionIcon, { backgroundColor: '#4CAF50' }]}>
+                  <Ionicons name="grid" size={moderateScale(28)} color="#fff" />
+                </View>
+                <View style={styles.formatOptionInfo}>
+                  <Text style={styles.formatOptionLabel}>CSV Spreadsheet</Text>
+                  <Text style={styles.formatOptionDescription}>
+                    Data in spreadsheet format for analysis
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={moderateScale(20)} color="#666" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Custom Alert */}
       <CustomAlert
@@ -582,10 +643,13 @@ const styles = StyleSheet.create({
     paddingBottom: moderateScale(40),
   },
   topActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: moderateScale(20),
     gap: moderateScale(12),
   },
   dropdownButton: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
@@ -599,22 +663,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
     padding: moderateScale(16),
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: moderateScale(8),
-    borderWidth: 1.5,
-    borderColor: '#1C86FF',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-  },
-  generateReportButtonText: {
-    fontSize: scaleFontSize(15),
-    fontWeight: '600',
-    color: '#1C86FF',
   },
   dropdownButtonContent: {
     flexDirection: 'row',
@@ -913,5 +968,64 @@ const styles = StyleSheet.create({
     fontSize: scaleFontSize(15),
     fontWeight: '600',
     color: '#1C86FF',
+  },
+  formatModal: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(16),
+    width: '100%',
+    maxWidth: moderateScale(400),
+    overflow: 'hidden',
+  },
+  formatModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: moderateScale(20),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  formatModalTitle: {
+    fontSize: scaleFontSize(18),
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  formatModalBody: {
+    padding: moderateScale(20),
+  },
+  formatModalSubtitle: {
+    fontSize: scaleFontSize(14),
+    color: '#666',
+    marginBottom: moderateScale(16),
+    textAlign: 'center',
+  },
+  formatOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(16),
+    marginBottom: moderateScale(12),
+    gap: moderateScale(12),
+  },
+  formatOptionIcon: {
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formatOptionInfo: {
+    flex: 1,
+  },
+  formatOptionLabel: {
+    fontSize: scaleFontSize(15),
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: moderateScale(4),
+  },
+  formatOptionDescription: {
+    fontSize: scaleFontSize(12),
+    color: '#666',
   },
 });

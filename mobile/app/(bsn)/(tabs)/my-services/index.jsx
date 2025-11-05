@@ -23,6 +23,7 @@ import AddServiceModal from './AddServiceModal';
 import { wp, hp, moderateScale, scaleFontSize } from '@utils/responsive';
 import apiClient from '@config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MyServicesListSkeleton } from '@components/SkeletonLoader';
 
 export default function MyServicesScreen() {
   const router = useRouter();
@@ -494,10 +495,7 @@ export default function MyServicesScreen() {
           showBack={true}
           onBackPress={handleBackPress}
         />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1C86FF" />
-          <Text style={styles.loadingText}>Loading services...</Text>
-        </View>
+        <MyServicesListSkeleton />
       </SafeAreaView>
     );
   }
