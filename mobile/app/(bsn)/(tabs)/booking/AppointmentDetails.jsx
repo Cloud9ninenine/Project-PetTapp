@@ -870,7 +870,10 @@ const AppointmentDetail = () => {
   const pet = bookingData.petId || {};
   const petName = pet.name || 'Unknown Pet';
   const petSpecies = pet.species || 'N/A';
-  const petAge = pet.age ? `${pet.age} years` : 'N/A';
+  const petAge = pet.age && pet.ageUnit ? `${pet.age} ${pet.ageUnit}${pet.age > 1 ? 's' : ''}` : (pet.age ? `${pet.age} years` : 'N/A');
+  const petMedicalHistory = pet.medicalHistory || null;
+  const petVaccinations = pet.vaccinations || [];
+  const petSpecialInstructions = pet.specialInstructions || null;
 
   // Appointment details
   const bookingId = bookingData._id ? `#${bookingData._id.slice(-8).toUpperCase()}` : 'N/A';
@@ -1103,10 +1106,46 @@ const AppointmentDetail = () => {
             <Text style={styles.dataLabel}>Species</Text>
             <Text style={styles.dataValue}>{petSpecies}</Text>
           </View>
-          <View style={[styles.dataRow, styles.dataRowLast]}>
+          <View style={styles.dataRow}>
             <Text style={styles.dataLabel}>Age</Text>
             <Text style={styles.dataValue}>{petAge}</Text>
           </View>
+
+          {petVaccinations && petVaccinations.length > 0 && (
+            <View style={styles.dataRow}>
+              <Text style={styles.dataLabel}>Vaccinations</Text>
+              <View style={styles.vaccinationsContainer}>
+                {petVaccinations.map((vaccination, index) => (
+                  <View key={index} style={styles.vaccinationChip}>
+                    <Ionicons name="medical" size={moderateScale(12)} color="#4CAF50" />
+                    <Text style={styles.vaccinationText}>{vaccination}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {petMedicalHistory && (
+            <View style={styles.dataRow}>
+              <Text style={styles.dataLabel}>Medical History</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline, styles.medicalHistoryText]}>
+                {petMedicalHistory}
+              </Text>
+            </View>
+          )}
+
+          {petSpecialInstructions && (
+            <View style={[styles.dataRow, styles.dataRowLast]}>
+              <Text style={styles.dataLabel}>Special Instructions</Text>
+              <Text style={[styles.dataValue, styles.dataValueMultiline, styles.specialInstructionsText]}>
+                {petSpecialInstructions}
+              </Text>
+            </View>
+          )}
+
+          {!petMedicalHistory && !petSpecialInstructions && (
+            <View style={[styles.dataRow, styles.dataRowLast]} />
+          )}
         </View>
 
         {/* 4. Appointment Details */}
@@ -2342,6 +2381,49 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: scaleFontSize(16),
     fontWeight: '600',
+  },
+  // Pet Information Styles
+  vaccinationsContainer: {
+    flex: 1.5,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  vaccinationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(12),
+    gap: moderateScale(4),
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  vaccinationText: {
+    fontSize: scaleFontSize(12),
+    color: '#4CAF50',
+    fontWeight: '600',
+  },
+  medicalHistoryText: {
+    color: '#FF9B79',
+    fontWeight: '500',
+    backgroundColor: '#FFF4E6',
+    padding: moderateScale(8),
+    borderRadius: moderateScale(6),
+    borderLeftWidth: moderateScale(3),
+    borderLeftColor: '#FF9B79',
+  },
+  specialInstructionsText: {
+    color: '#1C86FF',
+    fontWeight: '500',
+    backgroundColor: '#E3F2FD',
+    padding: moderateScale(8),
+    borderRadius: moderateScale(6),
+    borderLeftWidth: moderateScale(3),
+    borderLeftColor: '#1C86FF',
   },
 });
 

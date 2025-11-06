@@ -31,7 +31,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     category: '',
     description: '',
     duration: '',
-    capacity: '1',
     priceAmount: '',
     priceCurrency: 'PHP',
     petTypes: [],
@@ -73,7 +72,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
         category: editingService.category || '',
         description: editingService.description || '',
         duration: editingService.duration?.toString() || '',
-        capacity: editingService.capacity?.toString() || '1',
         priceAmount: editingService.price?.amount?.toString() || '',
         priceCurrency: editingService.price?.currency || 'PHP',
         petTypes: editingService.requirements?.petTypes || [],
@@ -95,7 +93,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       category: '',
       description: '',
       duration: '',
-      capacity: '1',
       priceAmount: '',
       priceCurrency: 'PHP',
       petTypes: [],
@@ -119,11 +116,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
     const duration = parseInt(formData.duration);
     if (!formData.duration || isNaN(duration) || duration < 15 || duration > 1440) {
       newErrors.duration = 'Duration must be between 15 and 1440 minutes';
-    }
-
-    const capacity = parseInt(formData.capacity);
-    if (!formData.capacity || isNaN(capacity) || capacity < 1 || capacity > 10) {
-      newErrors.capacity = 'Capacity must be between 1 and 10 workers';
     }
 
     const price = parseFloat(formData.priceAmount);
@@ -199,7 +191,6 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
       formDataToSend.append('category', formData.category);
       formDataToSend.append('description', formData.description.trim());
       formDataToSend.append('duration', formData.duration);
-      formDataToSend.append('capacity', formData.capacity);
 
       // Price as JSON string
       formDataToSend.append('price', JSON.stringify({
@@ -517,41 +508,22 @@ export default function AddServiceModal({ visible, onClose, onAddService, editin
               </View>
             </View>
 
-            {/* Duration and Capacity */}
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>
-                  Duration (min) <Text style={styles.requiredAsterisk}>*</Text>
-                </Text>
-                <TextInput
-                  style={[styles.input, errors.duration && styles.inputError]}
-                  placeholder="60"
-                  value={formData.duration}
-                  onChangeText={(text) => {
-                    setFormData({ ...formData, duration: text });
-                    setErrors({ ...errors, duration: null });
-                  }}
-                  keyboardType="numeric"
-                />
-                {errors.duration && <Text style={styles.errorText}>{errors.duration}</Text>}
-              </View>
-
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.inputLabel}>
-                  Capacity (workers) <Text style={styles.requiredAsterisk}>*</Text>
-                </Text>
-                <TextInput
-                  style={[styles.input, errors.capacity && styles.inputError]}
-                  placeholder="1"
-                  value={formData.capacity}
-                  onChangeText={(text) => {
-                    setFormData({ ...formData, capacity: text });
-                    setErrors({ ...errors, capacity: null });
-                  }}
-                  keyboardType="numeric"
-                />
-                {errors.capacity && <Text style={styles.errorText}>{errors.capacity}</Text>}
-              </View>
+            {/* Duration */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Duration (min) <Text style={styles.requiredAsterisk}>*</Text>
+              </Text>
+              <TextInput
+                style={[styles.input, errors.duration && styles.inputError]}
+                placeholder="60"
+                value={formData.duration}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, duration: text });
+                  setErrors({ ...errors, duration: null });
+                }}
+                keyboardType="numeric"
+              />
+              {errors.duration && <Text style={styles.errorText}>{errors.duration}</Text>}
             </View>
 
             {/* Pet Types */}

@@ -422,18 +422,6 @@ export default function ServiceDetails() {
             <Text style={styles.quickInfoLabel}>Price</Text>
             <Text style={styles.quickInfoValue}>{formatCurrency(service.price?.amount || 0)}</Text>
           </View>
-
-          <View style={styles.quickInfoCard}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="people-outline" size={moderateScale(20)} color="#FF9B79" />
-            </View>
-            <Text style={styles.quickInfoLabel}>Capacity</Text>
-            <Text style={styles.quickInfoValue} numberOfLines={2}>
-              {service.capacity || service.maxWorkers ?
-                `${service.capacity || service.maxWorkers} ${(service.capacity || service.maxWorkers) === 1 ? 'worker' : 'workers'}`
-                : 'N/A'}
-            </Text>
-          </View>
         </View>
 
         {/* Tab Content */}

@@ -56,96 +56,60 @@
         clearTimeout(searchTimeoutRef.current);
       }
 
-      if (searchQuery.trim().length >= 2) {
+      if (searchQuery.trim().length >= 1) {
         setIsSearching(true);
         setShowDropdown(true); // Show dropdown immediately
         searchTimeoutRef.current = setTimeout(async () => {
           try {
-            console.log('🔍 Searching for:', searchQuery.trim());
+            console.log('🔍 Searching with advanced search:', searchQuery.trim());
 
             // Create new AbortController for this request
             abortControllerRef.current = new AbortController();
 
-            // Search both businesses and services in parallel
-            const [businessResponse, serviceResponse] = await Promise.all([
-              apiClient.get('/businesses', {
-                params: {
-                  search: searchQuery.trim(),
-                  page: 1,
-                  limit: 5
-                },
-                signal: abortControllerRef.current.signal
-              }).catch((err) => {
-                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-                  console.log('🚫 Business search cancelled');
-                  return null;
-                }
-                console.log('❌ Business search error:', err.response?.data || err.message);
-                return { data: { success: false, data: [] } };
-              }),
-              apiClient.get('/services', {
-                params: {
-                  search: searchQuery.trim(),
-                  page: 1,
-                  limit: 5
-                },
-                signal: abortControllerRef.current.signal
-              }).catch((err) => {
-                if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-                  console.log('🚫 Service search cancelled');
-                  return null;
-                }
-                console.log('❌ Service search error:', err.response?.data || err.message);
-                return { data: { success: false, data: [] } };
-              })
-            ]);
+            // Use advanced search endpoint with autocomplete and typo tolerance
+            const searchResponse = await apiClient.get('/search', {
+              params: {
+                q: searchQuery.trim(),
+                limit: 10,
+                page: 1
+              },
+              signal: abortControllerRef.current.signal
+            }).catch((err) => {
+              if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+                console.log('🚫 Search cancelled');
+                return null;
+              }
+              console.log('❌ Search error:', err.response?.data || err.message);
+              return { data: { success: false, data: [] } };
+            });
 
             // If request was cancelled, don't update state
-            if (!businessResponse || !serviceResponse) {
+            if (!searchResponse) {
               return;
             }
 
-            console.log('📊 Business response:', businessResponse.data);
-            console.log('📊 Service response:', serviceResponse.data);
+            console.log('📊 Search response:', searchResponse.data);
 
-            const businesses = businessResponse.data?.success ? businessResponse.data.data || [] : [];
-            const services = serviceResponse.data?.success ? serviceResponse.data.data || [] : [];
+            const results = searchResponse.data?.success ? searchResponse.data.data || [] : [];
 
-            console.log('✅ Businesses found:', businesses.length);
-            console.log('✅ Services found:', services.length);
+            console.log('✅ Total results found:', results.length);
 
-            // Log first business to see available fields
-            if (businesses.length > 0) {
-              console.log('📸 First business data:', {
-                logo: businesses[0].logo,
-                imageUrl: businesses[0].imageUrl,
-                images: businesses[0].images,
-                businessName: businesses[0].businessName
-              });
+            // Log first result to see available fields
+            if (results.length > 0) {
+              console.log('📸 First search result:', results[0]);
             }
 
-            // Format results with type indicator
-            const formattedBusinesses = businesses.map(b => ({
-              ...b,
-              type: 'business',
-              displayName: b.businessName,
-              // Business logo comes from images.logo (attached by imageService)
-              image: b.images?.logo || b.logo || null
+            // Format results - backend already provides type, name, and image fields
+            const formattedResults = results.map(item => ({
+              ...item,
+              _id: item.id, // Backend returns 'id', we need '_id' for navigation
+              displayName: item.name,
+              image: item.image
             }));
 
-            const formattedServices = services.map(s => ({
-              ...s,
-              type: 'service',
-              displayName: s.name,
-              image: s.imageUrl
-            }));
+            console.log('🎯 Formatted results:', formattedResults.length);
 
-            // Combine and limit total results
-            const combinedResults = [...formattedServices, ...formattedBusinesses].slice(0, 10);
-
-            console.log('🎯 Combined results:', combinedResults.length);
-
-            setSearchResults(combinedResults);
+            setSearchResults(formattedResults);
             // Keep dropdown visible (will show results or "no results" message)
           } catch (error) {
             console.error('💥 Error searching:', error);
