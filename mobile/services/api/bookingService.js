@@ -1,8 +1,12 @@
 import apiClient from '@config/api';
+import cacheManager from '@utils/cacheManager';
 
 /**
  * Booking API - Handles all booking-related API calls
  */
+
+// Store abort controllers for cancellable requests
+const abortControllers = new Map();
 
 /**
  * Create a new booking
@@ -76,10 +80,21 @@ export const createBooking = async (bookingData) => {
  * @param {Object} filters - Optional filters
  * @param {string} filters.status - Filter by status (pending, confirmed, completed, cancelled)
  * @param {number} filters.limit - Maximum number of results
+ * @param {string} requestId - Unique request identifier for cancellation
  * @returns {Promise<Array>} Array of booking objects
  */
-export const fetchUserBookings = async (filters = {}) => {
+export const fetchUserBookings = async (filters = {}, requestId = 'default_bookings') => {
   try {
+    // Check cache first
+    const cacheKey = `user_bookings_${JSON.stringify(filters)}`;
+    const cachedData = cacheManager.get(cacheKey);
+    if (cachedData) {
+      if (__DEV__) {
+        console.log('📦 Using cached user bookings');
+      }
+      return cachedData;
+    }
+
     const params = {};
 
     if (filters.status) {
@@ -89,16 +104,52 @@ export const fetchUserBookings = async (filters = {}) => {
       params.limit = filters.limit;
     }
 
-    const response = await apiClient.get('/bookings', { params });
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllers.set(requestId, abortController);
+
+    const response = await apiClient.get('/bookings', {
+      params,
+      signal: abortController.signal
+    });
+
+    // Clean up abort controller
+    abortControllers.delete(requestId);
 
     if (response.data.success) {
-      return response.data.data || [];
+      const data = response.data.data || [];
+      // Cache for 2 minutes (shorter TTL for bookings as they change frequently)
+      cacheManager.set(cacheKey, data, 120000);
+      return data;
     }
 
     return [];
   } catch (error) {
+    // Clean up abort controller
+    abortControllers.delete(requestId);
+
+    if (error.name === 'AbortError') {
+      console.log('📛 Booking fetch request was cancelled');
+      return [];
+    }
+
     console.error('Error fetching user bookings:', error);
     throw error;
+  }
+};
+
+/**
+ * Cancel an in-flight booking fetch request
+ * @param {string} requestId - Request identifier to cancel
+ */
+export const cancelBookingsFetch = (requestId = 'default_bookings') => {
+  const abortController = abortControllers.get(requestId);
+  if (abortController) {
+    abortController.abort();
+    abortControllers.delete(requestId);
+    if (__DEV__) {
+      console.log(`📛 Cancelled bookings request: ${requestId}`);
+    }
   }
 };
 

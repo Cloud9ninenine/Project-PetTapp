@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import { useProfileCompletion } from '../../../_hooks/useProfileCompletion';
 import apiClient from '@config/api';
 import { MyPetsGridSkeleton } from '@components/SkeletonLoader';
 
-export default function MyPetsScreen() {
+function MyPetsScreen() {
   const router = useRouter();
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
   const [pets, setPets] = useState([]);
@@ -70,18 +70,12 @@ export default function MyPetsScreen() {
     }
   };
 
-  // Fetch pets on component mount and when screen is focused
-  useEffect(() => {
-    if (isProfileComplete) {
-      fetchPets();
-    }
-  }, [isProfileComplete]);
-
-  // Refresh pets when screen is focused (e.g., returning from add/edit pet)
+  // Use useFocusEffect for both initial load and refresh
+  // This automatically handles mount and screen focus events without double-fetching
   useFocusEffect(
     React.useCallback(() => {
       if (isProfileComplete) {
-        fetchPets(true);
+        fetchPets(false); // false = initial load, true = refresh after navigation
       }
     }, [isProfileComplete])
   );
@@ -95,7 +89,8 @@ export default function MyPetsScreen() {
 
 
 
-  const renderPetCard = (pet) => (
+  // OPTIMIZATION: Memoize pet card render to prevent re-renders on parent updates
+  const renderPetCard = useCallback((pet) => (
     <TouchableOpacity
       key={pet._id}
       style={styles.petCard}
@@ -131,9 +126,10 @@ export default function MyPetsScreen() {
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), [router]);
 
-  const renderAddPetCard = () => (
+  // OPTIMIZATION: Memoize add pet card render
+  const renderAddPetCard = useCallback(() => (
     <TouchableOpacity
       style={styles.addPetCard}
       activeOpacity={0.8}
@@ -144,7 +140,7 @@ export default function MyPetsScreen() {
       </View>
       <Text style={styles.addPetText}>Add New Pet</Text>
     </TouchableOpacity>
-  );
+  ), [router]);
 
   const renderLoadingState = () => (
     <MyPetsGridSkeleton />
@@ -358,3 +354,6 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
+
+// Export with React.memo to prevent unnecessary re-renders
+export default React.memo(MyPetsScreen);

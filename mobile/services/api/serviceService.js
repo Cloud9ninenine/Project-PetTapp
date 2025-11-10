@@ -1,66 +1,92 @@
 import apiClient from '@config/api';
+import cacheManager from '@utils/cacheManager';
+import requestDeduplicator from '@utils/requestDeduplicator';
 
 /**
  * Service API - Handles all service-related API calls
  */
 
 /**
- * Fetch services from different categories for carousel display
+ * Fetch services from different categories for carousel display with PARALLEL requests
  * @param {Object} location - User's current location {latitude, longitude}
  * @param {Array} categories - Array of category names to fetch
  * @returns {Promise<Array>} Array of carousel service objects
  */
 export const fetchCarouselServices = async (location = null, categories = ['veterinary', 'grooming', 'boarding', 'training', 'daycare', 'emergency', 'consultation']) => {
   try {
-    const carouselData = [];
+    // Check cache first
+    const cacheKey = `carousel_services_${location ? `${location.latitude}_${location.longitude}` : 'no_location'}`;
+    const cachedData = cacheManager.get(cacheKey);
+    if (cachedData) {
+      if (__DEV__) {
+        console.log('📦 Using cached carousel services');
+      }
+      return cachedData;
+    }
+
     const usedServiceIds = new Set();
 
-    // Fetch one service from each category
-    for (const category of categories) {
-      try {
-        const response = await apiClient.get('/services', {
+    // OPTIMIZATION: Use Promise.all for parallel requests instead of sequential for loop
+    // This reduces loading time from ~7 sequential requests to ~1-2 parallel batch
+    const categoryRequestsPromises = categories.map(category =>
+      requestDeduplicator.execute(
+        'GET',
+        '/services',
+        () => apiClient.get('/services', {
           params: {
             category,
             limit: 1,
           },
-        });
-
-        if (response.data.success && response.data.data.length > 0) {
-          const service = response.data.data[0];
-          // Avoid duplicates
-          if (!usedServiceIds.has(service._id)) {
-            carouselData.push({
-              id: service._id,
-              serviceId: service._id,
-              image: service.imageUrl ? { uri: service.imageUrl } : null,
-              title: service.name,
-              subtitle: service.businessId?.businessName || 'Pet Service',
-              category: service.category,
-              isDefault: false,
-            });
-            usedServiceIds.add(service._id);
-          }
-        }
-      } catch (error) {
+        }),
+        { category, limit: 1 }
+      ).catch(error => {
         console.error(`Error fetching ${category} service:`, error);
+        return null; // Return null on error to not break Promise.all
+      })
+    );
+
+    // Wait for all category requests in parallel
+    const categoryResponses = await Promise.all(categoryRequestsPromises);
+
+    // Process responses
+    const carouselData = [];
+    categoryResponses.forEach((response) => {
+      if (response?.data?.success && response.data.data.length > 0) {
+        const service = response.data.data[0];
+        if (!usedServiceIds.has(service._id)) {
+          carouselData.push({
+            id: service._id,
+            serviceId: service._id,
+            image: service.imageUrl ? { uri: service.imageUrl } : null,
+            title: service.name,
+            subtitle: service.businessId?.businessName || 'Pet Service',
+            category: service.category,
+            isDefault: false,
+          });
+          usedServiceIds.add(service._id);
+        }
       }
-    }
+    });
 
     // Optionally add nearby services if location is available
     if (location && carouselData.length < 6) {
       try {
-        const nearbyResponse = await apiClient.get('/services', {
-          params: {
-            latitude: location.latitude,
-            longitude: location.longitude,
-            radius: 10,
-            limit: 3,
-          },
-        });
+        const nearbyResponse = await requestDeduplicator.execute(
+          'GET',
+          '/services',
+          () => apiClient.get('/services', {
+            params: {
+              latitude: location.latitude,
+              longitude: location.longitude,
+              radius: 10,
+              limit: 3,
+            },
+          }),
+          { latitude: location.latitude, longitude: location.longitude, radius: 10, limit: 3 }
+        );
 
         if (nearbyResponse.data.success && nearbyResponse.data.data.length > 0) {
           nearbyResponse.data.data.forEach((service) => {
-            // Add nearby services if not already in carousel and haven't reached max
             if (!usedServiceIds.has(service._id) && carouselData.length < 8) {
               carouselData.push({
                 id: service._id,
@@ -79,6 +105,9 @@ export const fetchCarouselServices = async (location = null, categories = ['vete
         console.error('Error fetching nearby services for carousel:', error);
       }
     }
+
+    // Cache the result for 5 minutes
+    cacheManager.set(cacheKey, carouselData, 300000);
 
     return carouselData;
   } catch (error) {
@@ -99,6 +128,16 @@ export const searchServices = async (query, limit = 20) => {
   }
 
   try {
+    // Check cache first
+    const cacheKey = `search_services_${query.trim()}_${limit}`;
+    const cachedData = cacheManager.get(cacheKey);
+    if (cachedData) {
+      if (__DEV__) {
+        console.log('📦 Using cached search results');
+      }
+      return cachedData;
+    }
+
     const response = await apiClient.get('/services', {
       params: {
         search: query.trim(),
@@ -107,7 +146,10 @@ export const searchServices = async (query, limit = 20) => {
     });
 
     if (response.data.success) {
-      return response.data.data || [];
+      const data = response.data.data || [];
+      // Cache for 5 minutes
+      cacheManager.set(cacheKey, data, 300000);
+      return data;
     }
 
     return [];
@@ -126,6 +168,19 @@ export const searchServices = async (query, limit = 20) => {
  */
 export const fetchNearbyServices = async (location = null, radius = 10, limit = 6) => {
   try {
+    // Check cache first
+    let cacheKey = null;
+    if (location) {
+      cacheKey = `nearby_services_${location.latitude}_${location.longitude}_${radius}_${limit}`;
+      const cachedData = cacheManager.get(cacheKey);
+      if (cachedData) {
+        if (__DEV__) {
+          console.log('📦 Using cached nearby services');
+        }
+        return cachedData;
+      }
+    }
+
     const params = { limit };
 
     // Add location if available
@@ -138,7 +193,12 @@ export const fetchNearbyServices = async (location = null, radius = 10, limit = 
     const response = await apiClient.get('/services', { params });
 
     if (response.data.success) {
-      return response.data.data || [];
+      const data = response.data.data || [];
+      // Cache for 3 minutes (shorter TTL for location-based data)
+      if (cacheKey) {
+        cacheManager.set(cacheKey, data, 180000);
+      }
+      return data;
     }
 
     return [];
@@ -234,6 +294,16 @@ export const fetchServiceById = async (serviceId) => {
  */
 export const fetchServicesByCategory = async (category, limit = 20) => {
   try {
+    // Check cache first
+    const cacheKey = `services_category_${category}_${limit}`;
+    const cachedData = cacheManager.get(cacheKey);
+    if (cachedData) {
+      if (__DEV__) {
+        console.log('📦 Using cached category services');
+      }
+      return cachedData;
+    }
+
     const response = await apiClient.get('/services', {
       params: {
         category,
@@ -242,7 +312,10 @@ export const fetchServicesByCategory = async (category, limit = 20) => {
     });
 
     if (response.data.success) {
-      return response.data.data || [];
+      const data = response.data.data || [];
+      // Cache for 5 minutes
+      cacheManager.set(cacheKey, data, 300000);
+      return data;
     }
 
     return [];

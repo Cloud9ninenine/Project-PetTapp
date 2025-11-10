@@ -1,15 +1,32 @@
 import * as Location from 'expo-location';
+import cacheManager from '@utils/cacheManager';
 
 /**
  * Location Service - Handles location-related operations
  */
 
+// Location cache key
+const LOCATION_CACHE_KEY = 'user_location';
+const LOCATION_CACHE_TTL = 600000; // 10 minutes
+
 /**
  * Request location permissions and get current position
+ * @param {boolean} forceRefresh - Force fresh location fetch, skip cache
  * @returns {Promise<Object|null>} Location object with latitude and longitude, or null if permission denied
  */
-export const getUserLocation = async () => {
+export const getUserLocation = async (forceRefresh = false) => {
   try {
+    // Check cache first unless forcing refresh
+    if (!forceRefresh) {
+      const cachedLocation = cacheManager.get(LOCATION_CACHE_KEY);
+      if (cachedLocation) {
+        if (__DEV__) {
+          console.log('📦 Using cached location');
+        }
+        return cachedLocation;
+      }
+    }
+
     // Request foreground location permissions
     const { status } = await Location.requestForegroundPermissionsAsync();
 
@@ -23,12 +40,17 @@ export const getUserLocation = async () => {
       accuracy: Location.Accuracy.Balanced,
     });
 
-    return {
+    const locationData = {
       latitude: currentLocation.coords.latitude,
       longitude: currentLocation.coords.longitude,
       accuracy: currentLocation.coords.accuracy,
       timestamp: currentLocation.timestamp,
     };
+
+    // Cache location for 10 minutes
+    cacheManager.set(LOCATION_CACHE_KEY, locationData, LOCATION_CACHE_TTL);
+
+    return locationData;
   } catch (error) {
     console.error('Error getting user location:', error);
     return null;

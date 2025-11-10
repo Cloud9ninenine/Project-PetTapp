@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,7 @@ import CompleteProfileModal from "@components/CompleteProfileModal";
 import { wp, hp, moderateScale, scaleFontSize } from "@utils/responsive";
 import { useProfileCompletion } from "../../../_hooks/useProfileCompletion";
 import { fetchCarouselServices, fetchNearbyServices } from "@services/api/serviceService";
-import { fetchUserBookings } from "@services/api/bookingService";
+import { fetchUserBookings, cancelBookingsFetch } from "@services/api/bookingService";
 import apiClient from "@config/api";
 import { getUserLocation } from "@services/locationService";
 import { formatPrice } from "@utils/formatters";
@@ -46,7 +46,7 @@ const getStatusColor = (status) => {
   return colors[status] || "#808080";
 };
 
-export default function HomeScreen() {
+function HomeScreen() {
   // activeSlide shown to user: 0..n-1
   const [activeSlide, setActiveSlide] = useState(0);
   const [showProfileIncompleteModal, setShowProfileIncompleteModal] = useState(false);
@@ -218,8 +218,8 @@ export default function HomeScreen() {
     })
   ).current;
 
-  // Services categories array (limited to 5 categories)
-  const services = [
+  // OPTIMIZATION: Memoize services array so it doesn't get recreated on every render
+  const services = useMemo(() => [
     {
       id: 1,
       title: "Veterinary",
@@ -255,7 +255,7 @@ export default function HomeScreen() {
       color: "#6C5CE7",
       category: "pet-supplies",
     },
-  ];
+  ], []);
 
   // Fetch user location
   useEffect(() => {
@@ -333,15 +333,15 @@ export default function HomeScreen() {
       }
     };
 
-    // Only load if we haven't already loaded services or location changed significantly
-    if (nearbyServices.length === 0 || location) {
+    // Load nearby services when location is available
+    if (location) {
       loadNearbyServices();
     }
 
     return () => {
       isMounted = false;
     };
-  }, []); // Remove location dependency to prevent frequent refreshes
+  }, [location]); // Include location in dependency array to refresh when location changes
 
   // Fetch user profile for welcome message
   useEffect(() => {
@@ -388,11 +388,16 @@ export default function HomeScreen() {
 
   // Fetch appointments
   useEffect(() => {
+    let isMounted = true;
+    const requestId = 'home_appointments_fetch';
+
     const loadAppointments = async () => {
       try {
         setLoadingAppointments(true);
         // Fetch all appointments (not just confirmed/pending)
-        const bookings = await fetchUserBookings({});
+        const bookings = await fetchUserBookings({}, requestId);
+
+        if (!isMounted) return;
 
         // Sort by appointment time
         bookings.sort((a, b) => {
@@ -401,14 +406,23 @@ export default function HomeScreen() {
 
         setAllAppointments(bookings);
       } catch (error) {
+        if (!isMounted) return;
         console.error('Error fetching appointments:', error);
         setAllAppointments([]);
       } finally {
-        setLoadingAppointments(false);
+        if (isMounted) {
+          setLoadingAppointments(false);
+        }
       }
     };
 
     loadAppointments();
+
+    // Cleanup function: cancel request if component unmounts
+    return () => {
+      isMounted = false;
+      cancelBookingsFetch(requestId);
+    };
   }, []);
 
   // Update selected date appointments when date or appointments change
@@ -421,7 +435,8 @@ export default function HomeScreen() {
     setSelectedDateAppointments(appointmentsForDate);
   }, [selectedDate, allAppointments]);
 
-  const handleServicePress = (service) => {
+  // OPTIMIZATION: Memoize event handlers to prevent unnecessary re-renders of child components
+  const handleServicePress = useCallback((service) => {
     // Check if profile is complete before allowing access
     if (!isProfileComplete) {
       setShowProfileIncompleteModal(true);
@@ -434,9 +449,9 @@ export default function HomeScreen() {
         category: service.category,
       },
     });
-  };
+  }, [isProfileComplete, router]);
 
-  const handleNearbyServicePress = (service) => {
+  const handleNearbyServicePress = useCallback((service) => {
     // Check if profile is complete before allowing access
     if (!isProfileComplete) {
       setShowProfileIncompleteModal(true);
@@ -450,9 +465,9 @@ export default function HomeScreen() {
         serviceType: service.category,
       },
     });
-  };
+  }, [isProfileComplete, router]);
 
-  const handleCarouselItemPress = (item) => {
+  const handleCarouselItemPress = useCallback((item) => {
     // Don't navigate if it's a default carousel item or profile is incomplete
     if (item.isDefault) return;
 
@@ -470,9 +485,9 @@ export default function HomeScreen() {
         serviceType: item.category,
       },
     });
-  };
+  }, [isProfileComplete, router]);
 
-  const handleBusinessPress = (business) => {
+  const handleBusinessPress = useCallback((business) => {
     // Check if profile is complete before allowing access
     if (!isProfileComplete) {
       setShowProfileIncompleteModal(true);
@@ -484,11 +499,11 @@ export default function HomeScreen() {
         id: business._id,
       },
     });
-  };
+  }, [isProfileComplete, router]);
 
 
-  // Create marked dates object for calendar with status-based colors
-  const getMarkedDates = () => {
+  // OPTIMIZATION: Memoize marked dates calculation with O(1) lookup using Map
+  const markedDates = useMemo(() => {
     const marked = {};
     const today = new Date().toISOString().split('T')[0];
 
@@ -502,71 +517,61 @@ export default function HomeScreen() {
       'no-show': 1,
     };
 
-    // Group appointments by date
-    const appointmentsByDate = {};
+    // Use Map for O(1) date lookups instead of object
+    const appointmentsByDate = new Map();
+
+    // Group appointments by date in a single pass
     allAppointments.forEach(appointment => {
       if (appointment.appointmentDateTime && appointment.status) {
         const dateStr = new Date(appointment.appointmentDateTime).toISOString().split('T')[0];
-        if (!appointmentsByDate[dateStr]) {
-          appointmentsByDate[dateStr] = [];
+        if (!appointmentsByDate.has(dateStr)) {
+          appointmentsByDate.set(dateStr, []);
         }
-        appointmentsByDate[dateStr].push(appointment);
+        appointmentsByDate.get(dateStr).push(appointment);
       }
     });
 
     // Mark dates with appointments using status-based colors
-    Object.keys(appointmentsByDate).forEach(dateStr => {
-      const appointments = appointmentsByDate[dateStr];
+    appointmentsByDate.forEach((appointments, dateStr) => {
+      // Find highest priority appointment without sorting the entire array
+      let highestPriorityAppointment = appointments[0];
+      let highestPriority = statusPriority[highestPriorityAppointment.status] || 0;
 
-      // Sort by priority and get the highest priority appointment
-      const sortedByPriority = appointments.sort((a, b) => {
-        return (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0);
-      });
+      for (let i = 1; i < appointments.length; i++) {
+        const priority = statusPriority[appointments[i].status] || 0;
+        if (priority > highestPriority) {
+          highestPriority = priority;
+          highestPriorityAppointment = appointments[i];
+        }
+      }
 
-      const highestPriorityAppointment = sortedByPriority[0];
       const statusColor = getStatusColor(highestPriorityAppointment.status);
 
       marked[dateStr] = {
         marked: true,
         dotColor: statusColor,
         appointmentStatus: highestPriorityAppointment.status,
-        // Add dots array for better visibility (supports up to 3 dots)
         dots: [{ color: statusColor }]
       };
     });
 
     // Mark selected date
-    if (marked[selectedDate]) {
-      marked[selectedDate] = {
-        ...marked[selectedDate],
-        selected: true,
-        selectedColor: '#1C86FF',
-      };
-    } else {
-      marked[selectedDate] = {
-        selected: true,
-        selectedColor: '#1C86FF',
-      };
-    }
+    marked[selectedDate] = {
+      ...(marked[selectedDate] || {}),
+      selected: true,
+      selectedColor: '#1C86FF',
+    };
 
     // Mark today (if not selected)
     if (today !== selectedDate) {
-      if (marked[today]) {
-        marked[today] = {
-          ...marked[today],
-          today: true,
-        };
-      } else {
-        marked[today] = {
-          today: true,
-        };
-      }
+      marked[today] = {
+        ...(marked[today] || {}),
+        today: true,
+      };
     }
 
     return marked;
-  };
-
-  const markedDates = getMarkedDates();
+  }, [selectedDate, allAppointments]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1438,3 +1443,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+// Export with React.memo to prevent unnecessary re-renders
+export default React.memo(HomeScreen);
