@@ -167,12 +167,46 @@ export default function MessagesScreen() {
         return;
       }
 
+      // CRITICAL: Verify authentication before querying
+      const currentAuthUser = auth.currentUser;
+      if (!currentAuthUser) {
+        console.error('❌ No authenticated Firebase user found!');
+        Alert.alert('Authentication Error', 'Not authenticated with Firebase. Please restart the app.');
+        setLoading(false);
+        return;
+      }
+
+      // CRITICAL: Ensure authenticated UID matches expected Firebase UID
+      if (currentAuthUser.uid !== firebaseUid) {
+        console.error('❌ UID MISMATCH!');
+        console.error('Authenticated as:', currentAuthUser.uid);
+        console.error('Trying to query as:', firebaseUid);
+        Alert.alert(
+          'Authentication Error',
+          `UID mismatch detected. Please log out and log back in.\n\nExpected: ${firebaseUid}\nGot: ${currentAuthUser.uid}`
+        );
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Authentication verified:', {
+        firebaseUid: firebaseUid,
+        authUid: currentAuthUser.uid,
+        match: true
+      });
+
       // CRITICAL: Query using Firebase UID format
       const conversationsRef = collection(firestore, 'conversations');
       const q = query(
         conversationsRef,
         where('participants', 'array-contains', firebaseUid)
       );
+
+      console.log('📡 Starting Firestore query with:', {
+        collection: 'conversations',
+        query: `participants array-contains ${firebaseUid}`,
+        authUser: currentAuthUser.uid
+      });
 
       const unsubscribe = onSnapshot(q, async (snapshot) => {
         console.log('=== CONVERSATION SYNC DEBUG ===');
@@ -229,16 +263,29 @@ export default function MessagesScreen() {
         setLoading(false);
         setRefreshing(false);
       }, (error) => {
-        console.error('Error fetching conversations:', error);
+        console.error('❌ ERROR FETCHING CONVERSATIONS:', error);
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+
+        console.error('🔍 DEBUG INFO:');
+        console.error('  - Current Firebase Auth User:', auth.currentUser?.uid);
+        console.error('  - Expected Firebase UID:', firebaseUid);
+        console.error('  - Local User ID:', userId);
+        console.error('  - Query:', `participants array-contains ${firebaseUid}`);
+
         setLoading(false);
         setRefreshing(false);
 
         if (error.code === 'permission-denied') {
           Alert.alert(
-            'Permission Error',
-            'Firestore rules may not be deployed. Please contact support.'
+            'Permission Denied',
+            `Cannot access conversations. This usually means:\n\n1. You're not authenticated with Firebase\n2. Your authentication UID doesn't match your user ID\n3. Firestore security rules are incorrect\n\nAuth UID: ${auth.currentUser?.uid || 'Not authenticated'}\nExpected: ${firebaseUid}\n\nPlease log out and log back in.`
+          );
+        } else {
+          Alert.alert(
+            'Error',
+            `Failed to load conversations: ${error.message}`
           );
         }
       });
